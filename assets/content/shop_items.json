@@ -1,0 +1,22 @@
+[
+  {
+    "id": "food_apple",
+    "name": "Яблоко",
+    "category": "NEED",
+    "price": 40,
+    "persistent": false,
+    "effectType": "satiety",
+    "effectValue": 10,
+    "unlockType": "available"
+  },
+  {
+    "id": "toy_ball",
+    "name": "Мяч",
+    "category": "WANT",
+    "price": 120,
+    "persistent": true,
+    "effectType": "mood",
+    "effectValue": 8,
+    "unlockType": "available"
+  }
+]

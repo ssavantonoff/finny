@@ -1,0 +1,15 @@
+[
+  {
+    "id": "task_need_or_want_01",
+    "title": "Нужно или хочется?",
+    "topic": "needs_and_wants",
+    "description": "Помоги Финни различить обязательную и необязательную покупку.",
+    "type": "choice",
+    "reward": 50,
+    "period": 1,
+    "scenarioData": {
+      "prompt": "Что важнее купить сначала?",
+      "options": ["Полезный обед", "Новая игрушка"]
+    }
+  }
+]
