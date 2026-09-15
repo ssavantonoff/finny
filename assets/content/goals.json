@@ -1,0 +1,9 @@
+[
+  {
+    "id": "goal_scooter",
+    "name": "Самокат для Финни",
+    "price": 600,
+    "description": "Накопи постепенно и открой памятный предмет.",
+    "rewardAssetId": "reward_scooter"
+  }
+]
