@@ -92,6 +92,15 @@ Future<void> _tapChoice(WidgetTester tester, String id) async {
   await tester.pumpAndSettle();
 }
 
+Map<String, Rect> _choiceRects(WidgetTester tester, List<String> ids) => {
+  for (final id in ids)
+    id: () {
+      final choice = find.byKey(Key('pet-choice-$id'));
+      final wrap = find.ancestor(of: choice, matching: find.byType(Wrap)).first;
+      return tester.getRect(choice).shift(-tester.getTopLeft(wrap));
+    }(),
+};
+
 Future<void> _save(WidgetTester tester) async {
   final finder = find.widgetWithText(FilledButton, 'Создать Финни');
   await tester.ensureVisible(finder);
@@ -122,6 +131,55 @@ void main() {
     expect(repository.reads, 0);
     expect(repository.saves, 0);
     expect(find.text('  Мой Финни  '), findsOneWidget);
+  });
+
+  testWidgets('selection keeps every color and pattern in place at 360dp', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await _pumpPetCreation(tester, repository, null);
+
+    const colorIds = ['blue', 'purple', 'mint'];
+    const patternIds = ['plain', 'spots', 'stripes'];
+    final initialColors = _choiceRects(tester, colorIds);
+    final initialPatterns = _choiceRects(tester, patternIds);
+
+    for (final selected in ['blue', 'purple', 'mint', 'blue']) {
+      await _tapChoice(tester, selected);
+      expect(_choiceRects(tester, colorIds), initialColors);
+      expect(_choiceRects(tester, patternIds), initialPatterns);
+      expect(
+        tester.widget<FinnyPreview>(find.byType(FinnyPreview)).colorId,
+        selected,
+      );
+      expect(tester.takeException(), isNull);
+    }
+    for (final selected in ['plain', 'spots', 'stripes', 'plain']) {
+      await _tapChoice(tester, selected);
+      expect(_choiceRects(tester, colorIds), initialColors);
+      expect(_choiceRects(tester, patternIds), initialPatterns);
+      expect(
+        tester.widget<FinnyPreview>(find.byType(FinnyPreview)).patternId,
+        selected,
+      );
+      expect(tester.takeException(), isNull);
+    }
+    final selectedIcon =
+        tester
+                .widget<ChoiceChip>(find.byKey(const Key('pet-choice-blue')))
+                .avatar
+            as Icon;
+    final unselectedIcon =
+        tester
+                .widget<ChoiceChip>(find.byKey(const Key('pet-choice-purple')))
+                .avatar
+            as Icon;
+    expect(selectedIcon.color, isNot(Colors.transparent));
+    expect(unselectedIcon.color, Colors.transparent);
+    expect(find.byType(SingleChildScrollView), findsOneWidget);
   });
 
   testWidgets(

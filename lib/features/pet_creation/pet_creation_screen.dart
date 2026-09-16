@@ -289,9 +289,20 @@ class _PetCreationScreenState extends ConsumerState<PetCreationScreen> {
         for (final value in values)
           ChoiceChip(
             key: Key('pet-choice-$value'),
+            avatar: Icon(
+              Icons.check,
+              size: 18,
+              color: selected == value
+                  ? Theme.of(context).colorScheme.onSecondaryContainer
+                  : Colors.transparent,
+            ),
+            avatarBoxConstraints: const BoxConstraints.tightFor(
+              width: 18,
+              height: 18,
+            ),
             label: Text(labels[value]!),
             selected: selected == value,
-            showCheckmark: true,
+            showCheckmark: false,
             onSelected: _saving || _loading ? null : (_) => onSelect(value),
             materialTapTargetSize: MaterialTapTargetSize.padded,
             labelPadding: const EdgeInsets.symmetric(
