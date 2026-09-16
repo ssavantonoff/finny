@@ -12,6 +12,25 @@ import 'package:finny/services/savings_service.dart';
 import 'package:finny/services/task_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+final activeProfileIdProvider =
+    NotifierProvider<ActiveProfileIdController, int?>(
+      ActiveProfileIdController.new,
+    );
+
+class ActiveProfileIdController extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void setActiveProfileId(int profileId) {
+    if (profileId <= 0) {
+      throw ArgumentError.value(profileId, 'profileId', 'Must be positive.');
+    }
+    state = profileId;
+  }
+
+  void clear() => state = null;
+}
+
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   final database = AppDatabase();
   ref.onDispose(() => unawaited(database.close()));
