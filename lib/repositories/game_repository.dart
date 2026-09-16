@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart';
 
 abstract interface class GameRepository {
   Future<void> createInitialState(GameState state);
+  Future<GameState> ensureInitialState(int profileId);
   Future<GameState?> getGameState(int profileId);
   Future<void> savePet(Pet pet);
   Future<Pet?> getPet(int profileId);
@@ -78,6 +79,29 @@ class SqliteGameRepository implements GameRepository {
   Future<void> createInitialState(GameState state) async {
     final db = await _appDatabase.database;
     await db.insert('game_states', state.toMap());
+  }
+
+  @override
+  Future<GameState> ensureInitialState(int profileId) async {
+    if (profileId <= 0) {
+      throw ArgumentError.value(profileId, 'profileId', 'Must be positive.');
+    }
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final initialState = GameState(
+        profileId: profileId,
+        walletBalance: 0,
+        currentPeriod: 0,
+        savedAmount: 0,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      await txn.insert(
+        'game_states',
+        initialState.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      return _requireState(txn, profileId);
+    });
   }
 
   @override

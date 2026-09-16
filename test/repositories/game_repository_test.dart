@@ -22,6 +22,86 @@ void main() {
 
   tearDown(() => database.close());
 
+  Future<Profile> createProfile(String name) => profiles.create(
+    Profile(
+      gameName: name,
+      profileType: ProfileType.normal,
+      onboardingCompleted: false,
+      createdAt: DateTime.utc(2026, 1, 1),
+    ),
+  );
+
+  test('ensureInitialState creates canonical state when missing', () async {
+    final profile = await createProfile('Новый игрок');
+
+    final state = await games.ensureInitialState(profile.id!);
+
+    expect(state.profileId, profile.id);
+    expect(state.walletBalance, 0);
+    expect(state.currentPeriod, 0);
+    expect(state.activeGoalId, isNull);
+    expect(state.savedAmount, 0);
+    expect(state.updatedAt.isUtc, isTrue);
+    expect((await games.getGameState(profile.id!))?.toMap(), state.toMap());
+  });
+
+  test('ensureInitialState returns existing state unchanged', () async {
+    final profile = await createProfile('Текущий игрок');
+    final existing = GameState(
+      profileId: profile.id!,
+      walletBalance: 725,
+      currentPeriod: 3,
+      activeGoalId: 'goal_bicycle',
+      savedAmount: 240,
+      updatedAt: DateTime.utc(2026, 2, 3, 4, 5),
+    );
+    await games.createInitialState(existing);
+
+    final state = await games.ensureInitialState(profile.id!);
+
+    expect(state.toMap(), existing.toMap());
+    expect((await games.getGameState(profile.id!))?.toMap(), existing.toMap());
+  });
+
+  test('ensureInitialState is idempotent on repeat calls', () async {
+    final profile = await createProfile('Повторный вызов');
+
+    final first = await games.ensureInitialState(profile.id!);
+    final second = await games.ensureInitialState(profile.id!);
+    final db = await database.database;
+    final rows = await db.query(
+      'game_states',
+      columns: ['profile_id'],
+      where: 'profile_id = ?',
+      whereArgs: [profile.id],
+    );
+
+    expect(second.toMap(), first.toMap());
+    expect(rows, hasLength(1));
+  });
+
+  test('concurrent ensureInitialState calls create one state', () async {
+    final profile = await createProfile('Конкурентный вызов');
+
+    final states = await Future.wait([
+      for (var call = 0; call < 20; call++)
+        games.ensureInitialState(profile.id!),
+    ]);
+    final db = await database.database;
+    final rows = await db.query(
+      'game_states',
+      columns: ['profile_id'],
+      where: 'profile_id = ?',
+      whereArgs: [profile.id],
+    );
+
+    expect(rows, hasLength(1));
+    expect(
+      states.map((state) => state.toMap()),
+      everyElement(states.first.toMap()),
+    );
+  });
+
   test('persists a profile, game state, and pet', () async {
     final profile = await profiles.create(
       Profile(
