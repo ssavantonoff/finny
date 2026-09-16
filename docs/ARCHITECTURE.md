@@ -46,6 +46,13 @@ JSON в `assets/content/` описывает доступный контент: 
 тип профиля и не разрешена для NORMAL. Сами профили при такой очистке
 сохраняются.
 
+`activeProfileIdProvider` в `lib/app/providers.dart` — единый shared-контракт
+текущего активного профиля. До app-level инициализации его значение равно
+`null`: Foundation не создаёт профиль и не выбирает его по неявному правилу.
+После выбора уже существующего профиля app-level flow устанавливает его ID через
+`ActiveProfileIdController`, а feature-модули читают provider и передают этот ID
+в services/repositories. Выбор профиля не является ответственностью feature.
+
 ## Навигация и тема
 
 `lib/app/router.dart` содержит GoRouter-маршруты для всех согласованных модулей.
