@@ -54,7 +54,10 @@ final budgetServiceProvider = Provider<BudgetService>(
 );
 
 final purchaseServiceProvider = Provider<PurchaseService>(
-  (ref) => PurchaseService(ref.watch(gameRepositoryProvider)),
+  (ref) => PurchaseService(
+    ref.watch(gameRepositoryProvider),
+    ref.watch(contentRepositoryProvider),
+  ),
 );
 
 final savingsServiceProvider = Provider<SavingsService>(
@@ -62,7 +65,10 @@ final savingsServiceProvider = Provider<SavingsService>(
 );
 
 final periodServiceProvider = Provider<PeriodService>(
-  (ref) => PeriodService(ref.watch(gameRepositoryProvider)),
+  (ref) => PeriodService(
+    ref.watch(gameRepositoryProvider),
+    ref.watch(contentRepositoryProvider),
+  ),
 );
 
 final taskServiceProvider = Provider<TaskService>(

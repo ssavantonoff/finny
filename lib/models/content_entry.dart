@@ -4,12 +4,14 @@ class PeriodDefinition {
     required this.number,
     required this.title,
     required this.baseIncome,
+    required this.requiredCheckpoints,
   });
 
   final String id;
   final int number;
   final String title;
   final int baseIncome;
+  final List<String> requiredCheckpoints;
 
   factory PeriodDefinition.fromJson(Map<String, Object?> json) =>
       PeriodDefinition(
@@ -17,6 +19,9 @@ class PeriodDefinition {
         number: json['number'] as int,
         title: json['title'] as String,
         baseIncome: json['baseIncome'] as int,
+        requiredCheckpoints: List<String>.unmodifiable(
+          (json['requiredCheckpoints'] as List<Object?>).cast<String>(),
+        ),
       );
 }
 

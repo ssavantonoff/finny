@@ -17,7 +17,13 @@ void main() {
     expect(tasks.single.scenarioData, isNotEmpty);
     expect(items, hasLength(2));
     expect(goals.single.price, greaterThan(0));
-    expect(periods.single.baseIncome, greaterThan(0));
+    expect(periods, hasLength(5));
+    expect(periods.map((period) => period.number), [1, 2, 3, 4, 5]);
+    expect(periods.every((period) => period.baseIncome == 500), isTrue);
+    expect(
+      periods.every((period) => period.requiredCheckpoints.isNotEmpty),
+      isTrue,
+    );
     expect(glossary, isNotEmpty);
   });
 }
