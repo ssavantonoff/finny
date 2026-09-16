@@ -1,3 +1,13 @@
+abstract final class GameTransactionType {
+  static const periodIncome = 'period_income';
+  static const taskReward = 'task_reward';
+  static const otherIncome = 'other_income';
+  static const needExpense = 'need_expense';
+  static const wantExpense = 'want_expense';
+  static const savingsDeposit = 'savings_deposit';
+  static const savingsWithdrawal = 'savings_withdrawal';
+}
+
 class GameTransaction {
   const GameTransaction({
     this.id,

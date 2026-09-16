@@ -2,13 +2,14 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/profile.dart';
-import 'package:finny/models/shop_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_database.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test(
     'UI-facing providers resolve services without exposing SQLite',
     () async {
@@ -40,26 +41,27 @@ void main() {
           updatedAt: DateTime.utc(2026, 1, 1),
         ),
       );
+      final period = await container
+          .read(periodServiceProvider)
+          .startNextPeriod(profileId: profile.id!);
+      await container
+          .read(budgetServiceProvider)
+          .confirmPlan(profileId: profile.id!, periodId: period!.id!);
 
       final state = await container
           .read(purchaseServiceProvider)
           .purchase(
             profileId: profile.id!,
-            periodId: null,
-            item: const ShopItem(
-              id: 'food_test',
-              name: 'Еда',
-              category: ShopItemCategory.need,
-              price: 50,
-              persistent: false,
-              effectType: 'satiety',
-              effectValue: 10,
-              unlockType: 'available',
-            ),
+            periodId: period.id!,
+            operationId: 'service-boundary-purchase',
+            item: (await container
+                    .read(contentRepositoryProvider)
+                    .loadShopItems())
+                .first,
           );
 
-      expect(state.walletBalance, 150);
-      expect(await games.getTransactions(profile.id!), hasLength(1));
+      expect(state.walletBalance, 660);
+      expect(await games.getTransactions(profile.id!), hasLength(2));
     },
   );
 
@@ -92,6 +94,12 @@ void main() {
         updatedAt: DateTime.utc(2026, 1, 1),
       ),
     );
+    final period = await container
+        .read(periodServiceProvider)
+        .startNextPeriod(profileId: profile.id!);
+    await container
+        .read(budgetServiceProvider)
+        .confirmPlan(profileId: profile.id!, periodId: period!.id!);
     const task = FinancialTask(
       id: 'task_once',
       title: 'Одно задание',
@@ -106,19 +114,19 @@ void main() {
 
     await service.rewardCompletedTask(
       profileId: profile.id!,
-      periodId: null,
+      periodId: period.id!,
       task: task,
     );
     await expectLater(
       service.rewardCompletedTask(
         profileId: profile.id!,
-        periodId: null,
+        periodId: period.id!,
         task: task,
       ),
       throwsStateError,
     );
 
-    expect((await games.getGameState(profile.id!))?.walletBalance, 50);
-    expect(await games.getTransactions(profile.id!), hasLength(1));
+    expect((await games.getGameState(profile.id!))?.walletBalance, 550);
+    expect(await games.getTransactions(profile.id!), hasLength(2));
   });
 }

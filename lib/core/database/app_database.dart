@@ -5,7 +5,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 1;
+  static const schemaVersion = 2;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -26,6 +26,7 @@ class AppDatabase {
           await db.execute('PRAGMA foreign_keys = ON');
         },
         onCreate: _createSchema,
+        onUpgrade: _upgradeSchema,
       ),
     );
     return _database!;
@@ -77,6 +78,7 @@ class AppDatabase {
       CREATE TABLE game_periods (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         profile_id INTEGER NOT NULL,
+        definition_id TEXT NOT NULL,
         period_number INTEGER NOT NULL CHECK (period_number > 0),
         start_wallet_balance INTEGER NOT NULL CHECK (start_wallet_balance >= 0),
         base_income INTEGER NOT NULL DEFAULT 0 CHECK (base_income >= 0),
@@ -88,6 +90,8 @@ class AppDatabase {
         actual_need INTEGER NOT NULL DEFAULT 0 CHECK (actual_need >= 0),
         actual_want INTEGER NOT NULL DEFAULT 0 CHECK (actual_want >= 0),
         actual_savings INTEGER NOT NULL DEFAULT 0 CHECK (actual_savings >= 0),
+        required_checkpoints TEXT NOT NULL DEFAULT '[]',
+        resolved_checkpoints TEXT NOT NULL DEFAULT '[]',
         end_wallet_balance INTEGER CHECK (end_wallet_balance >= 0),
         growth_points_earned INTEGER NOT NULL DEFAULT 0 CHECK (growth_points_earned >= 0),
         status TEXT NOT NULL CHECK (status IN ('planning', 'active', 'readyToFinish', 'completed')),
@@ -145,5 +149,50 @@ class AppDatabase {
     await db.execute(
       'CREATE INDEX idx_transactions_profile_created ON transactions(profile_id, created_at)',
     );
+    await db.execute(
+      'CREATE INDEX idx_transactions_period ON transactions(profile_id, period_id)',
+    );
+  }
+
+  static Future<void> _upgradeSchema(
+    sqflite.Database db,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) {
+      await db.execute(
+        "ALTER TABLE game_periods ADD COLUMN definition_id TEXT NOT NULL DEFAULT ''",
+      );
+      await db.execute(
+        "ALTER TABLE game_periods ADD COLUMN required_checkpoints TEXT NOT NULL DEFAULT '[]'",
+      );
+      await db.execute(
+        "ALTER TABLE game_periods ADD COLUMN resolved_checkpoints TEXT NOT NULL DEFAULT '[]'",
+      );
+      await db.execute('''
+        UPDATE game_periods
+        SET
+          definition_id = CASE period_number
+            WHEN 1 THEN 'period_1_needs_vs_wants'
+            WHEN 2 THEN 'period_2_saving'
+            WHEN 3 THEN 'period_3_plans_changed'
+            WHEN 4 THEN 'period_4_discount'
+            WHEN 5 THEN 'period_5_independent'
+            ELSE 'legacy_period_' || period_number
+          END,
+          required_checkpoints = CASE period_number
+            WHEN 1 THEN '["financial_task","mandatory_need","savings_decision"]'
+            WHEN 2 THEN '["financial_task","mandatory_need","savings_decision"]'
+            WHEN 3 THEN '["financial_task","mandatory_need","savings_decision","changed_circumstance"]'
+            WHEN 4 THEN '["financial_task","mandatory_need","savings_decision","discount_decision"]'
+            WHEN 5 THEN '["financial_task","mandatory_need","savings_decision"]'
+            ELSE '[]'
+          END
+        WHERE definition_id = ''
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_transactions_period ON transactions(profile_id, period_id)',
+      );
+    }
   }
 }

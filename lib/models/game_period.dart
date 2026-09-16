@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum GamePeriodStatus {
   planning,
   active,
@@ -14,6 +16,7 @@ class GamePeriod {
   const GamePeriod({
     this.id,
     required this.profileId,
+    required this.definitionId,
     required this.periodNumber,
     required this.startWalletBalance,
     required this.baseIncome,
@@ -25,6 +28,8 @@ class GamePeriod {
     required this.actualNeed,
     required this.actualWant,
     required this.actualSavings,
+    required this.requiredCheckpoints,
+    required this.resolvedCheckpoints,
     this.endWalletBalance,
     required this.growthPointsEarned,
     required this.status,
@@ -34,6 +39,7 @@ class GamePeriod {
 
   final int? id;
   final int profileId;
+  final String definitionId;
   final int periodNumber;
   final int startWalletBalance;
   final int baseIncome;
@@ -45,13 +51,16 @@ class GamePeriod {
   final int actualNeed;
   final int actualWant;
   final int actualSavings;
+  final List<String> requiredCheckpoints;
+  final List<String> resolvedCheckpoints;
   final int? endWalletBalance;
   final int growthPointsEarned;
   final GamePeriodStatus status;
   final DateTime createdAt;
   final DateTime? completedAt;
 
-  int get availableToPlan => startWalletBalance + baseIncome + extraIncome;
+  int get startingBudget => startWalletBalance + baseIncome;
+  int get availableToPlan => startingBudget;
   int get plannedTotal =>
       plannedNeed + plannedWant + plannedSavings + plannedFree;
 
@@ -64,6 +73,7 @@ class GamePeriod {
     int? actualNeed,
     int? actualWant,
     int? actualSavings,
+    List<String>? resolvedCheckpoints,
     int? endWalletBalance,
     int? growthPointsEarned,
     GamePeriodStatus? status,
@@ -72,6 +82,7 @@ class GamePeriod {
     return GamePeriod(
       id: id ?? this.id,
       profileId: profileId,
+      definitionId: definitionId,
       periodNumber: periodNumber,
       startWalletBalance: startWalletBalance,
       baseIncome: baseIncome,
@@ -83,6 +94,8 @@ class GamePeriod {
       actualNeed: actualNeed ?? this.actualNeed,
       actualWant: actualWant ?? this.actualWant,
       actualSavings: actualSavings ?? this.actualSavings,
+      requiredCheckpoints: requiredCheckpoints,
+      resolvedCheckpoints: resolvedCheckpoints ?? this.resolvedCheckpoints,
       endWalletBalance: endWalletBalance ?? this.endWalletBalance,
       growthPointsEarned: growthPointsEarned ?? this.growthPointsEarned,
       status: status ?? this.status,
@@ -94,6 +107,7 @@ class GamePeriod {
   Map<String, Object?> toMap() => {
     if (id != null) 'id': id,
     'profile_id': profileId,
+    'definition_id': definitionId,
     'period_number': periodNumber,
     'start_wallet_balance': startWalletBalance,
     'base_income': baseIncome,
@@ -105,6 +119,8 @@ class GamePeriod {
     'actual_need': actualNeed,
     'actual_want': actualWant,
     'actual_savings': actualSavings,
+    'required_checkpoints': jsonEncode(requiredCheckpoints),
+    'resolved_checkpoints': jsonEncode(resolvedCheckpoints),
     'end_wallet_balance': endWalletBalance,
     'growth_points_earned': growthPointsEarned,
     'status': status.name,
@@ -115,6 +131,7 @@ class GamePeriod {
   factory GamePeriod.fromMap(Map<String, Object?> map) => GamePeriod(
     id: map['id'] as int,
     profileId: map['profile_id'] as int,
+    definitionId: map['definition_id'] as String,
     periodNumber: map['period_number'] as int,
     startWalletBalance: map['start_wallet_balance'] as int,
     baseIncome: map['base_income'] as int,
@@ -126,6 +143,14 @@ class GamePeriod {
     actualNeed: map['actual_need'] as int,
     actualWant: map['actual_want'] as int,
     actualSavings: map['actual_savings'] as int,
+    requiredCheckpoints: _decodeStringList(
+      map['required_checkpoints'] as String,
+      'required_checkpoints',
+    ),
+    resolvedCheckpoints: _decodeStringList(
+      map['resolved_checkpoints'] as String,
+      'resolved_checkpoints',
+    ),
     endWalletBalance: map['end_wallet_balance'] as int?,
     growthPointsEarned: map['growth_points_earned'] as int,
     status: GamePeriodStatus.fromStorage(map['status'] as String),
@@ -134,4 +159,12 @@ class GamePeriod {
         ? null
         : DateTime.parse(map['completed_at'] as String),
   );
+}
+
+List<String> _decodeStringList(String source, String fieldName) {
+  final decoded = jsonDecode(source);
+  if (decoded is! List<Object?> || decoded.any((value) => value is! String)) {
+    throw FormatException('$fieldName must be a JSON string array.');
+  }
+  return List<String>.unmodifiable(decoded.cast<String>());
 }

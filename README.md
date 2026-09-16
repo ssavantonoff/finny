@@ -36,5 +36,6 @@ flutter test
 ## Документация
 
 - [Архитектура](docs/ARCHITECTURE.md)
+- [Core Game Loop](docs/CORE_GAME_LOOP.md)
 - [Краткая продуктовая спецификация](docs/PRODUCT_SPEC.md)
 - [Правила для Codex-агентов](AGENTS.md)

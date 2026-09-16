@@ -39,6 +39,20 @@ JSON в `assets/content/` описывает доступный контент: 
 возвращает типизированные модели. Новый контент не должен требовать изменений
 виджетов или ядра, если его схема уже поддерживается.
 
+## Core Game Loop
+
+Периоды проходят только через состояния `planning → active → readyToFinish →
+completed`. `PeriodService` выбирает следующую definition из content, а
+`GameRepository` одной SQLite transaction создаёт runtime snapshot периода,
+начисляет базовый доход и обновляет wallet/current period. Незавершённый период
+у профиля может быть только один.
+
+Budget draft хранится в `planned_*` полях периода. После подтверждения plan
+неизменяем. Fact и additional income вычисляются из persisted transactions
+конкретного period instance; legacy-поля `extra_income` и `actual_*` не являются
+источником Fact. Required/resolved checkpoints сохраняются snapshot-списками у
+периода. Подробнее: [Core Game Loop](CORE_GAME_LOOP.md).
+
 ## NORMAL и DEMO
 
 `ProfileType` поддерживает `NORMAL` и `DEMO`. Состояние всегда запрашивается и
@@ -71,6 +85,10 @@ JSON в `assets/content/` описывает доступный контент: 
 
 ## Миграции
 
-Текущая schema version — 1. Следующее изменение схемы должно повысить
-`AppDatabase.schemaVersion` и добавить последовательную миграцию. Нельзя
-пересоздавать базу с потерей NORMAL-профиля.
+Текущая schema version — 2. Миграция v1 → v2 добавляет period definition identity,
+required/resolved checkpoint snapshots и индекс period transactions, не удаляя
+существующие профили, balances, планы или историю. Для прежних периодов 1–5
+identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
+их сохранённый `baseIncome` не переписывается. Следующие изменения схемы должны
+добавлять последовательные миграции; нельзя пересоздавать базу с потерей
+NORMAL-профиля.

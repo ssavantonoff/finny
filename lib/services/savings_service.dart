@@ -8,18 +8,25 @@ class SavingsService {
 
   Future<GameState> deposit({
     required int profileId,
-    required int? periodId,
+    required int periodId,
     required int amount,
+    required String operationId,
   }) {
     if (amount <= 0) {
       throw ArgumentError.value(amount, 'amount', 'Must be positive.');
     }
-    return _gameRepository.moveSavings(
+    if (operationId.trim().isEmpty) {
+      throw ArgumentError.value(
+        operationId,
+        'operationId',
+        'Must not be empty.',
+      );
+    }
+    return _gameRepository.depositSavings(
       profileId: profileId,
       periodId: periodId,
       amount: amount,
-      source: 'savings_deposit',
-      description: 'Пополнение накоплений',
+      operationId: operationId,
     );
   }
 
