@@ -8,6 +8,10 @@ abstract interface class ProfileRepository {
   Future<void> update(Profile profile);
 }
 
+class NormalProfileAlreadyExists implements Exception {
+  const NormalProfileAlreadyExists();
+}
+
 class SqliteProfileRepository implements ProfileRepository {
   SqliteProfileRepository(this._appDatabase);
 
@@ -19,6 +23,20 @@ class SqliteProfileRepository implements ProfileRepository {
       throw ArgumentError('A new profile must not already have an id.');
     }
     final db = await _appDatabase.database;
+    if (profile.profileType == ProfileType.normal) {
+      return db.transaction((txn) async {
+        final existing = await txn.query(
+          'profiles',
+          columns: ['id'],
+          where: 'profile_type = ?',
+          whereArgs: [ProfileType.normal.storageValue],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) throw const NormalProfileAlreadyExists();
+        final id = await txn.insert('profiles', profile.toMap());
+        return profile.copyWith(id: id);
+      });
+    }
     final id = await db.insert('profiles', profile.toMap());
     return profile.copyWith(id: id);
   }

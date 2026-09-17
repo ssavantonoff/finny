@@ -70,11 +70,21 @@ Budget draft хранится в `planned_*` полях периода. Посл
 `ActiveProfileIdController`, а feature-модули читают provider и передают этот ID
 в services/repositories. Выбор профиля не является ответственностью feature.
 
+Обычный startup учитывает только `NORMAL`. `ProfileRepository.create` проверяет
+отсутствие другого NORMAL внутри SQLite transaction; DEMO не ограничивается.
+Если в прежней базе оказалось несколько NORMAL, bootstrap сообщает конфликт и
+не выбирает профиль автоматически. `onboardingCompleted` означает подтверждение
+игрового имени после трёх шагов, независимо от создания Pet. App-level bootstrap
+обеспечивает Core state через `GameRepository.ensureInitialState(profileId)`
+до установки active profile и не сбрасывает существующее состояние.
+
 ## Навигация и тема
 
 `lib/app/router.dart` содержит GoRouter-маршруты для всех согласованных модулей.
-Пока они ведут на отдельные placeholder screens. Светлая Material 3 тема,
-базовые отступы и радиусы определены в `lib/core/theme/app_theme.dart`.
+Стартовый `/startup` ожидает bootstrap и направляет на onboarding, Pet Creation
+или Home; остальные ещё не реализованные модули сохраняют placeholder screens.
+Светлая Material 3 тема, базовые отступы и радиусы определены в
+`lib/core/theme/app_theme.dart`.
 
 ## Как добавлять feature
 

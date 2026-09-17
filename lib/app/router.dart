@@ -1,3 +1,4 @@
+import 'package:finny/app/bootstrap_screen.dart';
 import 'package:finny/features/adult/adult_screen.dart';
 import 'package:finny/features/budget/budget_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
@@ -14,9 +15,10 @@ import 'package:go_router/go_router.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
-    initialLocation: '/onboarding',
+    initialLocation: '/startup',
     routes: [
-      GoRoute(path: '/', redirect: (_, _) => '/onboarding'),
+      GoRoute(path: '/', redirect: (_, _) => '/startup'),
+      GoRoute(path: '/startup', builder: (_, _) => const BootstrapScreen()),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
       GoRoute(
         path: '/pet-creation',
