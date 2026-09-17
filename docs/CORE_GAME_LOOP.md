@@ -30,8 +30,15 @@ wallet. Повторный старт не может создать второ�
 Purchase, task reward, explicit income и wallet → savings разрешены только в
 `active`/`readyToFinish`. Purchase, deposit и explicit income используют
 persisted caller-provided `operationId`: идентичный retry является no-op, а тот же
-ID с другим payload отклоняется. Foundation-контракт savings withdrawal не входит
-в Core v1 и не учитывается как `factSavings`.
+ID с другим payload отклоняется. Public savings withdrawal отсутствует.
+Savings deposit требует canonical active goal, не может превысить недостающую до
+цели сумму и в одной transaction обновляет wallet, глобальную копилку,
+`actualSavings`, журнал и checkpoint `savings_decision`.
+
+Цель можно один раз сменить до её достижения без сброса копилки. Claim не зависит
+от состояния периода: он списывает canonical цену только из savings, создаёт
+`completed_goals`, выдаёт persistent reward в inventory и сохраняет возможный
+остаток. Claim не является расходом периода и не меняет его `actualSavings`.
 
 ## Checkpoints и завершение
 

@@ -1,8 +1,11 @@
 import 'package:finny/core/database/app_database.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/purchase_exception.dart';
+import 'package:finny/models/savings_exception.dart';
+import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:sqflite/sqflite.dart';
@@ -53,18 +56,36 @@ abstract interface class GameRepository {
     required ShopItem item,
     required String operationId,
   });
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId);
+  Future<GameState> selectSavingsGoal({
+    required int profileId,
+    required SavingsGoal goal,
+  });
+  Future<GameState> changeSavingsGoal({
+    required int profileId,
+    required SavingsGoal currentGoal,
+    required SavingsGoal newGoal,
+  });
   Future<GameState> depositSavings({
     required int profileId,
     required int periodId,
+    required SavingsGoal goal,
     required int amount,
     required String operationId,
   });
-  Future<GameState> moveSavings({
+  Future<GamePeriod> skipSavingsDecision({
     required int profileId,
-    required int? periodId,
-    required int amount,
-    required String source,
-    required String description,
+    required int periodId,
+  });
+  Future<GamePeriod> resolveSavingsDecisionForCompletedGoals({
+    required int profileId,
+    required int periodId,
+    required Set<String> canonicalGoalIds,
+  });
+  Future<GameState> claimSavingsGoal({
+    required int profileId,
+    required SavingsGoal goal,
+    required String operationId,
   });
   Future<int> getInventoryQuantity(int profileId, String itemId);
   Future<List<GameTransaction>> getTransactions(int profileId, {int? periodId});
@@ -94,6 +115,7 @@ class SqliteGameRepository implements GameRepository {
         walletBalance: 0,
         currentPeriod: 0,
         savedAmount: 0,
+        goalChangeUsed: false,
         updatedAt: DateTime.now().toUtc(),
       );
       await txn.insert(
@@ -516,9 +538,92 @@ class SqliteGameRepository implements GameRepository {
   }
 
   @override
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId) async {
+    final db = await _appDatabase.database;
+    final rows = await db.query(
+      'completed_goals',
+      where: 'profile_id = ?',
+      whereArgs: [profileId],
+      orderBy: 'completed_at ASC, goal_id ASC',
+    );
+    return rows.map(CompletedGoal.fromMap).toList(growable: false);
+  }
+
+  @override
+  Future<GameState> selectSavingsGoal({
+    required int profileId,
+    required SavingsGoal goal,
+  }) async {
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final state = await _requireValidSavingsState(txn, profileId);
+      if (await _isGoalCompleted(txn, profileId, goal.id)) {
+        throw SavingsGoalAlreadyCompletedException(goal.id);
+      }
+      if (state.activeGoalId == goal.id && !state.goalChangeUsed) return state;
+      if (state.activeGoalId != null) {
+        throw SavingsGoalAlreadyActiveException(
+          activeGoalId: state.activeGoalId!,
+        );
+      }
+      final updated = state.copyWith(
+        activeGoalId: goal.id,
+        goalChangeUsed: false,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      await _writeState(txn, updated);
+      return updated;
+    });
+  }
+
+  @override
+  Future<GameState> changeSavingsGoal({
+    required int profileId,
+    required SavingsGoal currentGoal,
+    required SavingsGoal newGoal,
+  }) async {
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final state = await _requireValidSavingsState(txn, profileId);
+      if (state.activeGoalId == newGoal.id && state.goalChangeUsed) {
+        return state;
+      }
+      if (state.activeGoalId == null) {
+        throw const SavingsGoalRequiredException();
+      }
+      if (state.activeGoalId != currentGoal.id) {
+        throw SavingsGoalMismatchException(
+          expectedGoalId: currentGoal.id,
+          actualGoalId: state.activeGoalId,
+        );
+      }
+      if (state.goalChangeUsed) {
+        throw const SavingsGoalChangeAlreadyUsedException();
+      }
+      if (state.savedAmount >= currentGoal.price) {
+        throw SavingsGoalReachedException(currentGoal.id);
+      }
+      if (newGoal.id == currentGoal.id) {
+        throw SavingsGoalAlreadyActiveException(activeGoalId: currentGoal.id);
+      }
+      if (await _isGoalCompleted(txn, profileId, newGoal.id)) {
+        throw SavingsGoalAlreadyCompletedException(newGoal.id);
+      }
+      final updated = state.copyWith(
+        activeGoalId: newGoal.id,
+        goalChangeUsed: true,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      await _writeState(txn, updated);
+      return updated;
+    });
+  }
+
+  @override
   Future<GameState> depositSavings({
     required int profileId,
     required int periodId,
+    required SavingsGoal goal,
     required int amount,
     required String operationId,
   }) async {
@@ -531,7 +636,7 @@ class SqliteGameRepository implements GameRepository {
       periodId: periodId,
       type: GameTransactionType.savingsDeposit,
       amount: -amount,
-      source: 'savings_deposit',
+      source: 'savings_deposit:${goal.id}',
       description: 'Пополнение накоплений',
       createdAt: DateTime.now().toUtc(),
       deduplicationKey: 'operation:$operationId',
@@ -545,18 +650,47 @@ class SqliteGameRepository implements GameRepository {
         transaction.deduplicationKey!,
       );
       if (existing != null) {
-        _requireSameCommand(existing, transaction);
+        _requireSameSavingsCommand(existing, transaction, operationId);
         return _requireState(txn, profileId);
       }
-      _requireFinancialActionsAllowed(period);
-      final state = await _requireState(txn, profileId);
-      final nextWallet = state.walletBalance - amount;
-      if (nextWallet < 0) {
-        throw StateError('Wallet balance cannot become negative.');
+      if (period.status != GamePeriodStatus.active &&
+          period.status != GamePeriodStatus.readyToFinish) {
+        throw const SavingsPeriodNotAvailableException();
+      }
+      final state = await _requireValidSavingsState(txn, profileId);
+      if (state.activeGoalId == null) {
+        throw const SavingsGoalRequiredException();
+      }
+      if (state.activeGoalId != goal.id) {
+        throw SavingsGoalMismatchException(
+          expectedGoalId: goal.id,
+          actualGoalId: state.activeGoalId,
+        );
+      }
+      if (state.savedAmount >= goal.price) {
+        throw SavingsGoalReachedException(goal.id);
+      }
+      if (amount > state.walletBalance) {
+        throw SavingsInsufficientWalletFundsException(
+          requestedAmount: amount,
+          availableBalance: state.walletBalance,
+        );
+      }
+      final remaining = goal.price - state.savedAmount;
+      if (amount > remaining) {
+        throw SavingsDepositExceedsGoalException(
+          requestedAmount: amount,
+          remainingAmount: remaining,
+        );
       }
       await txn.insert('transactions', transaction.toMap());
+      final resolved = _withSavingsDecisionResolved(period);
+      final updatedPeriod = resolved.copyWith(
+        actualSavings: resolved.actualSavings + amount,
+      );
+      await _writePeriod(txn, updatedPeriod);
       final updated = state.copyWith(
-        walletBalance: nextWallet,
+        walletBalance: state.walletBalance - amount,
         savedAmount: state.savedAmount + amount,
         updatedAt: transaction.createdAt,
       );
@@ -566,40 +700,140 @@ class SqliteGameRepository implements GameRepository {
   }
 
   @override
-  Future<GameState> moveSavings({
+  Future<GamePeriod> skipSavingsDecision({
     required int profileId,
-    required int? periodId,
-    required int amount,
-    required String source,
-    required String description,
+    required int periodId,
   }) async {
-    if (amount == 0) {
-      throw ArgumentError.value(amount, 'amount', 'Must be non-zero.');
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final period = await _requirePeriod(txn, profileId, periodId);
+      final state = await _requireValidSavingsState(txn, profileId);
+      if (state.activeGoalId == null) {
+        throw const SavingsGoalRequiredException();
+      }
+      if (period.actualSavings > 0) {
+        throw const SavingsDecisionAlreadyMadeException();
+      }
+      if (period.resolvedCheckpoints.contains('savings_decision')) {
+        return period;
+      }
+      if (period.status != GamePeriodStatus.active) {
+        throw const SavingsPeriodNotAvailableException();
+      }
+      final updated = _withSavingsDecisionResolved(period);
+      await _writePeriod(txn, updated);
+      return updated;
+    });
+  }
+
+  @override
+  Future<GamePeriod> resolveSavingsDecisionForCompletedGoals({
+    required int profileId,
+    required int periodId,
+    required Set<String> canonicalGoalIds,
+  }) async {
+    if (canonicalGoalIds.isEmpty) {
+      throw const FormatException('Savings goals must not be empty.');
     }
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
-      final state = await _requireState(txn, profileId);
-      final nextWallet = state.walletBalance - amount;
-      final nextSavings = state.savedAmount + amount;
-      if (nextWallet < 0 || nextSavings < 0) {
-        throw StateError('Wallet and savings balances cannot become negative.');
+      final period = await _requirePeriod(txn, profileId, periodId);
+      final state = await _requireValidSavingsState(txn, profileId);
+      if (state.activeGoalId != null) {
+        throw SavingsGoalAlreadyActiveException(
+          activeGoalId: state.activeGoalId!,
+        );
       }
-      final transaction = GameTransaction(
-        profileId: profileId,
-        periodId: periodId,
-        type: amount > 0
-            ? GameTransactionType.savingsDeposit
-            : GameTransactionType.savingsWithdrawal,
-        amount: -amount,
-        source: source,
-        description: description,
-        createdAt: DateTime.now().toUtc(),
+      final rows = await txn.query(
+        'completed_goals',
+        columns: ['goal_id'],
+        where: 'profile_id = ?',
+        whereArgs: [profileId],
       );
-      await txn.insert('transactions', transaction.toMap());
+      final completed = rows.map((row) => row['goal_id']! as String).toSet();
+      if (!completed.containsAll(canonicalGoalIds)) {
+        throw const SavingsAllGoalsNotCompletedException();
+      }
+      if (period.resolvedCheckpoints.contains('savings_decision')) {
+        return period;
+      }
+      if (period.status != GamePeriodStatus.active) {
+        throw const SavingsPeriodNotAvailableException();
+      }
+      final updated = _withSavingsDecisionResolved(period);
+      await _writePeriod(txn, updated);
+      return updated;
+    });
+  }
+
+  @override
+  Future<GameState> claimSavingsGoal({
+    required int profileId,
+    required SavingsGoal goal,
+    required String operationId,
+  }) async {
+    _validateOperationId(operationId);
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final replayRows = await txn.query(
+        'completed_goals',
+        where: 'profile_id = ? AND claim_operation_id = ?',
+        whereArgs: [profileId, operationId],
+        limit: 1,
+      );
+      if (replayRows.isNotEmpty) {
+        final completed = CompletedGoal.fromMap(replayRows.single);
+        if (completed.goalId != goal.id ||
+            completed.pricePaid != goal.price ||
+            completed.rewardAssetId != goal.rewardAssetId) {
+          throw SavingsOperationConflictException(operationId: operationId);
+        }
+        return _requireState(txn, profileId);
+      }
+      final state = await _requireValidSavingsState(txn, profileId);
+      if (await _isGoalCompleted(txn, profileId, goal.id)) {
+        throw SavingsGoalAlreadyCompletedException(goal.id);
+      }
+      if (state.activeGoalId != goal.id) {
+        throw SavingsGoalMismatchException(
+          expectedGoalId: goal.id,
+          actualGoalId: state.activeGoalId,
+        );
+      }
+      if (state.savedAmount < goal.price) {
+        throw SavingsGoalNotReachedException(
+          goalId: goal.id,
+          goalPrice: goal.price,
+          savedAmount: state.savedAmount,
+        );
+      }
+      if (await _readInventoryQuantity(txn, profileId, goal.rewardAssetId) >
+          0) {
+        throw SavingsRewardAlreadyOwnedException(goal.rewardAssetId);
+      }
+      final now = DateTime.now().toUtc();
+      await txn.insert(
+        'completed_goals',
+        CompletedGoal(
+          profileId: profileId,
+          goalId: goal.id,
+          rewardAssetId: goal.rewardAssetId,
+          pricePaid: goal.price,
+          completedAt: now,
+          claimOperationId: operationId,
+        ).toMap(),
+      );
+      await txn.insert('inventory', {
+        'profile_id': profileId,
+        'item_id': goal.rewardAssetId,
+        'quantity': 1,
+        'acquired_at': now.toIso8601String(),
+      });
       final updated = state.copyWith(
-        walletBalance: nextWallet,
-        savedAmount: nextSavings,
-        updatedAt: transaction.createdAt,
+        clearActiveGoal: true,
+        savedAmount: state.savedAmount - goal.price,
+        goalChangeUsed: false,
+        updatedAt: now,
       );
       await _writeState(txn, updated);
       return updated;
@@ -651,6 +885,7 @@ class SqliteGameRepository implements GameRepository {
         'inventory',
         'transactions',
         'game_periods',
+        'completed_goals',
         'pets',
         'game_states',
       ]) {
@@ -685,7 +920,86 @@ class SqliteGameRepository implements GameRepository {
       updatedAt: transaction.createdAt,
     );
     await _writeState(db, updated);
+    if (transaction.periodId != null) {
+      final period = await _requirePeriod(
+        db,
+        transaction.profileId,
+        transaction.periodId!,
+      );
+      final aggregated = switch (transaction.type) {
+        GameTransactionType.needExpense => period.copyWith(
+          actualNeed: period.actualNeed - transaction.amount,
+        ),
+        GameTransactionType.wantExpense => period.copyWith(
+          actualWant: period.actualWant - transaction.amount,
+        ),
+        GameTransactionType.otherIncome || GameTransactionType.taskReward =>
+          period.copyWith(extraIncome: period.extraIncome + transaction.amount),
+        _ => period,
+      };
+      if (!identical(aggregated, period)) await _writePeriod(db, aggregated);
+    }
     return updated;
+  }
+
+  Future<bool> _isGoalCompleted(
+    DatabaseExecutor db,
+    int profileId,
+    String goalId,
+  ) async {
+    final rows = await db.query(
+      'completed_goals',
+      columns: ['goal_id'],
+      where: 'profile_id = ? AND goal_id = ?',
+      whereArgs: [profileId, goalId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  Future<GameState> _requireValidSavingsState(
+    DatabaseExecutor db,
+    int profileId,
+  ) async {
+    final state = await _requireState(db, profileId);
+    if (state.activeGoalId == null && state.goalChangeUsed) {
+      throw StateError('goalChangeUsed cannot be true without an active goal.');
+    }
+    if (state.savedAmount < 0) {
+      throw StateError('savedAmount cannot be negative.');
+    }
+    return state;
+  }
+
+  GamePeriod _withSavingsDecisionResolved(GamePeriod period) {
+    if (!period.requiredCheckpoints.contains('savings_decision')) {
+      throw StateError('The period does not require a savings decision.');
+    }
+    if (period.resolvedCheckpoints.contains('savings_decision')) return period;
+    final resolved = [
+      for (final checkpoint in period.requiredCheckpoints)
+        if (checkpoint == 'savings_decision' ||
+            period.resolvedCheckpoints.contains(checkpoint))
+          checkpoint,
+    ];
+    return period.copyWith(
+      resolvedCheckpoints: List.unmodifiable(resolved),
+      status: resolved.length == period.requiredCheckpoints.length
+          ? GamePeriodStatus.readyToFinish
+          : GamePeriodStatus.active,
+    );
+  }
+
+  void _requireSameSavingsCommand(
+    GameTransaction existing,
+    GameTransaction requested,
+    String operationId,
+  ) {
+    try {
+      _requireSameCommand(existing, requested);
+    } on StateError {
+      throw SavingsOperationConflictException(operationId: operationId);
+    }
   }
 
   Future<GameState?> _readState(DatabaseExecutor db, int profileId) async {

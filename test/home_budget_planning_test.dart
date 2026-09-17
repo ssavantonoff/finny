@@ -347,7 +347,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Все важные решения приняты'), findsOneWidget);
     expect(find.text('День почти завершён.'), findsOneWidget);
-    expect(find.byType(FilledButton), findsNothing);
+    expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
 
     await tester.runAsync(
       () =>
@@ -357,8 +357,7 @@ void main() {
       harness.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('День завершён'), findsOneWidget);
-    expect(find.text('Начать день'), findsNothing);
+    expect(find.text('Все дни завершены'), findsOneWidget);
   });
 
   testWidgets(

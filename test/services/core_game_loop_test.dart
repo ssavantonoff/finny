@@ -7,6 +7,8 @@ import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/savings_goal.dart';
+import 'package:finny/models/savings_exception.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
@@ -76,6 +78,14 @@ const periodOneTask = FinancialTask(
   scenarioData: {},
 );
 
+const testSavingsGoal = SavingsGoal(
+  id: 'goal_test',
+  name: 'Тестовая цель',
+  price: 600,
+  description: 'Описание',
+  rewardAssetId: 'reward_test',
+);
+
 void main() {
   late AppDatabase database;
   late SqliteProfileRepository profiles;
@@ -93,11 +103,12 @@ void main() {
     final content = TestContentRepository(
       testPeriodDefinitions(count: 5),
       shopItems: const [needItem, wantItem, carryExpenseItem, tooExpensiveItem],
+      goals: const [testSavingsGoal],
     );
     periods = PeriodService(games, content);
     budgets = BudgetService(games);
     purchases = PurchaseService(games, content);
-    savings = SavingsService(games);
+    savings = SavingsService(games, content);
     tasks = TaskService(games);
   });
 
@@ -124,6 +135,10 @@ void main() {
         savedAmount: saved,
         updatedAt: DateTime.utc(2026, 1, 1),
       ),
+    );
+    await savings.selectGoal(
+      profileId: profile.id!,
+      goalId: testSavingsGoal.id,
     );
     return profile;
   }
@@ -380,7 +395,7 @@ void main() {
         amount: 10,
         operationId: 'planning-savings',
       ),
-      throwsStateError,
+      throwsA(isA<SavingsPeriodNotAvailableException>()),
     );
     await expectLater(
       tasks.rewardCompletedTask(
@@ -569,7 +584,7 @@ void main() {
           amount: 90,
           operationId: 'savings-1',
         ),
-        throwsStateError,
+        throwsA(isA<SavingsOperationConflictException>()),
       );
 
       await purchases.purchase(
@@ -616,6 +631,11 @@ void main() {
       expect(summary.needDeviation, -50);
       expect(summary.wantDeviation, 20);
       expect(summary.savingsDeviation, 0);
+      final aggregated = await games.getPeriodById(profile.id!, period.id!);
+      expect(aggregated?.actualNeed, 150);
+      expect(aggregated?.actualWant, 120);
+      expect(aggregated?.actualSavings, 100);
+      expect(aggregated?.extraIncome, 50);
       expect(await games.getInventoryQuantity(profile.id!, needItem.id), 1);
       expect(await games.getInventoryQuantity(profile.id!, wantItem.id), 1);
       expect(
@@ -645,7 +665,7 @@ void main() {
           amount: 181,
           operationId: 'insufficient-savings',
         ),
-        throwsStateError,
+        throwsA(isA<SavingsInsufficientWalletFundsException>()),
       );
       expect(
         () => savings.deposit(
@@ -697,25 +717,6 @@ void main() {
       expect(summary.startingBudget, 500);
     },
   );
-
-  test('Foundation savings withdrawal is not additional income', () async {
-    final profile = await createPlayer(saved: 100);
-    final period = await startActivePeriod(profile.id!);
-
-    await savings.withdraw(
-      profileId: profile.id!,
-      periodId: period.id!,
-      amount: 40,
-    );
-
-    final summary = await periods.getSummary(
-      profileId: profile.id!,
-      periodId: period.id!,
-    );
-    expect(summary.additionalIncome, 0);
-    expect(summary.factSavings, 0);
-    expect(summary.factRemainder, 540);
-  });
 
   test(
     'checkpoints drive ready state and completed period is immutable',
@@ -824,7 +825,7 @@ void main() {
           amount: 10,
           operationId: 'after-completed-savings',
         ),
-        throwsStateError,
+        throwsA(isA<SavingsPeriodNotAvailableException>()),
       );
       await expectLater(
         periods.addExplicitIncome(
@@ -1008,7 +1009,7 @@ void main() {
         normal.id!,
         normalPeriod.id!,
       ))?.resolvedCheckpoints,
-      ['financial_task'],
+      ['financial_task', 'savings_decision'],
     );
   });
 
@@ -1034,11 +1035,12 @@ void main() {
       final persistentContent = TestContentRepository(
         testPeriodDefinitions(),
         shopItems: const [needItem, wantItem],
+        goals: const [testSavingsGoal],
       );
       final firstPeriods = PeriodService(firstGames, persistentContent);
       final firstBudgets = BudgetService(firstGames);
       final firstPurchases = PurchaseService(firstGames, persistentContent);
-      final firstSavings = SavingsService(firstGames);
+      final firstSavings = SavingsService(firstGames, persistentContent);
       final profile = await firstProfiles.create(
         Profile(
           gameName: 'Persistent',
@@ -1082,6 +1084,10 @@ void main() {
         item: needItem,
         operationId: 'persistent-purchase',
       );
+      await firstSavings.selectGoal(
+        profileId: profile.id!,
+        goalId: testSavingsGoal.id,
+      );
       await firstSavings.deposit(
         profileId: profile.id!,
         periodId: started.id!,
@@ -1103,10 +1109,11 @@ void main() {
       final reopenedContent = TestContentRepository(
         testPeriodDefinitions(),
         shopItems: const [needItem, wantItem],
+        goals: const [testSavingsGoal],
       );
       final reopenedPeriods = PeriodService(reopenedGames, reopenedContent);
       final reopenedPurchases = PurchaseService(reopenedGames, reopenedContent);
-      final reopenedSavings = SavingsService(reopenedGames);
+      final reopenedSavings = SavingsService(reopenedGames, reopenedContent);
       addTearDown(reopenedDatabase.close);
 
       final restored = await reopenedGames.getCurrentPeriod(profile.id!);
@@ -1114,7 +1121,10 @@ void main() {
       expect(restored?.plannedNeed, 200);
       expect(restored?.plannedWant, 100);
       expect(restored?.plannedSavings, 50);
-      expect(restored?.resolvedCheckpoints, ['financial_task']);
+      expect(restored?.resolvedCheckpoints, [
+        'financial_task',
+        'savings_decision',
+      ]);
       expect(
         (await reopenedGames.getGameState(profile.id!))?.walletBalance,
         325,
@@ -1186,7 +1196,7 @@ void main() {
           amount: 60,
           operationId: 'persistent-savings',
         ),
-        throwsStateError,
+        throwsA(isA<SavingsOperationConflictException>()),
       );
       expect(
         (await reopenedGames.getGameState(profile.id!))?.walletBalance,

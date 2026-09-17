@@ -5,7 +5,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 2;
+  static const schemaVersion = 3;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -69,6 +69,7 @@ class AppDatabase {
         current_period INTEGER NOT NULL DEFAULT 0 CHECK (current_period >= 0),
         active_goal_id TEXT,
         saved_amount INTEGER NOT NULL DEFAULT 0 CHECK (saved_amount >= 0),
+        goal_change_used INTEGER NOT NULL DEFAULT 0 CHECK (goal_change_used IN (0, 1)),
         updated_at TEXT NOT NULL,
         FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
       )
@@ -143,6 +144,8 @@ class AppDatabase {
       )
     ''');
 
+    await _createCompletedGoalsTable(db);
+
     await db.execute(
       'CREATE INDEX idx_periods_profile_status ON game_periods(profile_id, status)',
     );
@@ -194,5 +197,26 @@ class AppDatabase {
         'CREATE INDEX idx_transactions_period ON transactions(profile_id, period_id)',
       );
     }
+    if (oldVersion < 3) {
+      await db.execute(
+        'ALTER TABLE game_states ADD COLUMN goal_change_used INTEGER NOT NULL DEFAULT 0 CHECK (goal_change_used IN (0, 1))',
+      );
+      await _createCompletedGoalsTable(db);
+    }
   }
+
+  static Future<void> _createCompletedGoalsTable(sqflite.DatabaseExecutor db) =>
+      db.execute('''
+    CREATE TABLE completed_goals (
+      profile_id INTEGER NOT NULL,
+      goal_id TEXT NOT NULL,
+      reward_asset_id TEXT NOT NULL,
+      price_paid INTEGER NOT NULL CHECK (price_paid > 0),
+      completed_at TEXT NOT NULL,
+      claim_operation_id TEXT NOT NULL,
+      PRIMARY KEY (profile_id, goal_id),
+      UNIQUE (profile_id, claim_operation_id),
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+    )
+  ''');
 }

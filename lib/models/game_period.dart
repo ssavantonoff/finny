@@ -66,6 +66,7 @@ class GamePeriod {
 
   GamePeriod copyWith({
     int? id,
+    int? extraIncome,
     int? plannedNeed,
     int? plannedWant,
     int? plannedSavings,
@@ -86,7 +87,7 @@ class GamePeriod {
       periodNumber: periodNumber,
       startWalletBalance: startWalletBalance,
       baseIncome: baseIncome,
-      extraIncome: extraIncome,
+      extraIncome: extraIncome ?? this.extraIncome,
       plannedNeed: plannedNeed ?? this.plannedNeed,
       plannedWant: plannedWant ?? this.plannedWant,
       plannedSavings: plannedSavings ?? this.plannedSavings,

@@ -87,110 +87,110 @@ void main() {
     return (profileId: profile.id!, periodId: active.id!);
   }
 
-  test('insufficient funds exposes canonical price and available balance', () async {
-    final player = await createActivePlayer();
-    final transactionsBefore = await games.getTransactions(
-      player.profileId,
-      periodId: player.periodId,
-    );
-
-    await expectLater(
-      purchases.purchase(
-        profileId: player.profileId,
-        periodId: player.periodId,
-        item: expensiveItem,
-        operationId: 'insufficient',
-      ),
-      throwsA(
-        isA<InsufficientFundsException>()
-            .having((error) => error.itemPrice, 'itemPrice', 600)
-            .having(
-              (error) => error.availableBalance,
-              'availableBalance',
-              500,
-            ),
-      ),
-    );
-
-    expect(
-      (await games.getGameState(player.profileId))?.walletBalance,
-      500,
-    );
-    expect(
-      await games.getInventoryQuantity(player.profileId, expensiveItem.id),
-      0,
-    );
-    expect(
-      await games.getTransactions(
+  test(
+    'insufficient funds exposes canonical price and available balance',
+    () async {
+      final player = await createActivePlayer();
+      final transactionsBefore = await games.getTransactions(
         player.profileId,
         periodId: player.periodId,
-      ),
-      hasLength(transactionsBefore.length),
-    );
-  });
+      );
 
-  test('persistent purchase replays same operation and rejects a new one', () async {
-    final player = await createActivePlayer();
+      await expectLater(
+        purchases.purchase(
+          profileId: player.profileId,
+          periodId: player.periodId,
+          item: expensiveItem,
+          operationId: 'insufficient',
+        ),
+        throwsA(
+          isA<InsufficientFundsException>()
+              .having((error) => error.itemPrice, 'itemPrice', 600)
+              .having(
+                (error) => error.availableBalance,
+                'availableBalance',
+                500,
+              ),
+        ),
+      );
 
-    final first = await purchases.purchase(
-      profileId: player.profileId,
-      periodId: player.periodId,
-      item: persistentItem,
-      operationId: 'persistent-first',
-    );
-    final replay = await purchases.purchase(
-      profileId: player.profileId,
-      periodId: player.periodId,
-      item: persistentItem,
-      operationId: 'persistent-first',
-    );
+      expect((await games.getGameState(player.profileId))?.walletBalance, 500);
+      expect(
+        await games.getInventoryQuantity(player.profileId, expensiveItem.id),
+        0,
+      );
+      expect(
+        await games.getTransactions(
+          player.profileId,
+          periodId: player.periodId,
+        ),
+        hasLength(transactionsBefore.length),
+      );
+    },
+  );
 
-    expect(first.walletBalance, 380);
-    expect(replay.walletBalance, 380);
-    expect(
-      await games.getInventoryQuantity(player.profileId, persistentItem.id),
-      1,
-    );
-    expect(
-      await games.getTransactions(
-        player.profileId,
-        periodId: player.periodId,
-      ),
-      hasLength(2),
-    );
+  test(
+    'persistent purchase replays same operation and rejects a new one',
+    () async {
+      final player = await createActivePlayer();
 
-    await expectLater(
-      purchases.purchase(
+      final first = await purchases.purchase(
         profileId: player.profileId,
         periodId: player.periodId,
         item: persistentItem,
-        operationId: 'persistent-second',
-      ),
-      throwsA(
-        isA<PersistentItemAlreadyOwnedException>().having(
-          (error) => error.itemId,
-          'itemId',
-          persistentItem.id,
-        ),
-      ),
-    );
-
-    expect(
-      (await games.getGameState(player.profileId))?.walletBalance,
-      380,
-    );
-    expect(
-      await games.getInventoryQuantity(player.profileId, persistentItem.id),
-      1,
-    );
-    expect(
-      await games.getTransactions(
-        player.profileId,
+        operationId: 'persistent-first',
+      );
+      final replay = await purchases.purchase(
+        profileId: player.profileId,
         periodId: player.periodId,
-      ),
-      hasLength(2),
-    );
-  });
+        item: persistentItem,
+        operationId: 'persistent-first',
+      );
+
+      expect(first.walletBalance, 380);
+      expect(replay.walletBalance, 380);
+      expect(
+        await games.getInventoryQuantity(player.profileId, persistentItem.id),
+        1,
+      );
+      expect(
+        await games.getTransactions(
+          player.profileId,
+          periodId: player.periodId,
+        ),
+        hasLength(2),
+      );
+
+      await expectLater(
+        purchases.purchase(
+          profileId: player.profileId,
+          periodId: player.periodId,
+          item: persistentItem,
+          operationId: 'persistent-second',
+        ),
+        throwsA(
+          isA<PersistentItemAlreadyOwnedException>().having(
+            (error) => error.itemId,
+            'itemId',
+            persistentItem.id,
+          ),
+        ),
+      );
+
+      expect((await games.getGameState(player.profileId))?.walletBalance, 380);
+      expect(
+        await games.getInventoryQuantity(player.profileId, persistentItem.id),
+        1,
+      );
+      expect(
+        await games.getTransactions(
+          player.profileId,
+          periodId: player.periodId,
+        ),
+        hasLength(2),
+      );
+    },
+  );
 
   test('consumable items can be purchased repeatedly', () async {
     final player = await createActivePlayer();
@@ -208,19 +208,13 @@ void main() {
       operationId: 'consumable-second',
     );
 
-    expect(
-      (await games.getGameState(player.profileId))?.walletBalance,
-      200,
-    );
+    expect((await games.getGameState(player.profileId))?.walletBalance, 200);
     expect(
       await games.getInventoryQuantity(player.profileId, consumableItem.id),
       2,
     );
     expect(
-      await games.getTransactions(
-        player.profileId,
-        periodId: player.periodId,
-      ),
+      await games.getTransactions(player.profileId, periodId: player.periodId),
       hasLength(3),
     );
   });
@@ -251,19 +245,13 @@ void main() {
       results.whereType<PersistentItemAlreadyOwnedException>(),
       hasLength(1),
     );
-    expect(
-      (await games.getGameState(player.profileId))?.walletBalance,
-      380,
-    );
+    expect((await games.getGameState(player.profileId))?.walletBalance, 380);
     expect(
       await games.getInventoryQuantity(player.profileId, persistentItem.id),
       1,
     );
     expect(
-      await games.getTransactions(
-        player.profileId,
-        periodId: player.periodId,
-      ),
+      await games.getTransactions(player.profileId, periodId: player.periodId),
       hasLength(2),
     );
   });

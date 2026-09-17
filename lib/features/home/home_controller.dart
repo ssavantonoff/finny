@@ -29,8 +29,12 @@ class HomeReady extends HomeViewState {
     required this.gameState,
     required this.period,
     required this.definition,
+    required this.completedDays,
+    required this.allDaysCompleted,
     this.startingDay = false,
     this.startFailed = false,
+    this.finishingDay = false,
+    this.finishFailed = false,
   });
 
   final Profile profile;
@@ -38,17 +42,30 @@ class HomeReady extends HomeViewState {
   final GameState gameState;
   final GamePeriod? period;
   final PeriodDefinition? definition;
+  final int completedDays;
+  final bool allDaysCompleted;
   final bool startingDay;
   final bool startFailed;
+  final bool finishingDay;
+  final bool finishFailed;
 
-  HomeReady copyWith({bool? startingDay, bool? startFailed}) => HomeReady(
+  HomeReady copyWith({
+    bool? startingDay,
+    bool? startFailed,
+    bool? finishingDay,
+    bool? finishFailed,
+  }) => HomeReady(
     profile: profile,
     pet: pet,
     gameState: gameState,
     period: period,
     definition: definition,
+    completedDays: completedDays,
+    allDaysCompleted: allDaysCompleted,
     startingDay: startingDay ?? this.startingDay,
     startFailed: startFailed ?? this.startFailed,
+    finishingDay: finishingDay ?? this.finishingDay,
+    finishFailed: finishFailed ?? this.finishFailed,
   );
 }
 
@@ -59,6 +76,7 @@ final homeControllerProvider = NotifierProvider<HomeController, HomeViewState>(
 class HomeController extends Notifier<HomeViewState> {
   int _loadGeneration = 0;
   bool _startingDay = false;
+  bool _finishingDay = false;
 
   @override
   HomeViewState build() => const HomeLoading();
@@ -72,7 +90,10 @@ class HomeController extends Notifier<HomeViewState> {
 
   Future<GamePeriod?> startDay() async {
     final current = state;
-    if (_startingDay || current is! HomeReady || current.period != null) {
+    if (_startingDay ||
+        current is! HomeReady ||
+        current.period != null ||
+        current.allDaysCompleted) {
       return null;
     }
     _startingDay = true;
@@ -98,6 +119,37 @@ class HomeController extends Notifier<HomeViewState> {
     }
     state = refreshed;
     return null;
+  }
+
+  Future<bool> finishDay() async {
+    final current = state;
+    final period = current is HomeReady ? current.period : null;
+    if (_finishingDay ||
+        current is! HomeReady ||
+        period?.id == null ||
+        period!.status != GamePeriodStatus.readyToFinish) {
+      return false;
+    }
+    _finishingDay = true;
+    state = current.copyWith(finishingDay: true, finishFailed: false);
+    try {
+      await ref
+          .read(periodServiceProvider)
+          .completePeriod(profileId: current.profile.id!, periodId: period.id!);
+    } catch (_) {
+      _finishingDay = false;
+      final refreshed = await _readSnapshot();
+      if (refreshed is HomeReady &&
+          refreshed.completedDays > current.completedDays) {
+        state = refreshed;
+        return true;
+      }
+      state = current.copyWith(finishingDay: false, finishFailed: true);
+      return false;
+    }
+    _finishingDay = false;
+    state = await _readSnapshot();
+    return true;
   }
 
   Future<HomeViewState> _readSnapshot() async {
@@ -127,11 +179,7 @@ class HomeController extends Notifier<HomeViewState> {
           .where((period) => period.status != GamePeriodStatus.completed)
           .toList(growable: false);
       if (unfinished.length > 1) return const HomeFailure();
-      final period = unfinished.isNotEmpty
-          ? unfinished.single
-          : periods.isEmpty
-          ? null
-          : periods.last;
+      final period = unfinished.isEmpty ? null : unfinished.single;
       PeriodDefinition? definition;
       if (period != null) {
         final matches = definitions
@@ -150,6 +198,13 @@ class HomeController extends Notifier<HomeViewState> {
         gameState: gameState,
         period: period,
         definition: definition,
+        completedDays: periods
+            .where((item) => item.status == GamePeriodStatus.completed)
+            .length,
+        allDaysCompleted:
+            definitions.isNotEmpty &&
+            periods.length == definitions.length &&
+            periods.every((item) => item.status == GamePeriodStatus.completed),
       );
     } catch (_) {
       return const HomeFailure();
