@@ -2,6 +2,7 @@ import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:sqflite/sqflite.dart';
@@ -479,6 +480,26 @@ class SqliteGameRepository implements GameRepository {
         _requireSameCommand(existing, transaction);
         return _requireState(txn, profileId);
       }
+
+      if (item.persistent) {
+        final ownedQuantity = await _readInventoryQuantity(
+          txn,
+          profileId,
+          item.id,
+        );
+        if (ownedQuantity > 0) {
+          throw PersistentItemAlreadyOwnedException(itemId: item.id);
+        }
+      }
+
+      final state = await _requireState(txn, profileId);
+      if (state.walletBalance < item.price) {
+        throw InsufficientFundsException(
+          itemPrice: item.price,
+          availableBalance: state.walletBalance,
+        );
+      }
+
       final updated = await _applyWalletTransaction(txn, transaction);
       await txn.rawInsert(
         '''
@@ -588,14 +609,7 @@ class SqliteGameRepository implements GameRepository {
   @override
   Future<int> getInventoryQuantity(int profileId, String itemId) async {
     final db = await _appDatabase.database;
-    final rows = await db.query(
-      'inventory',
-      columns: ['quantity'],
-      where: 'profile_id = ? AND item_id = ?',
-      whereArgs: [profileId, itemId],
-      limit: 1,
-    );
-    return rows.isEmpty ? 0 : rows.single['quantity'] as int;
+    return _readInventoryQuantity(db, profileId, itemId);
   }
 
   @override
@@ -682,6 +696,21 @@ class SqliteGameRepository implements GameRepository {
       limit: 1,
     );
     return rows.isEmpty ? null : GameState.fromMap(rows.single);
+  }
+
+  Future<int> _readInventoryQuantity(
+    DatabaseExecutor db,
+    int profileId,
+    String itemId,
+  ) async {
+    final rows = await db.query(
+      'inventory',
+      columns: ['quantity'],
+      where: 'profile_id = ? AND item_id = ?',
+      whereArgs: [profileId, itemId],
+      limit: 1,
+    );
+    return rows.isEmpty ? 0 : rows.single['quantity'] as int;
   }
 
   Future<GameState> _requireState(DatabaseExecutor db, int profileId) async {
