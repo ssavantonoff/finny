@@ -1,6 +1,8 @@
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/savings_goal.dart';
+import 'package:finny/models/savings_exception.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
@@ -20,6 +22,14 @@ const persistentItem = ShopItem(
   effectType: 'mood',
   effectValue: 8,
   unlockType: 'available',
+);
+
+const savingsGoal = SavingsGoal(
+  id: 'goal_test',
+  name: 'Тестовая цель',
+  price: 600,
+  description: 'Описание',
+  rewardAssetId: 'reward_test',
 );
 
 void main() {
@@ -109,10 +119,7 @@ void main() {
       1,
     );
     expect(
-      await games.getTransactions(
-        player.profileId,
-        periodId: player.periodId,
-      ),
+      await games.getTransactions(player.profileId, periodId: player.periodId),
       hasLength(2),
     );
 
@@ -153,10 +160,7 @@ void main() {
 
     expect(replay.walletBalance, 550);
     expect(
-      await games.getTransactions(
-        player.profileId,
-        periodId: player.periodId,
-      ),
+      await games.getTransactions(player.profileId, periodId: player.periodId),
       hasLength(2),
     );
 
@@ -175,10 +179,15 @@ void main() {
 
   test('savings replay succeeds after period completion', () async {
     final player = await createActivePlayer();
+    await games.selectSavingsGoal(
+      profileId: player.profileId,
+      goal: savingsGoal,
+    );
 
     final first = await games.depositSavings(
       profileId: player.profileId,
       periodId: player.periodId,
+      goal: savingsGoal,
       amount: 100,
       operationId: 'savings-retry',
     );
@@ -190,6 +199,7 @@ void main() {
     final replay = await games.depositSavings(
       profileId: player.profileId,
       periodId: player.periodId,
+      goal: savingsGoal,
       amount: 100,
       operationId: 'savings-retry',
     );
@@ -197,10 +207,7 @@ void main() {
     expect(replay.walletBalance, 400);
     expect(replay.savedAmount, 100);
     expect(
-      await games.getTransactions(
-        player.profileId,
-        periodId: player.periodId,
-      ),
+      await games.getTransactions(player.profileId, periodId: player.periodId),
       hasLength(2),
     );
 
@@ -208,10 +215,11 @@ void main() {
       games.depositSavings(
         profileId: player.profileId,
         periodId: player.periodId,
+        goal: savingsGoal,
         amount: 100,
         operationId: 'savings-new-after-complete',
       ),
-      throwsStateError,
+      throwsA(isA<SavingsPeriodNotAvailableException>()),
     );
   });
 }

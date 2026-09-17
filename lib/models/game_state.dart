@@ -5,6 +5,7 @@ class GameState {
     required this.currentPeriod,
     this.activeGoalId,
     required this.savedAmount,
+    this.goalChangeUsed = false,
     required this.updatedAt,
   });
 
@@ -13,6 +14,7 @@ class GameState {
   final int currentPeriod;
   final String? activeGoalId;
   final int savedAmount;
+  final bool goalChangeUsed;
   final DateTime updatedAt;
 
   GameState copyWith({
@@ -21,6 +23,7 @@ class GameState {
     String? activeGoalId,
     bool clearActiveGoal = false,
     int? savedAmount,
+    bool? goalChangeUsed,
     DateTime? updatedAt,
   }) {
     return GameState(
@@ -29,6 +32,9 @@ class GameState {
       currentPeriod: currentPeriod ?? this.currentPeriod,
       activeGoalId: clearActiveGoal ? null : activeGoalId ?? this.activeGoalId,
       savedAmount: savedAmount ?? this.savedAmount,
+      goalChangeUsed: clearActiveGoal
+          ? false
+          : goalChangeUsed ?? this.goalChangeUsed,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
@@ -39,6 +45,7 @@ class GameState {
     'current_period': currentPeriod,
     'active_goal_id': activeGoalId,
     'saved_amount': savedAmount,
+    'goal_change_used': goalChangeUsed ? 1 : 0,
     'updated_at': updatedAt.toUtc().toIso8601String(),
   };
 
@@ -48,6 +55,7 @@ class GameState {
     currentPeriod: map['current_period'] as int,
     activeGoalId: map['active_goal_id'] as String?,
     savedAmount: map['saved_amount'] as int,
+    goalChangeUsed: (map['goal_change_used'] as int? ?? 0) == 1,
     updatedAt: DateTime.parse(map['updated_at'] as String),
   );
 }

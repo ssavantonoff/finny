@@ -54,10 +54,11 @@ void main() {
             profileId: profile.id!,
             periodId: period.id!,
             operationId: 'service-boundary-purchase',
-            item: (await container
-                    .read(contentRepositoryProvider)
-                    .loadShopItems())
-                .first,
+            item:
+                (await container
+                        .read(contentRepositoryProvider)
+                        .loadShopItems())
+                    .first,
           );
 
       expect(state.walletBalance, 660);

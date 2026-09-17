@@ -5,10 +5,15 @@ import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/content_repository.dart';
 
 class TestContentRepository implements ContentRepository {
-  TestContentRepository(this.periods, {this.shopItems = const []});
+  TestContentRepository(
+    this.periods, {
+    this.shopItems = const [],
+    this.goals = const [],
+  });
 
   final List<PeriodDefinition> periods;
   final List<ShopItem> shopItems;
+  final List<SavingsGoal> goals;
 
   @override
   Future<List<PeriodDefinition>> loadPeriods() async => periods;
@@ -17,7 +22,7 @@ class TestContentRepository implements ContentRepository {
   Future<List<GlossaryEntry>> loadGlossary() async => const [];
 
   @override
-  Future<List<SavingsGoal>> loadGoals() async => const [];
+  Future<List<SavingsGoal>> loadGoals() async => goals;
 
   @override
   Future<List<ShopItem>> loadShopItems() async => shopItems;

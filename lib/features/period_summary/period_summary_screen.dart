@@ -1,13 +1,122 @@
-import 'package:finny/core/widgets/feature_placeholder_screen.dart';
-import 'package:flutter/widgets.dart';
+import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/features/period_summary/period_summary_controller.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class PeriodSummaryScreen extends StatelessWidget {
+class PeriodSummaryScreen extends ConsumerStatefulWidget {
   const PeriodSummaryScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const FeaturePlaceholderScreen(
-    title: 'Итоги периода',
-    description: 'Здесь позже появится сравнение плана и факта.',
-    currentPath: '/period-summary',
+  ConsumerState<PeriodSummaryScreen> createState() =>
+      _PeriodSummaryScreenState();
+}
+
+class _PeriodSummaryScreenState extends ConsumerState<PeriodSummaryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(ref.read(periodSummaryControllerProvider.notifier).load);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(periodSummaryControllerProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Итоги дня')),
+      body: switch (state) {
+        PeriodSummaryLoading() => const Center(
+          child: CircularProgressIndicator(),
+        ),
+        PeriodSummaryFailure() => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.large),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Не удалось загрузить итоги дня.'),
+                const SizedBox(height: AppSpacing.medium),
+                FilledButton(
+                  onPressed: ref
+                      .read(periodSummaryControllerProvider.notifier)
+                      .load,
+                  child: const Text('Попробовать снова'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        PeriodSummaryReady() => _SummaryBody(state: state),
+      },
+    );
+  }
+}
+
+class _SummaryBody extends StatelessWidget {
+  const _SummaryBody({required this.state});
+  final PeriodSummaryReady state;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    child: ListView(
+      padding: const EdgeInsets.all(AppSpacing.medium),
+      children: [
+        Text(
+          'День ${state.period.periodNumber} завершён',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: AppSpacing.large),
+        const Row(
+          children: [
+            Expanded(child: Text('Категория')),
+            SizedBox(width: 80, child: Text('План')),
+            SizedBox(width: 80, child: Text('Факт')),
+          ],
+        ),
+        const Divider(),
+        _SummaryRow(
+          'Нужное',
+          state.summary.plannedNeed,
+          state.summary.factNeed,
+        ),
+        _SummaryRow('Хочу', state.summary.plannedWant, state.summary.factWant),
+        _SummaryRow(
+          'Накопления',
+          state.summary.plannedSavings,
+          state.summary.factSavings,
+        ),
+        _SummaryRow(
+          'Остаток',
+          state.summary.plannedRemainder,
+          state.summary.factRemainder,
+        ),
+        const SizedBox(height: AppSpacing.large),
+        FilledButton(
+          key: const Key('summary-home'),
+          onPressed: () => context.go('/home'),
+          child: const Text('На главную'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow(this.label, this.plan, this.fact);
+  final String label;
+  final int plan;
+  final int fact;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: AppSpacing.small),
+    child: Row(
+      children: [
+        Expanded(child: Text(label)),
+        SizedBox(width: 80, child: Text('$plan')),
+        SizedBox(width: 80, child: Text('$fact')),
+      ],
+    ),
   );
 }

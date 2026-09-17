@@ -1,9 +1,23 @@
 [
   {
+    "id": "goal_night_light",
+    "name": "Ночник для Финни",
+    "price": 400,
+    "description": "Накопи на уютный ночник для комнаты Финни.",
+    "rewardAssetId": "reward_night_light"
+  },
+  {
     "id": "goal_scooter",
     "name": "Самокат для Финни",
     "price": 600,
-    "description": "Накопи постепенно и открой памятный предмет.",
+    "description": "Накопи на самокат для прогулок с Финни.",
     "rewardAssetId": "reward_scooter"
+  },
+  {
+    "id": "goal_play_house",
+    "name": "Игровой домик для Финни",
+    "price": 900,
+    "description": "Накопи на игровой домик для комнаты Финни.",
+    "rewardAssetId": "reward_play_house"
   }
 ]
