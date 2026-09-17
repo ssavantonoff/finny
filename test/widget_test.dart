@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
+import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
@@ -44,15 +45,23 @@ class _Games extends SqliteGameRepository {
   _Games(super.database);
 
   Pet? pet;
+  GameState? gameState;
 
   @override
-  Future<GameState> ensureInitialState(int profileId) async => GameState(
-    profileId: profileId,
-    walletBalance: 0,
-    currentPeriod: 0,
-    savedAmount: 0,
-    updatedAt: DateTime.utc(2026),
-  );
+  Future<GameState> ensureInitialState(int profileId) async =>
+      gameState ??= GameState(
+        profileId: profileId,
+        walletBalance: 0,
+        currentPeriod: 0,
+        savedAmount: 0,
+        updatedAt: DateTime.utc(2026),
+      );
+
+  @override
+  Future<GameState?> getGameState(int profileId) async => gameState;
+
+  @override
+  Future<List<GamePeriod>> getPeriods(int profileId) async => const [];
 
   @override
   Future<Pet?> getPet(int profileId) async => pet;
@@ -130,7 +139,8 @@ void main() {
       UncontrolledProviderScope(container: container, child: const FinnyApp()),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Дом Финни'), findsOneWidget);
+    expect(find.text('Первый день'), findsOneWidget);
+    expect(find.text('Финни'), findsOneWidget);
     expect(find.text('Привет! Я Финни'), findsNothing);
     expect(container.read(activeProfileIdProvider), 1);
   });
