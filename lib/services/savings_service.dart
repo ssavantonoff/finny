@@ -141,10 +141,17 @@ class SavingsService {
   Future<GamePeriod> skipToday({
     required int profileId,
     required int periodId,
-  }) => _gameRepository.skipSavingsDecision(
-    profileId: profileId,
-    periodId: periodId,
-  );
+  }) async {
+    final goals = await loadValidatedGoals();
+    final state = await _requireState(profileId);
+    final activeGoalId = state.activeGoalId;
+    if (activeGoalId == null) throw const SavingsGoalRequiredException();
+    _findGoal(goals, activeGoalId);
+    return _gameRepository.skipSavingsDecision(
+      profileId: profileId,
+      periodId: periodId,
+    );
+  }
 
   Future<GamePeriod> resolveAllGoalsCompletedDecision({
     required int profileId,

@@ -41,6 +41,21 @@ const goals = [
   ),
 ];
 
+class _TrackingGameRepository extends SqliteGameRepository {
+  _TrackingGameRepository(super.database);
+
+  int skipCalls = 0;
+
+  @override
+  Future<GamePeriod> skipSavingsDecision({
+    required int profileId,
+    required int periodId,
+  }) {
+    skipCalls++;
+    return super.skipSavingsDecision(profileId: profileId, periodId: periodId);
+  }
+}
+
 void main() {
   late AppDatabase database;
   late SqliteProfileRepository profiles;
@@ -48,12 +63,13 @@ void main() {
   late SavingsService savings;
   late PeriodService periods;
   late BudgetService budgets;
+  late TestContentRepository content;
 
   setUp(() {
     database = createTestDatabase();
     profiles = SqliteProfileRepository(database);
     games = SqliteGameRepository(database);
-    final content = TestContentRepository(
+    content = TestContentRepository(
       testPeriodDefinitions(count: 2),
       goals: goals,
     );
@@ -301,6 +317,47 @@ void main() {
       );
     },
   );
+
+  test('skip rejects an active goal missing from canonical content', () async {
+    final profileId = await createPlayer(
+      wallet: 275,
+      saved: 125,
+      activeGoalId: 'unknown_or_deleted_goal',
+    );
+    final period = await startActive(profileId);
+    final stateBefore = (await games.getGameState(profileId))!;
+    final periodBefore = (await games.getPeriodById(profileId, period.id!))!;
+    final transactionsBefore = await games.getTransactions(
+      profileId,
+      periodId: period.id,
+    );
+    final trackingGames = _TrackingGameRepository(database);
+    final boundary = SavingsService(trackingGames, content);
+
+    await expectLater(
+      boundary.skipToday(profileId: profileId, periodId: period.id!),
+      throwsA(
+        isA<SavingsGoalNotFoundException>().having(
+          (error) => error.goalId,
+          'goalId',
+          'unknown_or_deleted_goal',
+        ),
+      ),
+    );
+
+    expect(trackingGames.skipCalls, 0);
+    final stateAfter = (await games.getGameState(profileId))!;
+    final periodAfter = (await games.getPeriodById(profileId, period.id!))!;
+    expect(periodAfter.resolvedCheckpoints, periodBefore.resolvedCheckpoints);
+    expect(periodAfter.status, periodBefore.status);
+    expect(stateAfter.walletBalance, stateBefore.walletBalance);
+    expect(stateAfter.savedAmount, stateBefore.savedAmount);
+    expect(periodAfter.actualSavings, periodBefore.actualSavings);
+    expect(
+      await games.getTransactions(profileId, periodId: period.id),
+      hasLength(transactionsBefore.length),
+    );
+  });
 
   test(
     'claim preserves excess, gives one reward and has durable replay',
