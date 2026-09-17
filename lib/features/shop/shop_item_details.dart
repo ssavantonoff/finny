@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/features/shop/shop_widgets.dart';
+import 'package:finny/models/game_period.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,7 +30,15 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
     super.initState();
     ref.listenManual(shopControllerProvider, (_, next) {
       if (!_confirming || _closing) return;
-      if (next.period?.id == _periodId) return;
+      if (next.profileId != widget.profileId) return;
+      if (next.load != ShopLoad.ready) return;
+      final periodChanged = next.period?.id != _periodId;
+      final statusInvalid =
+          !periodChanged &&
+          next.period != null &&
+          next.period!.status != GamePeriodStatus.active &&
+          next.period!.status != GamePeriodStatus.readyToFinish;
+      if (!periodChanged && !statusInvalid) return;
       setState(() {
         _confirming = false;
         _periodId = null;

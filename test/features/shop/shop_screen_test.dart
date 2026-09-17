@@ -260,13 +260,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
 
-      // Period changes to planning (still id=91 but different object — use
-      // a different id to trigger the stale check reliably).
-      h.games.periods[1] = period(
-        1,
-        id: 300,
-        status: GamePeriodStatus.planning,
-      );
+      // Same id=91 but status changes to planning.
+      h.games.periods[1] = period(1, id: 91, status: GamePeriodStatus.planning);
       await h.controller.load();
       await tester.pumpAndSettle();
 
@@ -301,6 +296,94 @@ void main() {
     expect(
       find.text('Игровой период изменился. Подтверди покупку ещё раз.'),
       findsOneWidget,
+    );
+    expect(h.purchases.calls, isEmpty);
+    expect(h.generatedIds, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'confirmation survives reload when canonical period id is unchanged',
+    (tester) async {
+      await mount(tester);
+      await details(tester);
+
+      // Enter confirmation with period A (id=91).
+      await tester.tap(find.byKey(const Key('shop-buy')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+      expect(h.purchases.calls, isEmpty);
+      expect(h.generatedIds, 0);
+
+      // Reload without changing the canonical period.
+      await h.controller.load();
+      await tester.pumpAndSettle();
+
+      // Confirmation must survive — no false invalidation.
+      expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+      expect(
+        find.text('Игровой период изменился. Подтверди покупку ещё раз.'),
+        findsNothing,
+      );
+      expect(h.purchases.calls, isEmpty);
+      expect(h.generatedIds, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'confirmation closes on profile switch without period-changed message',
+    (tester) async {
+      await mount(tester);
+      await details(tester);
+
+      // Enter confirmation with profile 1.
+      await tester.tap(find.byKey(const Key('shop-buy')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+
+      // Switch to profile 2.
+      h.select(2);
+      await tester.pumpAndSettle();
+
+      // Details closed by existing profile-switch logic.
+      expect(find.byKey(const Key('shop-buy')), findsNothing);
+      expect(h.purchases.calls, isEmpty);
+      expect(h.generatedIds, 0);
+      // No false period-changed SnackBar.
+      expect(
+        find.text('Игровой период изменился. Подтверди покупку ещё раз.'),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('confirmation survives active to readyToFinish transition', (
+    tester,
+  ) async {
+    await mount(tester);
+    await details(tester);
+
+    // Enter confirmation with period id=91, active.
+    await tester.tap(find.byKey(const Key('shop-buy')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+
+    // Period transitions to readyToFinish (still purchasable).
+    h.games.periods[1] = period(
+      1,
+      id: 91,
+      status: GamePeriodStatus.readyToFinish,
+    );
+    await h.controller.load();
+    await tester.pumpAndSettle();
+
+    // Confirmation must survive — readyToFinish allows purchases.
+    expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+    expect(
+      find.text('Игровой период изменился. Подтверди покупку ещё раз.'),
+      findsNothing,
     );
     expect(h.purchases.calls, isEmpty);
     expect(h.generatedIds, 0);
