@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/shop/shop_screen.dart';
+import 'package:finny/models/game_period.dart';
 import 'package:finny/models/purchase_exception.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -200,5 +201,109 @@ void main() {
     expect(find.text('Профиль пока не выбран.'), findsOneWidget);
     expect(find.byKey(const Key('shop-buy')), findsNothing);
     expect(h.purchases.calls, isEmpty);
+  });
+
+  testWidgets(
+    'stale confirmation period invalidates and allows re-confirmation',
+    (tester) async {
+      await mount(tester);
+      await details(tester);
+
+      // Enter confirmation with period A (id=91).
+      await tester.tap(find.byKey(const Key('shop-buy')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+      expect(h.purchases.calls, isEmpty);
+      expect(h.generatedIds, 0);
+
+      // Change canonical period to B (id=200).
+      h.games.periods[1] = period(1, id: 200);
+      await h.controller.load();
+      await tester.pumpAndSettle();
+
+      // Stale confirmation must be reset.
+      expect(find.byKey(const Key('shop-confirmation')), findsNothing);
+      expect(
+        find.text('Игровой период изменился. Подтверди покупку ещё раз.'),
+        findsOneWidget,
+      );
+      expect(h.purchases.calls, isEmpty);
+      expect(h.generatedIds, 0);
+
+      // Re-enter confirmation with period B.
+      final buy = find.byKey(const Key('shop-buy'));
+      await tester.ensureVisible(buy);
+      await tester.tap(buy);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+
+      // Final purchase.
+      await tester.ensureVisible(buy);
+      await tester.tap(buy);
+      await tester.pumpAndSettle();
+
+      expect(h.purchases.calls, hasLength(1));
+      expect(h.purchases.calls.single.periodId, 200);
+      expect(h.generatedIds, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'stale confirmation invalidated when period becomes non-purchasable',
+    (tester) async {
+      await mount(tester);
+      await details(tester);
+
+      // Enter confirmation with period A (id=91, active).
+      await tester.tap(find.byKey(const Key('shop-buy')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+
+      // Period changes to planning (still id=91 but different object — use
+      // a different id to trigger the stale check reliably).
+      h.games.periods[1] = period(
+        1,
+        id: 300,
+        status: GamePeriodStatus.planning,
+      );
+      await h.controller.load();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('shop-confirmation')), findsNothing);
+      expect(
+        find.text('Игровой период изменился. Подтверди покупку ещё раз.'),
+        findsOneWidget,
+      );
+      expect(h.purchases.calls, isEmpty);
+      expect(h.generatedIds, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('stale confirmation invalidated when period becomes null', (
+    tester,
+  ) async {
+    await mount(tester);
+    await details(tester);
+
+    // Enter confirmation with period A (id=91, active).
+    await tester.tap(find.byKey(const Key('shop-buy')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('shop-confirmation')), findsOneWidget);
+
+    // Period disappears entirely.
+    h.games.periods[1] = null;
+    await h.controller.load();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('shop-confirmation')), findsNothing);
+    expect(
+      find.text('Игровой период изменился. Подтверди покупку ещё раз.'),
+      findsOneWidget,
+    );
+    expect(h.purchases.calls, isEmpty);
+    expect(h.generatedIds, 0);
+    expect(tester.takeException(), isNull);
   });
 }

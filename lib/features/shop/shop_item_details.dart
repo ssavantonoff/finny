@@ -25,6 +25,24 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
   int? _periodId;
 
   @override
+  void initState() {
+    super.initState();
+    ref.listenManual(shopControllerProvider, (_, next) {
+      if (!_confirming || _closing) return;
+      if (next.period?.id == _periodId) return;
+      setState(() {
+        _confirming = false;
+        _periodId = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Игровой период изменился. Подтверди покупку ещё раз.'),
+        ),
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(shopControllerProvider);
     final controller = ref.read(shopControllerProvider.notifier);
