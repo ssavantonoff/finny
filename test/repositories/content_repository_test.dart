@@ -16,7 +16,8 @@ void main() {
     expect(tasks, isNotEmpty);
     expect(tasks.single.scenarioData, isNotEmpty);
     expect(items, hasLength(2));
-    expect(goals.single.price, greaterThan(0));
+    expect(goals, hasLength(3));
+    expect(goals.every((goal) => goal.price > 0), isTrue);
     expect(periods, hasLength(5));
     expect(periods.map((period) => period.number), [1, 2, 3, 4, 5]);
     expect(periods.every((period) => period.baseIncome == 500), isTrue);

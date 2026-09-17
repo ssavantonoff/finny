@@ -35,6 +35,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _incomeSheetOpen = false;
   }
 
+  Future<void> _openSavings() async {
+    await context.push('/savings');
+    if (mounted) await ref.read(homeControllerProvider.notifier).load();
+  }
+
+  Future<void> _finishDay() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Завершить день?'),
+        content: const Text(
+          'После завершения изменить решения этого дня нельзя.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Завершить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final completed = await ref
+        .read(homeControllerProvider.notifier)
+        .finishDay();
+    if (completed && mounted) context.go('/period-summary');
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(homeControllerProvider);
@@ -53,22 +85,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       HomeFailure() => _HomeError(
         onRetry: ref.read(homeControllerProvider.notifier).load,
       ),
-      HomeReady() => _HomeContent(state: state, onStartDay: _startDay),
+      HomeReady() => _HomeContent(
+        state: state,
+        onStartDay: _startDay,
+        onSavings: _openSavings,
+        onFinishDay: _finishDay,
+      ),
     };
   }
 }
 
 class _HomeContent extends StatelessWidget {
-  const _HomeContent({required this.state, required this.onStartDay});
+  const _HomeContent({
+    required this.state,
+    required this.onStartDay,
+    required this.onSavings,
+    required this.onFinishDay,
+  });
 
   final HomeReady state;
   final VoidCallback onStartDay;
+  final VoidCallback onSavings;
+  final VoidCallback onFinishDay;
 
   @override
   Widget build(BuildContext context) {
     final period = state.period;
     final title = period == null
-        ? 'Первый день'
+        ? state.completedDays == 0
+              ? 'Первый день'
+              : 'Дом Финни'
         : 'День ${period.periodNumber} • ${state.definition!.title}';
     return Scaffold(
       appBar: AppBar(
@@ -114,13 +160,25 @@ class _HomeContent extends StatelessWidget {
                       'Не получилось начать день. Попробуй ещё раз.',
                     ),
                   ],
+                  if (state.finishFailed) ...[
+                    const SizedBox(height: AppSpacing.medium),
+                    const _Notice(
+                      'Не получилось завершить день. Попробуй ещё раз.',
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.large),
-                  if (period == null)
+                  if (state.allDaysCompleted)
+                    const _Notice('Все дни завершены')
+                  else if (period == null)
                     FilledButton(
                       key: const Key('home-start-day'),
                       onPressed: state.startingDay ? null : onStartDay,
                       child: Text(
-                        state.startingDay ? 'Начинаем…' : 'Начать день',
+                        state.startingDay
+                            ? 'Начинаем…'
+                            : state.completedDays == 0
+                            ? 'Начать день'
+                            : 'Начать следующий день',
                       ),
                     )
                   else if (period.status == GamePeriodStatus.planning)
@@ -134,7 +192,22 @@ class _HomeContent extends StatelessWidget {
                       key: const Key('home-view-plan'),
                       onPressed: () => context.go('/budget'),
                       child: const Text('Посмотреть план'),
+                    )
+                  else if (period.status == GamePeriodStatus.readyToFinish)
+                    FilledButton(
+                      key: const Key('home-finish-day'),
+                      onPressed: state.finishingDay ? null : onFinishDay,
+                      child: Text(
+                        state.finishingDay ? 'Завершаем…' : 'Завершить день',
+                      ),
                     ),
+                  const SizedBox(height: AppSpacing.small),
+                  OutlinedButton.icon(
+                    key: const Key('home-savings'),
+                    onPressed: onSavings,
+                    icon: const Icon(Icons.savings_outlined),
+                    label: const Text('Накопления'),
+                  ),
                 ],
               ),
             ),

@@ -52,9 +52,19 @@ completed`. `PeriodService` выбирает следующую definition из 
 
 Budget draft хранится в `planned_*` полях периода. После подтверждения plan
 неизменяем. Fact и additional income вычисляются из persisted transactions
-конкретного period instance; legacy-поля `extra_income` и `actual_*` не являются
-источником Fact. Required/resolved checkpoints сохраняются snapshot-списками у
+конкретного period instance; `extra_income` и `actual_*` синхронно обновляются в
+тех же Core-транзакциях как runtime aggregates, но журнал остаётся источником
+Period Summary. Required/resolved checkpoints сохраняются snapshot-списками у
 периода. Подробнее: [Core Game Loop](CORE_GAME_LOOP.md).
+
+## Savings goals
+
+`GameState.savedAmount` — глобальная копилка профиля, а `activeGoalId` и
+`goalChangeUsed` описывают текущий цикл цели. Canonical identity и цена целей
+загружаются из `assets/content/goals.json` через `SavingsService`; UI передаёт
+только IDs и суммы. Выданные цели фиксируются отдельно в `completed_goals`, а
+их persistent rewards — в `inventory`. Deposit и claim атомарно изменяют все
+связанные runtime-записи и имеют durable idempotency proof.
 
 ## NORMAL и DEMO
 
@@ -82,7 +92,8 @@ Budget draft хранится в `planned_*` полях периода. Посл
 
 `lib/app/router.dart` содержит GoRouter-маршруты для всех согласованных модулей.
 Стартовый `/startup` ожидает bootstrap и направляет на onboarding, Pet Creation
-или Home; остальные ещё не реализованные модули сохраняют placeholder screens.
+или Home. Home открывает Savings, завершает готовый период и ведёт на минимальный
+Period Summary; следующий период запускается только отдельным действием на Home.
 Светлая Material 3 тема, базовые отступы и радиусы определены в
 `lib/core/theme/app_theme.dart`.
 
@@ -98,10 +109,12 @@ Budget draft хранится в `planned_*` полях периода. Посл
 
 ## Миграции
 
-Текущая schema version — 2. Миграция v1 → v2 добавляет period definition identity,
+Текущая schema version — 3. Миграция v1 → v2 добавляет period definition identity,
 required/resolved checkpoint snapshots и индекс period transactions, не удаляя
 существующие профили, balances, планы или историю. Для прежних периодов 1–5
 identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
-их сохранённый `baseIncome` не переписывается. Следующие изменения схемы должны
-добавлять последовательные миграции; нельзя пересоздавать базу с потерей
-NORMAL-профиля.
+их сохранённый `baseIncome` не переписывается. Миграция v2 → v3 добавляет
+`game_states.goal_change_used` и таблицу `completed_goals`, не выводя completion
+из inventory и не сбрасывая wallet, savings, periods или историю. Следующие
+изменения схемы должны добавлять последовательные миграции; нельзя пересоздавать
+базу с потерей NORMAL-профиля.

@@ -28,7 +28,9 @@ class PurchaseService {
     final items = await _contentRepository.loadShopItems();
     final matchingItems = items.where((candidate) => candidate.id == item.id);
     if (matchingItems.length != 1) {
-      throw StateError('Shop item ${item.id} is missing or duplicated in content.');
+      throw StateError(
+        'Shop item ${item.id} is missing or duplicated in content.',
+      );
     }
     final canonicalItem = matchingItems.single;
     if (canonicalItem.price != item.price ||
