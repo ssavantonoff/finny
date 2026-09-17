@@ -429,7 +429,6 @@ class SqliteGameRepository implements GameRepository {
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
       final period = await _requirePeriod(txn, transaction.profileId, periodId);
-      _requireFinancialActionsAllowed(period);
       final existing = await _readTransactionByKey(
         txn,
         transaction.profileId,
@@ -439,6 +438,7 @@ class SqliteGameRepository implements GameRepository {
         _requireSameCommand(existing, transaction);
         return _requireState(txn, transaction.profileId);
       }
+      _requireFinancialActionsAllowed(period);
       return _applyWalletTransaction(txn, transaction);
     });
   }
@@ -470,7 +470,6 @@ class SqliteGameRepository implements GameRepository {
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
       final period = await _requirePeriod(txn, profileId, periodId);
-      _requireFinancialActionsAllowed(period);
       final existing = await _readTransactionByKey(
         txn,
         profileId,
@@ -480,6 +479,7 @@ class SqliteGameRepository implements GameRepository {
         _requireSameCommand(existing, transaction);
         return _requireState(txn, profileId);
       }
+      _requireFinancialActionsAllowed(period);
 
       if (item.persistent) {
         final ownedQuantity = await _readInventoryQuantity(
@@ -539,7 +539,6 @@ class SqliteGameRepository implements GameRepository {
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
       final period = await _requirePeriod(txn, profileId, periodId);
-      _requireFinancialActionsAllowed(period);
       final existing = await _readTransactionByKey(
         txn,
         profileId,
@@ -549,6 +548,7 @@ class SqliteGameRepository implements GameRepository {
         _requireSameCommand(existing, transaction);
         return _requireState(txn, profileId);
       }
+      _requireFinancialActionsAllowed(period);
       final state = await _requireState(txn, profileId);
       final nextWallet = state.walletBalance - amount;
       if (nextWallet < 0) {
