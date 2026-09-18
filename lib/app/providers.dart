@@ -7,6 +7,7 @@ import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/pet_progress_service.dart';
+import 'package:finny/services/pet_state_service.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:finny/services/savings_service.dart';
 import 'package:finny/services/task_service.dart';
@@ -88,4 +89,8 @@ final taskServiceProvider = Provider<TaskService>(
 
 final petProgressServiceProvider = Provider<PetProgressService>(
   (ref) => PetProgressService(ref.watch(gameRepositoryProvider)),
+);
+
+final petStateServiceProvider = Provider<PetStateService>(
+  (ref) => PetStateService(ref.watch(gameRepositoryProvider)),
 );

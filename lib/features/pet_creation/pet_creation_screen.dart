@@ -3,6 +3,7 @@ import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/features/pet_creation/pet_creation_draft.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/pet_state_rules.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -135,8 +136,9 @@ class _PetCreationScreenState extends ConsumerState<PetCreationScreen> {
               patternId: _draft.patternId,
               developmentStage: 0,
               growthPoints: 0,
-              satiety: 100,
-              mood: 100,
+              satiety: PetStateRules.initialValue,
+              care: PetStateRules.initialValue,
+              mood: PetStateRules.initialValue,
             )
           : currentPet.copyWith(
               name: _draft.trimmedName,

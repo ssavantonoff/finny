@@ -126,6 +126,7 @@ void main() {
         developmentStage: 0,
         growthPoints: 0,
         satiety: 100,
+        care: 100,
         mood: 100,
       );
     final container = ProviderContainer(

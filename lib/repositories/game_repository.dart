@@ -4,6 +4,7 @@ import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/pet_state_rules.dart';
 import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/savings_exception.dart';
 import 'package:finny/models/savings_goal.dart';
@@ -19,6 +20,11 @@ abstract interface class GameRepository {
   Future<GameState?> getGameState(int profileId);
   Future<void> savePet(Pet pet);
   Future<Pet?> getPet(int profileId);
+  Future<Pet> applyActiveElapsedTime({
+    required int profileId,
+    required int periodId,
+    required Duration elapsed,
+  });
   Future<GamePeriod?> getPeriod(int profileId, int periodNumber);
   Future<GamePeriod?> getPeriodById(int profileId, int periodId);
   Future<GamePeriod?> getCurrentPeriod(int profileId);
@@ -148,6 +154,7 @@ class SqliteGameRepository implements GameRepository {
 
   @override
   Future<void> savePet(Pet pet) async {
+    _validatePet(pet);
     final db = await _appDatabase.database;
     await db.insert(
       'pets',
@@ -166,6 +173,67 @@ class SqliteGameRepository implements GameRepository {
       limit: 1,
     );
     return rows.isEmpty ? null : Pet.fromMap(rows.single);
+  }
+
+  @override
+  Future<Pet> applyActiveElapsedTime({
+    required int profileId,
+    required int periodId,
+    required Duration elapsed,
+  }) async {
+    if (elapsed.isNegative) {
+      throw ArgumentError.value(elapsed, 'elapsed', 'Must not be negative.');
+    }
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final period = await _requirePeriod(txn, profileId, periodId);
+      if (period.status != GamePeriodStatus.active &&
+          period.status != GamePeriodStatus.readyToFinish) {
+        throw StateError(
+          'Pet decay requires an active or ready-to-finish period.',
+        );
+      }
+      final pet = await _requirePet(txn, profileId);
+      final uncappedElapsed =
+          period.activeElapsedMilliseconds + elapsed.inMilliseconds;
+      final activeElapsedMilliseconds =
+          uncappedElapsed > PetStateRules.fullDailyDecay.inMilliseconds
+          ? PetStateRules.fullDailyDecay.inMilliseconds
+          : uncappedElapsed;
+      final activeElapsed = Duration(milliseconds: activeElapsedMilliseconds);
+      final targetSatietyDecay = PetStateRules.decayAt(
+        activeElapsed,
+        PetStateRules.maxSatietyDecay,
+      );
+      final targetCareDecay = PetStateRules.decayAt(
+        activeElapsed,
+        PetStateRules.maxCareDecay,
+      );
+      final targetMoodDecay = PetStateRules.decayAt(
+        activeElapsed,
+        PetStateRules.maxMoodDecay,
+      );
+      final updatedPet = pet.copyWith(
+        satiety: PetStateRules.clampStat(
+          pet.satiety - (targetSatietyDecay - period.satietyDecayApplied),
+        ),
+        care: PetStateRules.clampStat(
+          pet.care - (targetCareDecay - period.careDecayApplied),
+        ),
+        mood: PetStateRules.clampStat(
+          pet.mood - (targetMoodDecay - period.moodDecayApplied),
+        ),
+      );
+      final updatedPeriod = period.copyWith(
+        activeElapsedMilliseconds: activeElapsedMilliseconds,
+        satietyDecayApplied: targetSatietyDecay,
+        careDecayApplied: targetCareDecay,
+        moodDecayApplied: targetMoodDecay,
+      );
+      await _writePet(txn, updatedPet);
+      await _writePeriod(txn, updatedPeriod);
+      return updatedPet;
+    });
   }
 
   @override
@@ -928,6 +996,7 @@ class SqliteGameRepository implements GameRepository {
       }
       for (final table in [
         'task_progress',
+        'pet_daily_usage',
         'inventory',
         'transactions',
         'game_periods',
@@ -1056,6 +1125,32 @@ class SqliteGameRepository implements GameRepository {
       limit: 1,
     );
     return rows.isEmpty ? null : GameState.fromMap(rows.single);
+  }
+
+  Future<Pet> _requirePet(DatabaseExecutor db, int profileId) async {
+    final rows = await db.query(
+      'pets',
+      where: 'profile_id = ?',
+      whereArgs: [profileId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw StateError('Pet for profile $profileId is missing.');
+    }
+    return Pet.fromMap(rows.single);
+  }
+
+  Future<void> _writePet(DatabaseExecutor db, Pet pet) async {
+    _validatePet(pet);
+    final count = await db.update(
+      'pets',
+      pet.toMap()..remove('profile_id'),
+      where: 'profile_id = ?',
+      whereArgs: [pet.profileId],
+    );
+    if (count != 1) {
+      throw StateError('Pet for profile ${pet.profileId} is missing.');
+    }
   }
 
   Future<int> _readInventoryQuantity(
@@ -1193,6 +1288,18 @@ class SqliteGameRepository implements GameRepository {
         'operationId',
         'Must not be empty.',
       );
+    }
+  }
+
+  void _validatePet(Pet pet) {
+    if (pet.profileId <= 0 ||
+        pet.satiety < 0 ||
+        pet.satiety > PetStateRules.maxValue ||
+        pet.care < 0 ||
+        pet.care > PetStateRules.maxValue ||
+        pet.mood < 0 ||
+        pet.mood > PetStateRules.maxValue) {
+      throw ArgumentError('Pet identity or state is invalid.');
     }
   }
 }

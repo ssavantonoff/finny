@@ -12,7 +12,7 @@ import '../helpers/task_progress_schema.dart';
 import '../helpers/test_database.dart';
 
 void main() {
-  test('fresh v4 has canonical task_progress schema', () async {
+  test('fresh current schema has canonical task_progress schema', () async {
     final database = createTestDatabase();
     addTearDown(database.close);
     final profile = await SqliteProfileRepository(database).create(
@@ -26,7 +26,7 @@ void main() {
     await expectTaskProgressV4Schema(database, profileId: profile.id!);
   });
 
-  test('v3 without task_progress upgrades to v4 without losing data', () async {
+  test('v3 without task_progress upgrades to current without losing data', () async {
     sqfliteFfiInit();
     final directory = await Directory.systemTemp.createTemp('finny_v4_');
     final path = '${directory.path}/finny.sqlite';
@@ -57,6 +57,18 @@ void main() {
               saved_amount INTEGER NOT NULL,
               goal_change_used INTEGER NOT NULL,
               updated_at TEXT NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE pets (
+              profile_id INTEGER PRIMARY KEY,
+              name TEXT NOT NULL,
+              color_id TEXT NOT NULL,
+              pattern_id TEXT NOT NULL,
+              development_stage INTEGER NOT NULL,
+              growth_points INTEGER NOT NULL,
+              satiety INTEGER NOT NULL,
+              mood INTEGER NOT NULL
             )
           ''');
           await db.execute('''
@@ -116,6 +128,16 @@ void main() {
       'saved_amount': 123,
       'goal_change_used': 0,
       'updated_at': created,
+    });
+    await legacy.insert('pets', {
+      'profile_id': 1,
+      'name': 'Existing Finny',
+      'color_id': 'mint',
+      'pattern_id': 'spots',
+      'development_stage': 1,
+      'growth_points': 20,
+      'satiety': 66,
+      'mood': 77,
     });
     await legacy.insert('game_periods', {
       'id': 7,

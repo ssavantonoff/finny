@@ -12,7 +12,7 @@ import '../helpers/test_content_repository.dart';
 import '../helpers/task_progress_schema.dart';
 
 void main() {
-  test('schema v1 migrates to v4 without losing period state', () async {
+  test('schema v1 migrates to current without losing period state', () async {
     sqfliteFfiInit();
     final directory = await Directory.systemTemp.createTemp('finny_migration_');
     final path = '${directory.path}/finny.sqlite';
@@ -44,6 +44,18 @@ void main() {
               active_goal_id TEXT,
               saved_amount INTEGER NOT NULL,
               updated_at TEXT NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE pets (
+              profile_id INTEGER PRIMARY KEY,
+              name TEXT NOT NULL,
+              color_id TEXT NOT NULL,
+              pattern_id TEXT NOT NULL,
+              development_stage INTEGER NOT NULL,
+              growth_points INTEGER NOT NULL,
+              satiety INTEGER NOT NULL,
+              mood INTEGER NOT NULL
             )
           ''');
           await db.execute('''
@@ -99,6 +111,16 @@ void main() {
       'active_goal_id': null,
       'saved_amount': 70,
       'updated_at': DateTime.utc(2026, 1, 2).toIso8601String(),
+    });
+    await legacy.insert('pets', {
+      'profile_id': 1,
+      'name': 'Legacy Finny',
+      'color_id': 'blue',
+      'pattern_id': 'plain',
+      'development_stage': 0,
+      'growth_points': 0,
+      'satiety': 64,
+      'mood': 73,
     });
     await legacy.insert('game_periods', {
       'id': 1,

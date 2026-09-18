@@ -5,7 +5,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 4;
+  static const schemaVersion = 5;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -56,8 +56,9 @@ class AppDatabase {
         pattern_id TEXT NOT NULL,
         development_stage INTEGER NOT NULL DEFAULT 0 CHECK (development_stage >= 0),
         growth_points INTEGER NOT NULL DEFAULT 0 CHECK (growth_points >= 0),
-        satiety INTEGER NOT NULL DEFAULT 100 CHECK (satiety BETWEEN 0 AND 100),
-        mood INTEGER NOT NULL DEFAULT 100 CHECK (mood BETWEEN 0 AND 100),
+        satiety INTEGER NOT NULL DEFAULT 40 CHECK (satiety BETWEEN 0 AND 100),
+        care INTEGER NOT NULL DEFAULT 40 CHECK (care BETWEEN 0 AND 100),
+        mood INTEGER NOT NULL DEFAULT 40 CHECK (mood BETWEEN 0 AND 100),
         FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
       )
     ''');
@@ -95,6 +96,14 @@ class AppDatabase {
         resolved_checkpoints TEXT NOT NULL DEFAULT '[]',
         end_wallet_balance INTEGER CHECK (end_wallet_balance >= 0),
         growth_points_earned INTEGER NOT NULL DEFAULT 0 CHECK (growth_points_earned >= 0),
+        active_elapsed_milliseconds INTEGER NOT NULL DEFAULT 0
+          CHECK (active_elapsed_milliseconds BETWEEN 0 AND 360000),
+        satiety_decay_applied INTEGER NOT NULL DEFAULT 0
+          CHECK (satiety_decay_applied BETWEEN 0 AND 15),
+        care_decay_applied INTEGER NOT NULL DEFAULT 0
+          CHECK (care_decay_applied BETWEEN 0 AND 10),
+        mood_decay_applied INTEGER NOT NULL DEFAULT 0
+          CHECK (mood_decay_applied BETWEEN 0 AND 12),
         status TEXT NOT NULL CHECK (status IN ('planning', 'active', 'readyToFinish', 'completed')),
         created_at TEXT NOT NULL,
         completed_at TEXT,
@@ -144,6 +153,10 @@ class AppDatabase {
     await db.execute(
       'CREATE INDEX idx_transactions_period ON transactions(profile_id, period_id)',
     );
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_periods_profile_id_id ON game_periods(profile_id, id)',
+    );
+    await _createPetDailyUsageTable(db);
   }
 
   static Future<void> _upgradeSchema(
@@ -195,6 +208,43 @@ class AppDatabase {
     if (oldVersion < 4) {
       await _createTaskProgressTable(db);
     }
+    if (oldVersion < 5) {
+      await _addColumnIfMissing(
+        db,
+        table: 'pets',
+        column: 'care',
+        definition:
+            'INTEGER NOT NULL DEFAULT 40 CHECK (care BETWEEN 0 AND 100)',
+      );
+      await _addColumnIfMissing(
+        db,
+        table: 'game_periods',
+        column: 'active_elapsed_milliseconds',
+        definition: 'INTEGER NOT NULL DEFAULT 0 CHECK (active_elapsed_milliseconds BETWEEN 0 AND 360000)',
+      );
+      await _addColumnIfMissing(
+        db,
+        table: 'game_periods',
+        column: 'satiety_decay_applied',
+        definition: 'INTEGER NOT NULL DEFAULT 0 CHECK (satiety_decay_applied BETWEEN 0 AND 15)',
+      );
+      await _addColumnIfMissing(
+        db,
+        table: 'game_periods',
+        column: 'care_decay_applied',
+        definition: 'INTEGER NOT NULL DEFAULT 0 CHECK (care_decay_applied BETWEEN 0 AND 10)',
+      );
+      await _addColumnIfMissing(
+        db,
+        table: 'game_periods',
+        column: 'mood_decay_applied',
+        definition: 'INTEGER NOT NULL DEFAULT 0 CHECK (mood_decay_applied BETWEEN 0 AND 12)',
+      );
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_periods_profile_id_id ON game_periods(profile_id, id)',
+      );
+      await _createPetDailyUsageTable(db);
+    }
   }
 
   static Future<void> _createTaskProgressTable(sqflite.DatabaseExecutor db) =>
@@ -225,4 +275,35 @@ class AppDatabase {
       FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
     )
   ''');
+
+  static Future<void> _createPetDailyUsageTable(sqflite.DatabaseExecutor db) =>
+      db.execute('''
+    CREATE TABLE IF NOT EXISTS pet_daily_usage (
+      profile_id INTEGER NOT NULL,
+      period_id INTEGER NOT NULL,
+      action_id TEXT NOT NULL CHECK (length(trim(action_id)) > 0),
+      usage_slot TEXT NOT NULL DEFAULT 'default'
+        CHECK (length(trim(usage_slot)) > 0),
+      usage_count INTEGER NOT NULL DEFAULT 1 CHECK (usage_count > 0),
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (profile_id, period_id, action_id, usage_slot),
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+      FOREIGN KEY (profile_id, period_id)
+        REFERENCES game_periods(profile_id, id) ON DELETE CASCADE
+    )
+  ''');
+
+  static Future<void> _addColumnIfMissing(
+    sqflite.DatabaseExecutor db, {
+    required String table,
+    required String column,
+    required String definition,
+  }) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    if (columns.isEmpty) {
+      throw StateError('Cannot migrate missing table $table.');
+    }
+    if (columns.any((row) => row['name'] == column)) return;
+    await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
+  }
 }

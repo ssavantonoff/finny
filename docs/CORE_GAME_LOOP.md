@@ -56,6 +56,15 @@ ID из required snapshot. Когда закрыты все required checkpoints
 Completed period недоступен для новых игровых транзакций, изменения plan или
 checkpoints. Следующий content period стартует только отдельной командой.
 
+## Active-time Финни
+
+Характеристики Финни изменяются Core-операциями, а не виджетами. В активном или
+готовом к завершению периоде `applyActiveElapsedTime` атомарно обновляет Pet и
+period-bound счётчики: за шесть минут foreground active-time дневной decay
+достигает максимумов `15` сытости, `10` ухода и `12` настроения. Persisted
+счётчики исключают повторное применение после restart. Реальное wall-clock время
+между вызовами, planning и completed не учитываются.
+
 ## Plan / Fact
 
 `PeriodSummary` объединяет immutable plan snapshot и persisted transactions

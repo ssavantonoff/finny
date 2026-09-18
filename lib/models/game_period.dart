@@ -32,6 +32,10 @@ class GamePeriod {
     required this.resolvedCheckpoints,
     this.endWalletBalance,
     required this.growthPointsEarned,
+    this.activeElapsedMilliseconds = 0,
+    this.satietyDecayApplied = 0,
+    this.careDecayApplied = 0,
+    this.moodDecayApplied = 0,
     required this.status,
     required this.createdAt,
     this.completedAt,
@@ -55,6 +59,10 @@ class GamePeriod {
   final List<String> resolvedCheckpoints;
   final int? endWalletBalance;
   final int growthPointsEarned;
+  final int activeElapsedMilliseconds;
+  final int satietyDecayApplied;
+  final int careDecayApplied;
+  final int moodDecayApplied;
   final GamePeriodStatus status;
   final DateTime createdAt;
   final DateTime? completedAt;
@@ -77,6 +85,10 @@ class GamePeriod {
     List<String>? resolvedCheckpoints,
     int? endWalletBalance,
     int? growthPointsEarned,
+    int? activeElapsedMilliseconds,
+    int? satietyDecayApplied,
+    int? careDecayApplied,
+    int? moodDecayApplied,
     GamePeriodStatus? status,
     DateTime? completedAt,
   }) {
@@ -99,6 +111,11 @@ class GamePeriod {
       resolvedCheckpoints: resolvedCheckpoints ?? this.resolvedCheckpoints,
       endWalletBalance: endWalletBalance ?? this.endWalletBalance,
       growthPointsEarned: growthPointsEarned ?? this.growthPointsEarned,
+      activeElapsedMilliseconds:
+          activeElapsedMilliseconds ?? this.activeElapsedMilliseconds,
+      satietyDecayApplied: satietyDecayApplied ?? this.satietyDecayApplied,
+      careDecayApplied: careDecayApplied ?? this.careDecayApplied,
+      moodDecayApplied: moodDecayApplied ?? this.moodDecayApplied,
       status: status ?? this.status,
       createdAt: createdAt,
       completedAt: completedAt ?? this.completedAt,
@@ -124,6 +141,10 @@ class GamePeriod {
     'resolved_checkpoints': jsonEncode(resolvedCheckpoints),
     'end_wallet_balance': endWalletBalance,
     'growth_points_earned': growthPointsEarned,
+    'active_elapsed_milliseconds': activeElapsedMilliseconds,
+    'satiety_decay_applied': satietyDecayApplied,
+    'care_decay_applied': careDecayApplied,
+    'mood_decay_applied': moodDecayApplied,
     'status': status.name,
     'created_at': createdAt.toUtc().toIso8601String(),
     'completed_at': completedAt?.toUtc().toIso8601String(),
@@ -154,6 +175,10 @@ class GamePeriod {
     ),
     endWalletBalance: map['end_wallet_balance'] as int?,
     growthPointsEarned: map['growth_points_earned'] as int,
+    activeElapsedMilliseconds: map['active_elapsed_milliseconds'] as int? ?? 0,
+    satietyDecayApplied: map['satiety_decay_applied'] as int? ?? 0,
+    careDecayApplied: map['care_decay_applied'] as int? ?? 0,
+    moodDecayApplied: map['mood_decay_applied'] as int? ?? 0,
     status: GamePeriodStatus.fromStorage(map['status'] as String),
     createdAt: DateTime.parse(map['created_at'] as String),
     completedAt: map['completed_at'] == null
