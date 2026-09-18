@@ -5,12 +5,10 @@ import 'package:finny/repositories/game_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import '../helpers/task_progress_schema.dart';
-
 void main() {
-  test('schema v2 migrates to current without losing runtime data', () async {
+  test('v4 migrates pet state without losing existing runtime data', () async {
     sqfliteFfiInit();
-    final directory = await Directory.systemTemp.createTemp('finny_v3_');
+    final directory = await Directory.systemTemp.createTemp('finny_v5_');
     final path = '${directory.path}/finny.sqlite';
     addTearDown(() async {
       if (await directory.exists()) await directory.delete(recursive: true);
@@ -19,7 +17,7 @@ void main() {
     final legacy = await databaseFactoryFfi.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 4,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE profiles (
@@ -28,16 +26,6 @@ void main() {
               profile_type TEXT NOT NULL,
               onboarding_completed INTEGER NOT NULL,
               created_at TEXT NOT NULL
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE game_states (
-              profile_id INTEGER PRIMARY KEY,
-              wallet_balance INTEGER NOT NULL,
-              current_period INTEGER NOT NULL,
-              active_goal_id TEXT,
-              saved_amount INTEGER NOT NULL,
-              updated_at TEXT NOT NULL
             )
           ''');
           await db.execute('''
@@ -50,6 +38,17 @@ void main() {
               growth_points INTEGER NOT NULL,
               satiety INTEGER NOT NULL,
               mood INTEGER NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE game_states (
+              profile_id INTEGER PRIMARY KEY,
+              wallet_balance INTEGER NOT NULL,
+              current_period INTEGER NOT NULL,
+              active_goal_id TEXT,
+              saved_amount INTEGER NOT NULL,
+              goal_change_used INTEGER NOT NULL,
+              updated_at TEXT NOT NULL
             )
           ''');
           await db.execute('''
@@ -77,38 +76,26 @@ void main() {
               completed_at TEXT
             )
           ''');
-          await db.execute('''
-            CREATE TABLE transactions (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              profile_id INTEGER NOT NULL,
-              period_id INTEGER,
-              type TEXT NOT NULL,
-              amount INTEGER NOT NULL,
-              source TEXT NOT NULL,
-              description TEXT NOT NULL,
-              created_at TEXT NOT NULL,
-              deduplication_key TEXT
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE inventory (
-              profile_id INTEGER NOT NULL,
-              item_id TEXT NOT NULL,
-              quantity INTEGER NOT NULL,
-              acquired_at TEXT NOT NULL,
-              PRIMARY KEY (profile_id, item_id)
-            )
-          ''');
         },
       ),
     );
-    final created = DateTime.utc(2026, 1, 1).toIso8601String();
+    final created = DateTime.utc(2026, 9, 18).toIso8601String();
     await legacy.insert('profiles', {
       'id': 1,
-      'game_name': 'Legacy',
+      'game_name': 'Existing player',
       'profile_type': 'NORMAL',
       'onboarding_completed': 1,
       'created_at': created,
+    });
+    await legacy.insert('pets', {
+      'profile_id': 1,
+      'name': 'Existing Finny',
+      'color_id': 'mint',
+      'pattern_id': 'spots',
+      'development_stage': 1,
+      'growth_points': 25,
+      'satiety': 63,
+      'mood': 74,
     });
     await legacy.insert('game_states', {
       'profile_id': 1,
@@ -116,34 +103,25 @@ void main() {
       'current_period': 1,
       'active_goal_id': 'goal_scooter',
       'saved_amount': 123,
+      'goal_change_used': 1,
       'updated_at': created,
     });
-    await legacy.insert('pets', {
-      'profile_id': 1,
-      'name': 'Legacy Finny',
-      'color_id': 'blue',
-      'pattern_id': 'plain',
-      'development_stage': 1,
-      'growth_points': 12,
-      'satiety': 61,
-      'mood': 72,
-    });
     await legacy.insert('game_periods', {
-      'id': 4,
+      'id': 7,
       'profile_id': 1,
       'definition_id': 'period_1_needs_vs_wants',
       'period_number': 1,
-      'start_wallet_balance': 0,
+      'start_wallet_balance': 10,
       'base_income': 500,
-      'extra_income': 0,
+      'extra_income': 50,
       'planned_need': 100,
       'planned_want': 100,
       'planned_savings': 100,
-      'planned_free': 200,
-      'actual_need': 20,
+      'planned_free': 210,
+      'actual_need': 40,
       'actual_want': 30,
-      'actual_savings': 40,
-      'required_checkpoints': '["savings_decision"]',
+      'actual_savings': 20,
+      'required_checkpoints': '["financial_task"]',
       'resolved_checkpoints': '[]',
       'end_wallet_balance': null,
       'growth_points_earned': 0,
@@ -151,43 +129,34 @@ void main() {
       'created_at': created,
       'completed_at': null,
     });
-    await legacy.insert('transactions', {
-      'id': 8,
-      'profile_id': 1,
-      'period_id': 4,
-      'type': 'savings_deposit',
-      'amount': -40,
-      'source': 'legacy',
-      'description': 'Legacy',
-      'created_at': created,
-      'deduplication_key': 'legacy-1',
-    });
-    await legacy.insert('inventory', {
-      'profile_id': 1,
-      'item_id': 'legacy_item',
-      'quantity': 1,
-      'acquired_at': created,
-    });
     await legacy.close();
 
     final migrated = AppDatabase(
       factory: databaseFactoryFfi,
       databasePath: path,
     );
-    final games = SqliteGameRepository(migrated);
-    final state = await games.getGameState(1);
-    final period = await games.getPeriodById(1, 4);
     final db = await migrated.database;
+    final games = SqliteGameRepository(migrated);
     expect(await db.getVersion(), AppDatabase.schemaVersion);
-    await expectTaskProgressV4Schema(migrated, profileId: 1);
-    expect(state?.walletBalance, 321);
-    expect(state?.savedAmount, 123);
-    expect(state?.activeGoalId, 'goal_scooter');
-    expect(state?.goalChangeUsed, isFalse);
-    expect(period?.actualSavings, 40);
-    expect(await games.getTransactions(1), hasLength(1));
-    expect(await games.getInventoryQuantity(1, 'legacy_item'), 1);
-    expect(await games.getCompletedGoals(1), isEmpty);
+    expect((await games.getPet(1))?.satiety, 63);
+    expect((await games.getPet(1))?.care, 40);
+    expect((await games.getPet(1))?.mood, 74);
+    expect((await games.getPet(1))?.growthPoints, 25);
+    expect((await games.getGameState(1))?.walletBalance, 321);
+    expect((await games.getGameState(1))?.savedAmount, 123);
+    final period = await games.getPeriodById(1, 7);
+    expect(period?.plannedFree, 210);
+    expect(period?.actualSavings, 20);
+    expect(period?.activeElapsedMilliseconds, 0);
+    expect(period?.satietyDecayApplied, 0);
+    expect(period?.careDecayApplied, 0);
+    expect(period?.moodDecayApplied, 0);
+    expect(
+      await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pet_daily_usage'",
+      ),
+      hasLength(1),
+    );
     await migrated.close();
 
     final reopened = AppDatabase(
@@ -195,13 +164,12 @@ void main() {
       databasePath: path,
     );
     addTearDown(reopened.close);
+    expect((await SqliteGameRepository(reopened).getPet(1))?.care, 40);
     expect(
-      (await reopened.database).getVersion(),
-      completion(AppDatabase.schemaVersion),
-    );
-    expect(
-      (await SqliteGameRepository(reopened).getGameState(1))?.savedAmount,
-      123,
+      (await SqliteGameRepository(
+        reopened,
+      ).getPeriodById(1, 7))?.activeElapsedMilliseconds,
+      0,
     );
   });
 }

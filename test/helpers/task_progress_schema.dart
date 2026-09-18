@@ -9,7 +9,10 @@ Future<void> expectTaskProgressV4Schema(
   required int profileId,
 }) async {
   final db = await database.database;
-  expect((await db.rawQuery('PRAGMA user_version')).single['user_version'], 4);
+  expect(
+    (await db.rawQuery('PRAGMA user_version')).single['user_version'],
+    AppDatabase.schemaVersion,
+  );
 
   final columns = await db.rawQuery('PRAGMA table_info(task_progress)');
   expect(columns.map((row) => row['name']), [

@@ -233,8 +233,9 @@ void main() {
       expect(pet?.patternId, 'spots');
       expect(pet?.developmentStage, 0);
       expect(pet?.growthPoints, 0);
-      expect(pet?.satiety, 100);
-      expect(pet?.mood, 100);
+      expect(pet?.satiety, 40);
+      expect(pet?.care, 40);
+      expect(pet?.mood, 40);
     },
   );
 
@@ -291,6 +292,7 @@ void main() {
         developmentStage: 3,
         growthPoints: 85,
         satiety: 42,
+        care: 58,
         mood: 73,
       ),
     );
@@ -303,6 +305,7 @@ void main() {
         developmentStage: 2,
         growthPoints: 15,
         satiety: 60,
+        care: 62,
         mood: 65,
       ),
     );
@@ -322,6 +325,7 @@ void main() {
     expect(normal?.developmentStage, 3);
     expect(normal?.growthPoints, 85);
     expect(normal?.satiety, 42);
+    expect(normal?.care, 58);
     expect(normal?.mood, 73);
     expect(demo?.name, 'Демо');
     expect(demo?.colorId, 'mint');

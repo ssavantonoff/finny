@@ -39,6 +39,7 @@ void main() {
         developmentStage: 0,
         growthPoints: 0,
         satiety: 100,
+        care: 100,
         mood: 100,
       ),
     );
@@ -51,6 +52,7 @@ void main() {
         developmentStage: 4,
         growthPoints: 81,
         satiety: 52,
+        care: 56,
         mood: 61,
       ),
     );
@@ -62,6 +64,7 @@ void main() {
     expect(saved?.developmentStage, 0);
     expect(saved?.growthPoints, 0);
     expect(saved?.satiety, 100);
+    expect(saved?.care, 100);
     expect(saved?.mood, 100);
     expect((await games.getPet(demo.id!))?.name, 'Демо Финни');
 
@@ -73,6 +76,7 @@ void main() {
     expect(updated?.colorId, 'purple');
     expect(updated?.patternId, 'spots');
     expect(updated?.satiety, 100);
+    expect(updated?.care, 100);
     expect((await games.getPet(demo.id!))?.growthPoints, 81);
   });
 }

@@ -7,6 +7,7 @@ class Pet {
     required this.developmentStage,
     required this.growthPoints,
     required this.satiety,
+    required this.care,
     required this.mood,
   });
 
@@ -17,6 +18,7 @@ class Pet {
   final int developmentStage;
   final int growthPoints;
   final int satiety;
+  final int care;
   final int mood;
 
   Pet copyWith({
@@ -26,6 +28,7 @@ class Pet {
     int? developmentStage,
     int? growthPoints,
     int? satiety,
+    int? care,
     int? mood,
   }) {
     return Pet(
@@ -36,6 +39,7 @@ class Pet {
       developmentStage: developmentStage ?? this.developmentStage,
       growthPoints: growthPoints ?? this.growthPoints,
       satiety: satiety ?? this.satiety,
+      care: care ?? this.care,
       mood: mood ?? this.mood,
     );
   }
@@ -48,6 +52,7 @@ class Pet {
     'development_stage': developmentStage,
     'growth_points': growthPoints,
     'satiety': satiety,
+    'care': care,
     'mood': mood,
   };
 
@@ -59,6 +64,7 @@ class Pet {
     developmentStage: map['development_stage'] as int,
     growthPoints: map['growth_points'] as int,
     satiety: map['satiety'] as int,
+    care: map['care'] as int,
     mood: map['mood'] as int,
   );
 }

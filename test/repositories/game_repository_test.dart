@@ -131,6 +131,7 @@ void main() {
         developmentStage: 0,
         growthPoints: 10,
         satiety: 90,
+        care: 92,
         mood: 95,
       ),
     );

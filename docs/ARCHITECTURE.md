@@ -66,6 +66,21 @@ Period Summary. Required/resolved checkpoints сохраняются snapshot-с
 их persistent rewards — в `inventory`. Deposit и claim атомарно изменяют все
 связанные runtime-записи и имеют durable idempotency proof.
 
+## Pet state core
+
+`pets` хранит три характеристики Финни в диапазоне `0..100`: сытость, уход и
+настроение. Для нового Финни canonical начальное значение каждой характеристики
+равно 40. UI не вычисляет ухудшение самостоятельно: `PetStateService` передаёт
+фактически накопленное foreground active-time в атомарный repository-контракт.
+
+Active-time и уже применённый decay сохраняются в конкретном `game_periods`.
+За первые шесть минут активного игрового времени линейно набираются дневные
+максимумы `15/10/12`; после этого дальнейшее время состояние не снижает.
+`planning` и `completed` не принимают decay. Таблица `pet_daily_usage` является
+period-bound инфраструктурой будущих лимитов действий; сами item/free actions в
+этот Core-патч не входят. Расчёт значений следующего утра детерминирован и не
+привязан к реальному календарному времени.
+
 ## NORMAL и DEMO
 
 `ProfileType` поддерживает `NORMAL` и `DEMO`. Состояние всегда запрашивается и
@@ -109,12 +124,15 @@ Period Summary; следующий период запускается толь�
 
 ## Миграции
 
-Текущая schema version — 3. Миграция v1 → v2 добавляет period definition identity,
+Текущая schema version — 5. Миграция v1 → v2 добавляет period definition identity,
 required/resolved checkpoint snapshots и индекс period transactions, не удаляя
 существующие профили, balances, планы или историю. Для прежних периодов 1–5
 identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
 их сохранённый `baseIncome` не переписывается. Миграция v2 → v3 добавляет
 `game_states.goal_change_used` и таблицу `completed_goals`, не выводя completion
-из inventory и не сбрасывая wallet, savings, periods или историю. Следующие
+из inventory и не сбрасывая wallet, savings, periods или историю. Миграция
+v3 → v4 гарантирует canonical `task_progress`. Миграция v4 → v5 добавляет care,
+persisted active-time/decay и `pet_daily_usage`, сохраняя прежние характеристики
+питомца и всё финансовое состояние. Следующие
 изменения схемы должны добавлять последовательные миграции; нельзя пересоздавать
 базу с потерей NORMAL-профиля.
