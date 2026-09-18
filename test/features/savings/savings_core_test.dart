@@ -11,6 +11,7 @@ import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/savings_service.dart';
+import 'package:finny/services/task_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -280,13 +281,21 @@ void main() {
       final profileId = await createPlayer();
       await savings.selectGoal(profileId: profileId, goalId: 'goal_scooter');
       var period = await startActive(profileId);
-      for (final checkpoint in const ['financial_task', 'mandatory_need']) {
-        period = await periods.resolveCheckpoint(
-          profileId: profileId,
-          periodId: period.id!,
-          checkpointId: checkpoint,
-        );
-      }
+      await TaskService(
+        games,
+        SqliteTaskCompletionPort(database),
+        content,
+      ).submitAnswer(
+        profileId: profileId,
+        periodId: period.id!,
+        taskId: 'task_period_1',
+        answerId: 'apple',
+      );
+      period = await periods.resolveCheckpoint(
+        profileId: profileId,
+        periodId: period.id!,
+        checkpointId: 'mandatory_need',
+      );
       period = await savings.skipToday(
         profileId: profileId,
         periodId: period.id!,
@@ -295,7 +304,7 @@ void main() {
       expect(period.actualSavings, 0);
       expect(
         await games.getTransactions(profileId, periodId: period.id),
-        hasLength(1),
+        hasLength(2),
       );
 
       await savings.deposit(

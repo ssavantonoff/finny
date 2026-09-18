@@ -1,16 +1,34 @@
 import 'dart:io';
 
 import 'package:finny/core/database/app_database.dart';
+import 'package:finny/models/profile.dart';
+import 'package:finny/models/task_progress.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/repositories/profile_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../helpers/task_progress_schema.dart';
+import '../helpers/test_database.dart';
 
 void main() {
-  test('schema v2 migrates to v4 without losing runtime data', () async {
+  test('fresh v4 has canonical task_progress schema', () async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final profile = await SqliteProfileRepository(database).create(
+      Profile(
+        gameName: 'Fresh',
+        profileType: ProfileType.normal,
+        onboardingCompleted: true,
+        createdAt: DateTime.utc(2026, 9, 18),
+      ),
+    );
+    await expectTaskProgressV4Schema(database, profileId: profile.id!);
+  });
+
+  test('v3 without task_progress upgrades to v4 without losing data', () async {
     sqfliteFfiInit();
-    final directory = await Directory.systemTemp.createTemp('finny_v3_');
+    final directory = await Directory.systemTemp.createTemp('finny_v4_');
     final path = '${directory.path}/finny.sqlite';
     addTearDown(() async {
       if (await directory.exists()) await directory.delete(recursive: true);
@@ -19,7 +37,7 @@ void main() {
     final legacy = await databaseFactoryFfi.openDatabase(
       path,
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 3,
         onCreate: (db, version) async {
           await db.execute('''
             CREATE TABLE profiles (
@@ -37,6 +55,7 @@ void main() {
               current_period INTEGER NOT NULL,
               active_goal_id TEXT,
               saved_amount INTEGER NOT NULL,
+              goal_change_used INTEGER NOT NULL,
               updated_at TEXT NOT NULL
             )
           ''');
@@ -78,22 +97,13 @@ void main() {
               deduplication_key TEXT
             )
           ''');
-          await db.execute('''
-            CREATE TABLE inventory (
-              profile_id INTEGER NOT NULL,
-              item_id TEXT NOT NULL,
-              quantity INTEGER NOT NULL,
-              acquired_at TEXT NOT NULL,
-              PRIMARY KEY (profile_id, item_id)
-            )
-          ''');
         },
       ),
     );
     final created = DateTime.utc(2026, 1, 1).toIso8601String();
     await legacy.insert('profiles', {
       'id': 1,
-      'game_name': 'Legacy',
+      'game_name': 'Existing player',
       'profile_type': 'NORMAL',
       'onboarding_completed': 1,
       'created_at': created,
@@ -104,10 +114,11 @@ void main() {
       'current_period': 1,
       'active_goal_id': 'goal_scooter',
       'saved_amount': 123,
+      'goal_change_used': 0,
       'updated_at': created,
     });
     await legacy.insert('game_periods', {
-      'id': 4,
+      'id': 7,
       'profile_id': 1,
       'definition_id': 'period_1_needs_vs_wants',
       'period_number': 1,
@@ -121,7 +132,7 @@ void main() {
       'actual_need': 20,
       'actual_want': 30,
       'actual_savings': 40,
-      'required_checkpoints': '["savings_decision"]',
+      'required_checkpoints': '["financial_task"]',
       'resolved_checkpoints': '[]',
       'end_wallet_balance': null,
       'growth_points_earned': 0,
@@ -132,7 +143,7 @@ void main() {
     await legacy.insert('transactions', {
       'id': 8,
       'profile_id': 1,
-      'period_id': 4,
+      'period_id': 7,
       'type': 'savings_deposit',
       'amount': -40,
       'source': 'legacy',
@@ -140,43 +151,74 @@ void main() {
       'created_at': created,
       'deduplication_key': 'legacy-1',
     });
-    await legacy.insert('inventory', {
-      'profile_id': 1,
-      'item_id': 'legacy_item',
-      'quantity': 1,
-      'acquired_at': created,
-    });
     await legacy.close();
 
     final migrated = AppDatabase(
       factory: databaseFactoryFfi,
       databasePath: path,
     );
-    final games = SqliteGameRepository(migrated);
-    final state = await games.getGameState(1);
-    final period = await games.getPeriodById(1, 4);
-    final db = await migrated.database;
-    expect(await db.getVersion(), 4);
+    addTearDown(migrated.close);
     await expectTaskProgressV4Schema(migrated, profileId: 1);
-    expect(state?.walletBalance, 321);
-    expect(state?.savedAmount, 123);
-    expect(state?.activeGoalId, 'goal_scooter');
-    expect(state?.goalChangeUsed, isFalse);
-    expect(period?.actualSavings, 40);
-    expect(await games.getTransactions(1), hasLength(1));
-    expect(await games.getInventoryQuantity(1, 'legacy_item'), 1);
-    expect(await games.getCompletedGoals(1), isEmpty);
-    await migrated.close();
-
-    final reopened = AppDatabase(
-      factory: databaseFactoryFfi,
-      databasePath: path,
-    );
-    addTearDown(reopened.close);
-    expect((await reopened.database).getVersion(), completion(4));
-    expect(
-      (await SqliteGameRepository(reopened).getGameState(1))?.savedAmount,
-      123,
-    );
+    final db = await migrated.database;
+    final games = SqliteGameRepository(migrated);
+    expect((await db.query('profiles')).single['game_name'], 'Existing player');
+    expect((await games.getGameState(1))?.walletBalance, 321);
+    expect((await games.getGameState(1))?.savedAmount, 123);
+    expect((await games.getGameState(1))?.activeGoalId, 'goal_scooter');
+    expect((await games.getPeriodById(1, 7))?.actualSavings, 40);
+    expect((await games.getTransactions(1)).single.amount, -40);
   });
+
+  test(
+    'v3 with task_progress preserves existing rows during upgrade',
+    () async {
+      sqfliteFfiInit();
+      final directory = await Directory.systemTemp.createTemp(
+        'finny_v4_existing_',
+      );
+      final path = '${directory.path}/finny.sqlite';
+      addTearDown(() async {
+        if (await directory.exists()) await directory.delete(recursive: true);
+      });
+      final existing = AppDatabase(
+        factory: databaseFactoryFfi,
+        databasePath: path,
+      );
+      final profile = await SqliteProfileRepository(existing).create(
+        Profile(
+          gameName: 'Existing v3 player',
+          profileType: ProfileType.normal,
+          onboardingCompleted: true,
+          createdAt: DateTime.utc(2026, 1, 1),
+        ),
+      );
+      final db = await existing.database;
+      await db.insert(
+        'task_progress',
+        TaskProgress(
+          profileId: profile.id!,
+          taskId: 'persisted_task',
+          status: TaskProgressStatus.completed,
+          rewardClaimed: true,
+          scenarioState: const {'answerId': 'apple'},
+          updatedAt: DateTime.utc(2026, 1, 2),
+        ).toMap(),
+      );
+      // This disposable fixture mirrors a v3 installation that already had
+      // task_progress. Only its SQLite user_version is changed for the test.
+      await db.setVersion(3);
+      await existing.close();
+
+      final migrated = AppDatabase(
+        factory: databaseFactoryFfi,
+        databasePath: path,
+      );
+      addTearDown(migrated.close);
+      await expectTaskProgressV4Schema(migrated, profileId: profile.id!);
+      final preserved = await SqliteGameRepository(migrated)
+          .getTaskProgress(profile.id!, 'persisted_task');
+      expect(preserved?.rewardClaimed, isTrue);
+      expect(preserved?.scenarioState, {'answerId': 'apple'});
+    },
+  );
 }

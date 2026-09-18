@@ -21,8 +21,14 @@ class AssetContentRepository implements ContentRepository {
   final AssetBundle _bundle;
 
   @override
-  Future<List<FinancialTask>> loadTasks() =>
-      _loadList('assets/content/tasks.json', FinancialTask.fromJson);
+  Future<List<FinancialTask>> loadTasks() async {
+    final tasks = await _loadList(
+      'assets/content/tasks.json',
+      FinancialTask.fromJson,
+    );
+    validateTaskContent(tasks);
+    return tasks;
+  }
 
   @override
   Future<List<ShopItem>> loadShopItems() =>

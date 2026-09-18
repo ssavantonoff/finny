@@ -178,7 +178,7 @@ void main() {
     await games.applyWalletChange(
       GameTransaction(
         profileId: demo.id!,
-        type: 'task_reward',
+        type: 'other_income',
         amount: 50,
         source: 'task_reward_demo',
         description: 'Демо-награда',

@@ -9,11 +9,13 @@ class TestContentRepository implements ContentRepository {
     this.periods, {
     this.shopItems = const [],
     this.goals = const [],
+    this.tasks,
   });
 
   final List<PeriodDefinition> periods;
   final List<ShopItem> shopItems;
   final List<SavingsGoal> goals;
+  final List<FinancialTask>? tasks;
 
   @override
   Future<List<PeriodDefinition>> loadPeriods() async => periods;
@@ -28,8 +30,29 @@ class TestContentRepository implements ContentRepository {
   Future<List<ShopItem>> loadShopItems() async => shopItems;
 
   @override
-  Future<List<FinancialTask>> loadTasks() async => const [];
+  Future<List<FinancialTask>> loadTasks() async =>
+      tasks ?? [for (final period in periods) testFinancialTask(period.number)];
 }
+
+FinancialTask testFinancialTask(int periodNumber) => FinancialTask(
+  id: 'task_period_$periodNumber',
+  title: 'Финансовое решение',
+  topic: 'budget',
+  description: 'Тестовое задание',
+  type: 'choice',
+  reward: 50,
+  period: periodNumber,
+  choiceScenario: const ChoiceTaskScenario(
+    prompt: 'Финни проголодался. Что стоит купить в первую очередь?',
+    options: [
+      ChoiceTaskOption(id: 'apple', label: 'Яблоко'),
+      ChoiceTaskOption(id: 'ball', label: 'Мяч'),
+      ChoiceTaskOption(id: 'decoration', label: 'Украшение'),
+    ],
+    correctOptionId: 'apple',
+    explanation: 'Когда Финни голоден, сначала стоит купить еду — яблоко.',
+  ),
+);
 
 List<PeriodDefinition> testPeriodDefinitions({int count = 2}) => [
   for (var number = 1; number <= count; number++)

@@ -2,12 +2,17 @@ import 'dart:io';
 
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/game_period.dart';
+import 'package:finny/models/task_submission_result.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/services/task_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../helpers/test_content_repository.dart';
+import '../helpers/task_progress_schema.dart';
+
 void main() {
-  test('schema v1 migrates to v2 without losing period state', () async {
+  test('schema v1 migrates to v4 without losing period state', () async {
     sqfliteFfiInit();
     final directory = await Directory.systemTemp.createTemp('finny_migration_');
     final path = '${directory.path}/finny.sqlite';
@@ -144,14 +149,30 @@ void main() {
       'savings_decision',
     ]);
     expect(period?.resolvedCheckpoints, isEmpty);
+    await expectTaskProgressV4Schema(migratedDatabase, profileId: 1);
 
     var resumed = period!;
     for (final checkpoint in resumed.requiredCheckpoints) {
-      resumed = await games.resolveCheckpoint(
-        profileId: 1,
-        periodId: resumed.id!,
-        checkpointId: checkpoint,
-      );
+      if (checkpoint == 'financial_task') {
+        final result =
+            await TaskService(
+              games,
+              SqliteTaskCompletionPort(migratedDatabase),
+              TestContentRepository(testPeriodDefinitions(count: 1)),
+            ).submitAnswer(
+              profileId: 1,
+              periodId: resumed.id!,
+              taskId: 'task_period_1',
+              answerId: 'apple',
+            );
+        resumed = (result as TaskAnswerCompleted).period;
+      } else {
+        resumed = await games.resolveCheckpoint(
+          profileId: 1,
+          periodId: resumed.id!,
+          checkpointId: checkpoint,
+        );
+      }
     }
     expect(resumed.status, GamePeriodStatus.readyToFinish);
   });

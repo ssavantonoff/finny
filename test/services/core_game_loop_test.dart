@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/content_entry.dart';
-import 'package:finny/models/financial_task.dart';
+import 'package:finny/models/task_submission_result.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/profile.dart';
@@ -67,17 +67,6 @@ const tooExpensiveItem = ShopItem(
   unlockType: 'available',
 );
 
-const periodOneTask = FinancialTask(
-  id: 'task_period_1',
-  title: 'Финансовое решение',
-  topic: 'budget',
-  description: 'Тестовое задание',
-  type: 'choice',
-  reward: 50,
-  period: 1,
-  scenarioData: {},
-);
-
 const testSavingsGoal = SavingsGoal(
   id: 'goal_test',
   name: 'Тестовая цель',
@@ -109,7 +98,7 @@ void main() {
     budgets = BudgetService(games);
     purchases = PurchaseService(games, content);
     savings = SavingsService(games, content);
-    tasks = TaskService(games);
+    tasks = TaskService(games, SqliteTaskCompletionPort(database), content);
   });
 
   tearDown(() => database.close());
@@ -151,11 +140,18 @@ void main() {
   Future<GamePeriod> resolveAll(GamePeriod period) async {
     var current = period;
     for (final checkpoint in period.requiredCheckpoints) {
-      current = await periods.resolveCheckpoint(
-        profileId: period.profileId,
-        periodId: period.id!,
-        checkpointId: checkpoint,
-      );
+      current = checkpoint == 'financial_task'
+          ? (await tasks.submitAnswer(
+              profileId: period.profileId,
+              periodId: period.id!,
+              taskId: 'task_period_${period.periodNumber}',
+              answerId: 'apple',
+            ) as TaskAnswerCompleted).period
+          : await periods.resolveCheckpoint(
+              profileId: period.profileId,
+              periodId: period.id!,
+              checkpointId: checkpoint,
+            );
     }
     return current;
   }
@@ -398,10 +394,11 @@ void main() {
       throwsA(isA<SavingsPeriodNotAvailableException>()),
     );
     await expectLater(
-      tasks.rewardCompletedTask(
+      tasks.submitAnswer(
         profileId: profile.id!,
         periodId: period.id!,
-        task: periodOneTask,
+        taskId: 'task_period_1',
+        answerId: 'apple',
       ),
       throwsStateError,
     );
@@ -486,10 +483,11 @@ void main() {
         throwsStateError,
       );
       await expectLater(
-        tasks.rewardCompletedTask(
+        tasks.submitAnswer(
           profileId: profileA.id!,
           periodId: periodB.id!,
-          task: periodOneTask,
+          taskId: 'task_period_1',
+          answerId: 'apple',
         ),
         throwsStateError,
       );
@@ -554,10 +552,11 @@ void main() {
         periodId: started.id!,
       );
 
-      await tasks.rewardCompletedTask(
+      await tasks.submitAnswer(
         profileId: profile.id!,
         periodId: period.id!,
-        task: periodOneTask,
+        taskId: 'task_period_1',
+        answerId: 'apple',
       );
       await purchases.purchase(
         profileId: profile.id!,
@@ -608,13 +607,18 @@ void main() {
         ),
         throwsStateError,
       );
-      await expectLater(
-        tasks.rewardCompletedTask(
+      expect(
+        await tasks.submitAnswer(
           profileId: profile.id!,
           periodId: period.id!,
-          task: periodOneTask,
+          taskId: 'task_period_1',
+          answerId: 'apple',
         ),
-        throwsStateError,
+        isA<TaskAnswerCompleted>().having(
+          (result) => result.wasAlreadyCompleted,
+          'wasAlreadyCompleted',
+          isTrue,
+        ),
       );
 
       final summary = await periods.getSummary(
@@ -729,11 +733,12 @@ void main() {
         throwsStateError,
       );
 
-      period = await periods.resolveCheckpoint(
+      period = (await tasks.submitAnswer(
         profileId: profile.id!,
         periodId: period.id!,
-        checkpointId: 'financial_task',
-      );
+        taskId: 'task_period_1',
+        answerId: 'apple',
+      ) as TaskAnswerCompleted).period;
       expect(period.status, GamePeriodStatus.active);
       period = await periods.resolveCheckpoint(
         profileId: profile.id!,
@@ -783,11 +788,13 @@ void main() {
         source: 'test_income',
         description: 'Доход в readyToFinish',
       );
-      await tasks.rewardCompletedTask(
+      final taskReplay = await tasks.submitAnswer(
         profileId: profile.id!,
         periodId: period.id!,
-        task: periodOneTask,
+        taskId: 'task_period_1',
+        answerId: 'apple',
       );
+      expect((taskReplay as TaskAnswerCompleted).wasAlreadyCompleted, isTrue);
       final beforeCompletion = await periods.getSummary(
         profileId: profile.id!,
         periodId: period.id!,
@@ -838,13 +845,14 @@ void main() {
         ),
         throwsStateError,
       );
-      await expectLater(
-        tasks.rewardCompletedTask(
+      expect(
+        (await tasks.submitAnswer(
           profileId: profile.id!,
           periodId: period.id!,
-          task: periodOneTask,
-        ),
-        throwsStateError,
+          taskId: 'task_period_1',
+          answerId: 'apple',
+        ) as TaskAnswerCompleted).wasAlreadyCompleted,
+        isTrue,
       );
       await expectLater(
         periods.resolveCheckpoint(
@@ -933,8 +941,8 @@ void main() {
 
       var next = await periods.startNextPeriod(profileId: profile.id!);
       expect(next!.periodNumber, 2);
-      expect(next.startWalletBalance, 180);
-      expect(next.startingBudget, 680);
+      expect(next.startWalletBalance, 230);
+      expect(next.startingBudget, 730);
       expect(next.resolvedCheckpoints, isEmpty);
       expect((await games.getGameState(profile.id!))?.savedAmount, 100);
       final secondSummary = await periods.getSummary(
@@ -989,10 +997,11 @@ void main() {
       amount: 50,
       operationId: 'normal-savings',
     );
-    await periods.resolveCheckpoint(
+    await tasks.submitAnswer(
       profileId: normal.id!,
       periodId: normalPeriod.id!,
-      checkpointId: 'financial_task',
+      taskId: 'task_period_1',
+      answerId: 'apple',
     );
 
     expect((await games.getGameState(demo.id!))?.walletBalance, 100);
@@ -1002,7 +1011,7 @@ void main() {
 
     final demoPeriod = await periods.startNextPeriod(profileId: demo.id!);
     expect(demoPeriod?.startWalletBalance, 100);
-    expect((await games.getGameState(normal.id!))?.walletBalance, 300);
+    expect((await games.getGameState(normal.id!))?.walletBalance, 350);
     expect((await games.getGameState(normal.id!))?.savedAmount, 50);
     expect(
       (await games.getPeriodById(
@@ -1094,10 +1103,15 @@ void main() {
         amount: 50,
         operationId: 'persistent-savings',
       );
-      await firstPeriods.resolveCheckpoint(
+      await TaskService(
+        firstGames,
+        SqliteTaskCompletionPort(firstDatabase),
+        persistentContent,
+      ).submitAnswer(
         profileId: profile.id!,
         periodId: started.id!,
-        checkpointId: 'financial_task',
+        taskId: 'task_period_1',
+        answerId: 'apple',
       );
       await firstDatabase.close();
 
@@ -1127,7 +1141,7 @@ void main() {
       ]);
       expect(
         (await reopenedGames.getGameState(profile.id!))?.walletBalance,
-        325,
+        375,
       );
       expect((await reopenedGames.getGameState(profile.id!))?.savedAmount, 50);
       expect(
@@ -1157,7 +1171,7 @@ void main() {
       );
       expect(
         (await reopenedGames.getGameState(profile.id!))?.walletBalance,
-        325,
+        375,
       );
       expect((await reopenedGames.getGameState(profile.id!))?.savedAmount, 50);
       expect(
@@ -1166,7 +1180,7 @@ void main() {
       );
       expect(
         await reopenedGames.getTransactions(profile.id!, periodId: started.id!),
-        hasLength(4),
+        hasLength(5),
       );
 
       await expectLater(
@@ -1200,7 +1214,7 @@ void main() {
       );
       expect(
         (await reopenedGames.getGameState(profile.id!))?.walletBalance,
-        325,
+        375,
       );
       expect((await reopenedGames.getGameState(profile.id!))?.savedAmount, 50);
       expect(
@@ -1209,7 +1223,7 @@ void main() {
       );
       expect(
         await reopenedGames.getTransactions(profile.id!, periodId: started.id!),
-        hasLength(4),
+        hasLength(5),
       );
     },
   );
