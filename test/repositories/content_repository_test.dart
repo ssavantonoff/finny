@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:finny/models/financial_task.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -59,6 +60,16 @@ void main() {
     expect(tasks.single.choiceScenario.correctOptionId, 'apple');
     expect(tasks.single.choiceScenario.explanation, isNotEmpty);
     expect(items, hasLength(2));
+    final apple = items.singleWhere((item) => item.id == 'food_apple');
+    final ball = items.singleWhere((item) => item.id == 'toy_ball');
+    expect(
+      (apple.petEffects.satiety, apple.usagePolicy),
+      (20, ItemUsagePolicy.unlimited),
+    );
+    expect(
+      (ball.petEffects.mood, ball.usagePolicy),
+      (35, ItemUsagePolicy.oncePerPeriod),
+    );
     expect(goals, hasLength(3));
     expect(goals.every((goal) => goal.price > 0), isTrue);
     expect(periods, hasLength(5));

@@ -5,6 +5,7 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
+import 'package:finny/services/item_use_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/pet_progress_service.dart';
 import 'package:finny/services/pet_state_service.dart';
@@ -50,6 +51,10 @@ final _taskCompletionPortProvider = Provider<TaskCompletionPort>(
   (ref) => SqliteTaskCompletionPort(ref.watch(appDatabaseProvider)),
 );
 
+final _petActionPortProvider = Provider<PetActionPort>(
+  (ref) => SqlitePetActionPort(ref.watch(appDatabaseProvider)),
+);
+
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => AssetContentRepository(),
 );
@@ -93,4 +98,11 @@ final petProgressServiceProvider = Provider<PetProgressService>(
 
 final petStateServiceProvider = Provider<PetStateService>(
   (ref) => PetStateService(ref.watch(gameRepositoryProvider)),
+);
+
+final itemUseServiceProvider = Provider<ItemUseService>(
+  (ref) => ItemUseService(
+    ref.watch(_petActionPortProvider),
+    ref.watch(contentRepositoryProvider),
+  ),
 );

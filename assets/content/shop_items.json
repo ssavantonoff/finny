@@ -6,8 +6,9 @@
     "price": 40,
     "persistent": false,
     "effectType": "satiety",
-    "effectValue": 10,
-    "unlockType": "available"
+    "effectValue": 20,
+    "unlockType": "available",
+    "usagePolicy": "unlimited"
   },
   {
     "id": "toy_ball",
@@ -16,7 +17,8 @@
     "price": 120,
     "persistent": true,
     "effectType": "mood",
-    "effectValue": 8,
-    "unlockType": "available"
+    "effectValue": 35,
+    "unlockType": "available",
+    "usagePolicy": "oncePerPeriod"
   }
 ]

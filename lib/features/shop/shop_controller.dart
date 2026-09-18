@@ -318,6 +318,8 @@ bool sameShopItem(ShopItem? a, ShopItem b) =>
     a.persistent == b.persistent &&
     a.effectType == b.effectType &&
     a.effectValue == b.effectValue &&
+    a.usagePolicy == b.usagePolicy &&
+    a.effects == b.effects &&
     a.unlockType == b.unlockType;
 
 String shopCategory(ShopItem item) =>
