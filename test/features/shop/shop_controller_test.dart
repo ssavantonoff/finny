@@ -130,8 +130,8 @@ void main() {
         category: ShopItemCategory.want,
         price: 1,
         persistent: false,
-        effectType: 'unknown',
-        effectValue: 5,
+        effectType: 'none',
+        effectValue: 0,
         unlockType: 'future',
       );
       h.content.items.add(locked);
@@ -142,8 +142,8 @@ void main() {
       expect(shopEffect(locked), isNull);
       expect(shopEffect(apple), 'Сытость Финни +10');
       expect(shopEffect(ball), 'Настроение Финни +8');
-      expect(shopCategory(apple), 'Нужно');
-      expect(shopCategory(ball), 'Хочется');
+      expect(shopCategory(apple), 'Еда');
+      expect(shopCategory(ball), 'Игрушки');
     },
   );
   test('double submit makes one call; success uses returned wallet and rereads inventory', () async {

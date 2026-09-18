@@ -2,6 +2,7 @@ import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/special_purchase.dart';
 import 'package:finny/repositories/content_repository.dart';
 
 class TestContentRepository implements ContentRepository {
@@ -10,12 +11,22 @@ class TestContentRepository implements ContentRepository {
     this.shopItems = const [],
     this.goals = const [],
     this.tasks,
+    this.stories = const [],
+    this.promotions = const [],
   });
 
   final List<PeriodDefinition> periods;
   final List<ShopItem> shopItems;
   final List<SavingsGoal> goals;
   final List<FinancialTask>? tasks;
+  final List<StoryPurchase> stories;
+  final List<ShopPromotion> promotions;
+
+  @override
+  Future<List<StoryPurchase>> loadStoryPurchases() async => stories;
+
+  @override
+  Future<List<ShopPromotion>> loadPromotions() async => promotions;
 
   @override
   Future<List<PeriodDefinition>> loadPeriods() async => periods;

@@ -2,7 +2,6 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/profile.dart';
-import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
@@ -17,21 +16,21 @@ import '../../helpers/test_database.dart';
 import 'shop_test_support.dart' show ball;
 
 class LostReplyPurchase extends PurchaseService {
-  LostReplyPurchase(super.games, super.content);
+  LostReplyPurchase(super.port, super.content);
   bool loseReply = true;
   final ids = <String>[];
   @override
   Future<GameState> purchase({
     required int profileId,
     required int periodId,
-    required ShopItem item,
+    required String itemId,
     required String operationId,
   }) async {
     ids.add(operationId);
     final result = await super.purchase(
       profileId: profileId,
       periodId: periodId,
-      item: item,
+      itemId: itemId,
       operationId: operationId,
     );
     if (loseReply) {
@@ -74,7 +73,7 @@ void main() {
     final started = (await periods.startNextPeriod(profileId: normal.id!))!;
     await BudgetService(games)
         .confirmPlan(profileId: normal.id!, periodId: started.id!);
-    final service = LostReplyPurchase(games, content);
+    final service = LostReplyPurchase(SqlitePurchasePort(database), content);
     final container = ProviderContainer(
       overrides: [
         gameRepositoryProvider.overrideWithValue(games),
@@ -91,7 +90,7 @@ void main() {
         .setActiveProfileId(normal.id!);
     final controller = container.read(shopControllerProvider.notifier);
     await controller.load();
-    await controller.buy(ball, profileId: normal.id!, periodId: started.id!);
+    await controller.buy(ball.id, profileId: normal.id!, periodId: started.id!);
     expect(container.read(shopControllerProvider).pending, isNotNull);
     for (final checkpoint in started.requiredCheckpoints) {
       if (checkpoint == 'financial_task') {

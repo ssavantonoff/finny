@@ -4,11 +4,14 @@ import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/special_purchase.dart';
 import 'package:flutter/services.dart';
 
 abstract interface class ContentRepository {
   Future<List<FinancialTask>> loadTasks();
   Future<List<ShopItem>> loadShopItems();
+  Future<List<StoryPurchase>> loadStoryPurchases();
+  Future<List<ShopPromotion>> loadPromotions();
   Future<List<SavingsGoal>> loadGoals();
   Future<List<PeriodDefinition>> loadPeriods();
   Future<List<GlossaryEntry>> loadGlossary();
@@ -31,8 +34,22 @@ class AssetContentRepository implements ContentRepository {
   }
 
   @override
-  Future<List<ShopItem>> loadShopItems() =>
-      _loadList('assets/content/shop_items.json', ShopItem.fromJson);
+  Future<List<ShopItem>> loadShopItems() async {
+    final items = await _loadList(
+      'assets/content/shop_items.json',
+      ShopItem.fromJson,
+    );
+    validateShopContent(items);
+    return items;
+  }
+
+  @override
+  Future<List<StoryPurchase>> loadStoryPurchases() =>
+      _loadList('assets/content/story_purchases.json', StoryPurchase.fromJson);
+
+  @override
+  Future<List<ShopPromotion>> loadPromotions() =>
+      _loadList('assets/content/promotions.json', ShopPromotion.fromJson);
 
   @override
   Future<List<SavingsGoal>> loadGoals() =>

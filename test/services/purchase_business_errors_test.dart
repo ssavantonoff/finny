@@ -64,7 +64,7 @@ void main() {
     );
     periods = PeriodService(games, content);
     budgets = BudgetService(games);
-    purchases = PurchaseService(games, content);
+    purchases = PurchaseService(SqlitePurchasePort(database), content);
   });
 
   tearDown(() => database.close());
@@ -100,7 +100,7 @@ void main() {
         purchases.purchase(
           profileId: player.profileId,
           periodId: player.periodId,
-          item: expensiveItem,
+          itemId: expensiveItem.id,
           operationId: 'insufficient',
         ),
         throwsA(
@@ -137,13 +137,13 @@ void main() {
       final first = await purchases.purchase(
         profileId: player.profileId,
         periodId: player.periodId,
-        item: persistentItem,
+        itemId: persistentItem.id,
         operationId: 'persistent-first',
       );
       final replay = await purchases.purchase(
         profileId: player.profileId,
         periodId: player.periodId,
-        item: persistentItem,
+        itemId: persistentItem.id,
         operationId: 'persistent-first',
       );
 
@@ -165,7 +165,7 @@ void main() {
         purchases.purchase(
           profileId: player.profileId,
           periodId: player.periodId,
-          item: persistentItem,
+          itemId: persistentItem.id,
           operationId: 'persistent-second',
         ),
         throwsA(
@@ -198,13 +198,13 @@ void main() {
     await purchases.purchase(
       profileId: player.profileId,
       periodId: player.periodId,
-      item: consumableItem,
+      itemId: consumableItem.id,
       operationId: 'consumable-first',
     );
     await purchases.purchase(
       profileId: player.profileId,
       periodId: player.periodId,
-      item: consumableItem,
+      itemId: consumableItem.id,
       operationId: 'consumable-second',
     );
 
@@ -227,7 +227,7 @@ void main() {
         return await purchases.purchase(
           profileId: player.profileId,
           periodId: player.periodId,
-          item: persistentItem,
+          itemId: persistentItem.id,
           operationId: operationId,
         );
       } catch (error) {

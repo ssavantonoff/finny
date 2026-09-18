@@ -1,23 +1,20 @@
 import 'package:finny/models/game_state.dart';
-import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 
 class PurchaseService {
-  PurchaseService(this._gameRepository, this._contentRepository);
+  PurchaseService(this._purchasePort, this._contentRepository);
 
-  final GameRepository _gameRepository;
+  final PurchasePort _purchasePort;
   final ContentRepository _contentRepository;
 
   Future<GameState> purchase({
     required int profileId,
     required int periodId,
-    required ShopItem item,
+    required String itemId,
     required String operationId,
   }) async {
-    if (item.price <= 0) {
-      throw ArgumentError.value(item.price, 'item.price', 'Must be positive.');
-    }
+    if (itemId.trim().isEmpty) throw ArgumentError.value(itemId, 'itemId');
     if (operationId.trim().isEmpty) {
       throw ArgumentError.value(
         operationId,
@@ -26,18 +23,14 @@ class PurchaseService {
       );
     }
     final items = await _contentRepository.loadShopItems();
-    final matchingItems = items.where((candidate) => candidate.id == item.id);
+    final matchingItems = items.where((candidate) => candidate.id == itemId);
     if (matchingItems.length != 1) {
       throw StateError(
-        'Shop item ${item.id} is missing or duplicated in content.',
+        'Shop item $itemId is missing or duplicated in content.',
       );
     }
     final canonicalItem = matchingItems.single;
-    if (canonicalItem.price != item.price ||
-        canonicalItem.category != item.category) {
-      throw StateError('Shop item financial data does not match content.');
-    }
-    return _gameRepository.purchase(
+    return _purchasePort.purchase(
       profileId: profileId,
       periodId: periodId,
       item: canonicalItem,

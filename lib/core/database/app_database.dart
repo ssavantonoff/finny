@@ -5,7 +5,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 6;
+  static const schemaVersion = 7;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -158,6 +158,7 @@ class AppDatabase {
     );
     await _createPetDailyUsageTable(db);
     await _createPetActionOperationsTable(db);
+    await _createPeriodSpecialActionsTable(db);
   }
 
   static Future<void> _upgradeSchema(
@@ -249,7 +250,28 @@ class AppDatabase {
     if (oldVersion < 6) {
       await _createPetActionOperationsTable(db);
     }
+    if (oldVersion < 7) {
+      await _createPeriodSpecialActionsTable(db);
+    }
   }
+
+  static Future<void> _createPeriodSpecialActionsTable(
+    sqflite.DatabaseExecutor db,
+  ) => db.execute('''
+    CREATE TABLE IF NOT EXISTS period_special_actions (
+      profile_id INTEGER NOT NULL,
+      period_id INTEGER NOT NULL,
+      action_id TEXT NOT NULL CHECK (length(trim(action_id)) > 0),
+      outcome TEXT NOT NULL CHECK (outcome IN ('purchased', 'skipped')),
+      operation_id TEXT NOT NULL CHECK (length(trim(operation_id)) > 0),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (profile_id, period_id, action_id),
+      UNIQUE (profile_id, operation_id),
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+      FOREIGN KEY (profile_id, period_id)
+        REFERENCES game_periods(profile_id, id) ON DELETE CASCADE
+    )
+  ''');
 
   static Future<void> _createTaskProgressTable(sqflite.DatabaseExecutor db) =>
       db.execute('''

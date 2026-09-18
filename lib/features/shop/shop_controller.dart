@@ -228,16 +228,17 @@ class ShopController extends Notifier<ShopState> {
   }
 
   Future<void> buy(
-    ShopItem item, {
+    String itemId, {
     required int profileId,
     required int periodId,
   }) async {
     final current = state;
+    final item = current.itemById(itemId);
+    if (item == null) return;
     if (ref.read(activeProfileIdProvider) != profileId ||
         current.profileId != profileId ||
         current.period?.id != periodId ||
-        !current.canBuy(item) ||
-        !sameShopItem(current.itemById(item.id), item)) {
+        !current.canBuy(item)) {
       return;
     }
     final id =
@@ -282,7 +283,7 @@ class ShopController extends Notifier<ShopState> {
       purchasedState = await service.purchase(
         profileId: attempt.profileId,
         periodId: attempt.periodId,
-        item: attempt.item,
+        itemId: attempt.item.id,
         operationId: attempt.operationId,
       );
       result = const ShopResult(ShopResultKind.success);
@@ -320,15 +321,23 @@ bool sameShopItem(ShopItem? a, ShopItem b) =>
     a.effectValue == b.effectValue &&
     a.usagePolicy == b.usagePolicy &&
     a.effects == b.effects &&
-    a.unlockType == b.unlockType;
+    a.unlockType == b.unlockType &&
+    a.displaySection == b.displaySection &&
+    a.equipSlot == b.equipSlot;
 
-String shopCategory(ShopItem item) =>
-    item.category == ShopItemCategory.need ? 'Нужно' : 'Хочется';
-
-String? shopEffect(ShopItem item) => switch (item.effectType) {
-  'satiety' =>
-    'Сытость Финни ${item.effectValue >= 0 ? '+' : ''}${item.effectValue}',
-  'mood' =>
-    'Настроение Финни ${item.effectValue >= 0 ? '+' : ''}${item.effectValue}',
-  _ => null,
+String shopCategory(ShopItem item) => switch (item.displaySection) {
+  ShopDisplaySection.food => 'Еда',
+  ShopDisplaySection.care => 'Уход',
+  ShopDisplaySection.toys => 'Игрушки',
+  ShopDisplaySection.accessories => 'Аксессуары',
 };
+
+String? shopEffect(ShopItem item) {
+  final effects = item.petEffects;
+  final labels = [
+    if (effects.satiety > 0) 'Сытость Финни +${effects.satiety}',
+    if (effects.care > 0) 'Уход за Финни +${effects.care}',
+    if (effects.mood > 0) 'Настроение Финни +${effects.mood}',
+  ];
+  return labels.isEmpty ? null : labels.join(', ');
+}

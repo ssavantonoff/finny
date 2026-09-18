@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/special_purchase.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,6 +37,20 @@ Map<String, Object?> _validTaskJson() => {
   },
 };
 
+Map<String, Object?> _validShopJson() => {
+  'id': 'food_apple',
+  'name': 'Яблоко',
+  'displaySection': 'food',
+  'category': 'NEED',
+  'price': 40,
+  'persistent': false,
+  'usagePolicy': 'unlimited',
+  'effects': <String, Object?>{'satiety': 20, 'care': 0, 'mood': 0},
+  'effectType': 'satiety',
+  'effectValue': 20,
+  'unlockType': 'available',
+};
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -44,6 +59,8 @@ void main() {
 
     final tasks = await repository.loadTasks();
     final items = await repository.loadShopItems();
+    final stories = await repository.loadStoryPurchases();
+    final promotions = await repository.loadPromotions();
     final goals = await repository.loadGoals();
     final periods = await repository.loadPeriods();
     final glossary = await repository.loadGlossary();
@@ -59,7 +76,34 @@ void main() {
     ]);
     expect(tasks.single.choiceScenario.correctOptionId, 'apple');
     expect(tasks.single.choiceScenario.explanation, isNotEmpty);
-    expect(items, hasLength(2));
+    expect(items, hasLength(12));
+    expect(
+      (
+        stories.single.id,
+        stories.single.period,
+        stories.single.price,
+        stories.single.category,
+        stories.single.checkpoint,
+      ),
+      (
+        'day3_bowl_replacement',
+        3,
+        120,
+        ShopItemCategory.need,
+        'changed_circumstance',
+      ),
+    );
+    expect(
+      (
+        promotions.single.id,
+        promotions.single.period,
+        promotions.single.itemId,
+        promotions.single.promoPrice,
+        promotions.single.maxPromoQuantity,
+        promotions.single.checkpoint,
+      ),
+      ('day4_treat_discount', 4, 'food_treat', 35, 1, 'discount_decision'),
+    );
     final apple = items.singleWhere((item) => item.id == 'food_apple');
     final ball = items.singleWhere((item) => item.id == 'toy_ball');
     expect(
@@ -81,6 +125,317 @@ void main() {
     );
     expect(glossary, isNotEmpty);
   });
+
+  test('canonical catalog has the exact twelve approved items', () async {
+    final items = await AssetContentRepository().loadShopItems();
+    final expected =
+        <
+          String,
+          (
+            String,
+            ShopDisplaySection,
+            ShopItemCategory,
+            int,
+            bool,
+            ItemUsagePolicy,
+            int,
+            int,
+            int,
+            ShopEquipSlot?,
+          )
+        >{
+          'food_apple': (
+            'Яблоко',
+            ShopDisplaySection.food,
+            ShopItemCategory.need,
+            40,
+            false,
+            ItemUsagePolicy.unlimited,
+            20,
+            0,
+            0,
+            null,
+          ),
+          'food_feed': (
+            'Корм',
+            ShopDisplaySection.food,
+            ShopItemCategory.need,
+            90,
+            false,
+            ItemUsagePolicy.unlimited,
+            50,
+            0,
+            0,
+            null,
+          ),
+          'food_treat': (
+            'Лакомство',
+            ShopDisplaySection.food,
+            ShopItemCategory.want,
+            60,
+            false,
+            ItemUsagePolicy.unlimited,
+            10,
+            0,
+            10,
+            null,
+          ),
+          'care_shampoo': (
+            'Шампунь',
+            ShopDisplaySection.care,
+            ShopItemCategory.need,
+            60,
+            false,
+            ItemUsagePolicy.unlimited,
+            0,
+            40,
+            0,
+            null,
+          ),
+          'care_comb': (
+            'Расчёска',
+            ShopDisplaySection.care,
+            ShopItemCategory.need,
+            70,
+            true,
+            ItemUsagePolicy.oncePerPeriod,
+            0,
+            25,
+            0,
+            null,
+          ),
+          'care_toothbrush': (
+            'Зубная щётка',
+            ShopDisplaySection.care,
+            ShopItemCategory.need,
+            80,
+            true,
+            ItemUsagePolicy.toothbrush,
+            0,
+            8,
+            0,
+            null,
+          ),
+          'toy_ball': (
+            'Мяч',
+            ShopDisplaySection.toys,
+            ShopItemCategory.want,
+            120,
+            true,
+            ItemUsagePolicy.oncePerPeriod,
+            0,
+            0,
+            35,
+            null,
+          ),
+          'toy_frisbee': (
+            'Фрисби',
+            ShopDisplaySection.toys,
+            ShopItemCategory.want,
+            140,
+            true,
+            ItemUsagePolicy.oncePerPeriod,
+            0,
+            0,
+            40,
+            null,
+          ),
+          'toy_plush': (
+            'Плюшевая игрушка',
+            ShopDisplaySection.toys,
+            ShopItemCategory.want,
+            160,
+            true,
+            ItemUsagePolicy.oncePerPeriod,
+            0,
+            0,
+            30,
+            null,
+          ),
+          'accessory_bow': (
+            'Бантик',
+            ShopDisplaySection.accessories,
+            ShopItemCategory.want,
+            80,
+            true,
+            ItemUsagePolicy.none,
+            0,
+            0,
+            0,
+            ShopEquipSlot.head,
+          ),
+          'accessory_collar': (
+            'Ошейник',
+            ShopDisplaySection.accessories,
+            ShopItemCategory.want,
+            150,
+            true,
+            ItemUsagePolicy.none,
+            0,
+            0,
+            0,
+            ShopEquipSlot.neck,
+          ),
+          'accessory_hat': (
+            'Шапочка',
+            ShopDisplaySection.accessories,
+            ShopItemCategory.want,
+            180,
+            true,
+            ItemUsagePolicy.none,
+            0,
+            0,
+            0,
+            ShopEquipSlot.head,
+          ),
+        };
+    expect(items, hasLength(expected.length));
+    expect(items.map((item) => item.id).toSet(), expected.keys.toSet());
+    for (final item in items) {
+      expect(
+        (
+          item.name,
+          item.displaySection,
+          item.category,
+          item.price,
+          item.persistent,
+          item.usagePolicy,
+          item.petEffects.satiety,
+          item.petEffects.care,
+          item.petEffects.mood,
+          item.equipSlot,
+        ),
+        expected[item.id],
+        reason: item.id,
+      );
+    }
+    expect(items.map((item) => item.displaySection), [
+      for (final section in ShopDisplaySection.values) ...[
+        section,
+        section,
+        section,
+      ],
+    ]);
+  });
+
+  test('shop content rejects malformed values and duplicate IDs', () {
+    final invalidCases = <String, void Function(Map<String, Object?>)>{
+      'empty ID': (json) => json['id'] = ' ',
+      'empty name': (json) => json['name'] = ' ',
+      'zero price': (json) => json['price'] = 0,
+      'unsupported section': (json) => json['displaySection'] = 'other',
+      'unsupported category': (json) => json['category'] = 'OTHER',
+      'negative effect': (json) =>
+          (json['effects'] as Map<String, Object?>)['satiety'] = -1,
+      'unsupported effect': (json) =>
+          (json['effects'] as Map<String, Object?>)['energy'] = 1,
+      'consumable with restricted policy': (json) =>
+          json['usagePolicy'] = 'oncePerPeriod',
+      'unsupported unlock': (json) => json['unlockType'] = 'mystery',
+      'invalid equip slot': (json) => json['equipSlot'] = 'feet',
+    };
+    for (final entry in invalidCases.entries) {
+      final json = _validShopJson();
+      entry.value(json);
+      expect(
+        () => validateShopContent([ShopItem.fromJson(json)]),
+        throwsFormatException,
+        reason: entry.key,
+      );
+    }
+    final apple = ShopItem.fromJson(_validShopJson());
+    expect(() => validateShopContent([apple, apple]), throwsFormatException);
+    final invalidAccessory = _validShopJson()
+      ..['displaySection'] = 'accessories'
+      ..['persistent'] = true
+      ..['usagePolicy'] = 'none'
+      ..['equipSlot'] = 'head';
+    expect(
+      () => validateShopContent([ShopItem.fromJson(invalidAccessory)]),
+      throwsFormatException,
+    );
+  });
+
+  test(
+    'special content rejects duplicate IDs and invalid promotion pricing',
+    () {
+      const story = StoryPurchase(
+        id: 'day3_bowl_replacement',
+        name: 'Новая миска',
+        period: 3,
+        price: 120,
+        category: ShopItemCategory.need,
+        checkpoint: 'changed_circumstance',
+      );
+      const promo = ShopPromotion(
+        id: 'day4_treat_discount',
+        period: 4,
+        itemId: 'food_apple',
+        promoPrice: 35,
+        maxPromoQuantity: 1,
+        checkpoint: 'discount_decision',
+      );
+      final apple = ShopItem.fromJson(_validShopJson());
+      validateSpecialContent(const [story], const [promo], [apple]);
+      expect(
+        () => validateSpecialContent(const [story, story], const [promo], [
+          apple,
+        ]),
+        throwsFormatException,
+      );
+      expect(
+        () => validateSpecialContent(
+          const [story],
+          [
+            const ShopPromotion(
+              id: 'day3_bowl_replacement',
+              period: 4,
+              itemId: 'food_apple',
+              promoPrice: 35,
+              maxPromoQuantity: 1,
+              checkpoint: 'discount_decision',
+            ),
+          ],
+          [apple],
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => validateSpecialContent(
+          const [story],
+          [
+            const ShopPromotion(
+              id: 'day4_treat_discount',
+              period: 4,
+              itemId: 'food_apple',
+              promoPrice: 40,
+              maxPromoQuantity: 1,
+              checkpoint: 'discount_decision',
+            ),
+          ],
+          [apple],
+        ),
+        throwsFormatException,
+      );
+      expect(
+        () => validateSpecialContent(
+          const [story],
+          [
+            const ShopPromotion(
+              id: 'day4_treat_discount',
+              period: 4,
+              itemId: 'missing',
+              promoPrice: 35,
+              maxPromoQuantity: 1,
+              checkpoint: 'discount_decision',
+            ),
+          ],
+          [apple],
+        ),
+        throwsFormatException,
+      );
+    },
+  );
 
   test('duplicate task IDs are rejected across canonical asset', () async {
     final task = _validTaskJson();
