@@ -24,12 +24,13 @@ Map<String, Object?> _validTaskJson() => {
   'reward': 50,
   'period': 1,
   'scenarioData': <String, Object?>{
-    'prompt': 'Что сначала?',
+    'prompt': 'Финни проголодался. Что стоит купить в первую очередь?',
     'options': [
-      <String, Object?>{'id': 'need_lunch', 'label': 'Обед'},
-      <String, Object?>{'id': 'want_toy', 'label': 'Игрушка'},
+      <String, Object?>{'id': 'apple', 'label': 'Яблоко'},
+      <String, Object?>{'id': 'ball', 'label': 'Мяч'},
+      <String, Object?>{'id': 'decoration', 'label': 'Украшение'},
     ],
-    'correctOptionId': 'need_lunch',
+    'correctOptionId': 'apple',
     'explanation': 'Сначала нужное.',
   },
 };
@@ -51,10 +52,11 @@ void main() {
     expect(tasks.single.period, 1);
     expect(tasks.single.reward, 50);
     expect(tasks.single.choiceScenario.options.map((option) => option.id), [
-      'need_lunch',
-      'want_toy',
+      'apple',
+      'ball',
+      'decoration',
     ]);
-    expect(tasks.single.choiceScenario.correctOptionId, 'need_lunch');
+    expect(tasks.single.choiceScenario.correctOptionId, 'apple');
     expect(tasks.single.choiceScenario.explanation, isNotEmpty);
     expect(items, hasLength(2));
     expect(goals, hasLength(3));
@@ -89,13 +91,13 @@ void main() {
           (task['scenarioData'] as Map<String, Object?>)['prompt'] = '',
       'one option': (task) =>
           (task['scenarioData'] as Map<String, Object?>)['options'] = [
-            {'id': 'need_lunch', 'label': 'Обед'},
+            {'id': 'apple', 'label': 'Яблоко'},
           ],
       'duplicate option IDs': (task) =>
           ((task['scenarioData'] as Map<String, Object?>)['options']
               as List)[1] = {
-            'id': 'need_lunch',
-            'label': 'Игрушка',
+            'id': 'apple',
+            'label': 'Мяч',
           },
       'empty option ID': (task) =>
           (((task['scenarioData'] as Map<String, Object?>)['options']

@@ -200,7 +200,7 @@ void main() {
           taskId: 'persisted_task',
           status: TaskProgressStatus.completed,
           rewardClaimed: true,
-          scenarioState: const {'answerId': 'need_lunch'},
+          scenarioState: const {'answerId': 'apple'},
           updatedAt: DateTime.utc(2026, 1, 2),
         ).toMap(),
       );
@@ -218,7 +218,7 @@ void main() {
       final preserved = await SqliteGameRepository(migrated)
           .getTaskProgress(profile.id!, 'persisted_task');
       expect(preserved?.rewardClaimed, isTrue);
-      expect(preserved?.scenarioState, {'answerId': 'need_lunch'});
+      expect(preserved?.scenarioState, {'answerId': 'apple'});
     },
   );
 }

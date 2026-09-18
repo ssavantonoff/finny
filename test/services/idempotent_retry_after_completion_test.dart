@@ -53,7 +53,7 @@ void main() {
     periods = PeriodService(games, content);
     budgets = BudgetService(games);
     purchases = PurchaseService(games, content);
-    tasks = TaskService(games, content);
+    tasks = TaskService(games, SqliteTaskCompletionPort(database), content);
   });
 
   tearDown(() => database.close());
@@ -83,7 +83,7 @@ void main() {
       profileId: player.profileId,
       periodId: player.periodId,
       taskId: 'task_period_1',
-      answerId: 'need_lunch',
+      answerId: 'apple',
     );
     for (final checkpointId in const ['mandatory_need', 'savings_decision']) {
       await periods.resolveCheckpoint(

@@ -45,6 +45,10 @@ final gameRepositoryProvider = Provider<GameRepository>(
   (ref) => SqliteGameRepository(ref.watch(appDatabaseProvider)),
 );
 
+final _taskCompletionPortProvider = Provider<TaskCompletionPort>(
+  (ref) => SqliteTaskCompletionPort(ref.watch(appDatabaseProvider)),
+);
+
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => AssetContentRepository(),
 );
@@ -77,6 +81,7 @@ final periodServiceProvider = Provider<PeriodService>(
 final taskServiceProvider = Provider<TaskService>(
   (ref) => TaskService(
     ref.watch(gameRepositoryProvider),
+    ref.watch(_taskCompletionPortProvider),
     ref.watch(contentRepositoryProvider),
   ),
 );

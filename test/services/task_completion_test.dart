@@ -17,8 +17,8 @@ import '../helpers/test_content_repository.dart';
 import '../helpers/test_database.dart';
 
 const _taskId = 'task_period_1';
-const _correct = 'need_lunch';
-const _wrong = 'want_toy';
+const _correct = 'apple';
+const _wrong = 'ball';
 
 void main() {
   late AppDatabase database;
@@ -32,7 +32,7 @@ void main() {
     profiles = SqliteProfileRepository(database);
     games = SqliteGameRepository(database);
     content = TestContentRepository(testPeriodDefinitions(count: 1));
-    tasks = TaskService(games, content);
+    tasks = TaskService(games, SqliteTaskCompletionPort(database), content);
   });
   tearDown(() => database.close());
 
@@ -140,13 +140,33 @@ void main() {
           .map((entry) => entry.toMap())
           .toList();
 
-      final wrong = await submit(player, answerId: _wrong);
-      expect(wrong, isA<TaskAnswerIncorrect>());
-      expect(
-        wrong.explanation,
-        testFinancialTask(1).choiceScenario.explanation,
-      );
-      expect((wrong as TaskAnswerIncorrect).rewardAppliedNow, isFalse);
+      for (final answerId in [_wrong, 'decoration']) {
+        final wrong = await submit(player, answerId: answerId);
+        expect(wrong, isA<TaskAnswerIncorrect>());
+        expect(
+          wrong.explanation,
+          testFinancialTask(1).choiceScenario.explanation,
+        );
+        expect((wrong as TaskAnswerIncorrect).rewardAppliedNow, isFalse);
+        expect(
+          (await games.getGameState(player.profileId))?.toMap(),
+          stateBefore,
+        );
+        expect(
+          (await games.getPeriodById(
+            player.profileId,
+            player.period.id!,
+          ))?.toMap(),
+          periodBefore,
+        );
+        expect(
+          (await games.getTransactions(player.profileId))
+              .map((entry) => entry.toMap())
+              .toList(),
+          transactionsBefore,
+        );
+        expect(await games.getTaskProgress(player.profileId, _taskId), isNull);
+      }
       await expectLater(
         submit(player, answerId: 'unknown'),
         throwsArgumentError,
@@ -408,6 +428,7 @@ void main() {
     for (final changed in [changedReward, changedAnswer]) {
       final changedService = TaskService(
         games,
+        SqliteTaskCompletionPort(database),
         TestContentRepository(
           testPeriodDefinitions(count: 1),
           tasks: [changed],
@@ -450,6 +471,7 @@ void main() {
     await expectLater(
       TaskService(
         games,
+        SqliteTaskCompletionPort(database),
         TestContentRepository(
           testPeriodDefinitions(count: 1),
           tasks: [testFinancialTask(2)],
@@ -531,7 +553,11 @@ void main() {
       tasks: [testFinancialTask(1), testFinancialTask(1)],
     );
     await expectLater(
-      TaskService(games, duplicateContent).submitAnswer(
+      TaskService(
+        games,
+        SqliteTaskCompletionPort(database),
+        duplicateContent,
+      ).submitAnswer(
         profileId: player.profileId,
         periodId: player.period.id!,
         taskId: _taskId,
@@ -610,12 +636,18 @@ void main() {
       profileId: profile.id!,
       periodId: period.id!,
     );
-    final first = await TaskService(firstGames, content).submitAnswer(
-      profileId: profile.id!,
-      periodId: period.id!,
-      taskId: _taskId,
-      answerId: _correct,
-    ) as TaskAnswerCompleted;
+    final first =
+        await TaskService(
+              firstGames,
+              SqliteTaskCompletionPort(firstDatabase),
+              content,
+            ).submitAnswer(
+              profileId: profile.id!,
+              periodId: period.id!,
+              taskId: _taskId,
+              answerId: _correct,
+            )
+            as TaskAnswerCompleted;
     expect(first.period.status, GamePeriodStatus.readyToFinish);
     await firstDatabase.close();
 
@@ -625,12 +657,18 @@ void main() {
     );
     addTearDown(reopenedDatabase.close);
     final reopenedGames = SqliteGameRepository(reopenedDatabase);
-    final replay = await TaskService(reopenedGames, content).submitAnswer(
-      profileId: profile.id!,
-      periodId: period.id!,
-      taskId: _taskId,
-      answerId: _correct,
-    ) as TaskAnswerCompleted;
+    final replay =
+        await TaskService(
+              reopenedGames,
+              SqliteTaskCompletionPort(reopenedDatabase),
+              content,
+            ).submitAnswer(
+              profileId: profile.id!,
+              periodId: period.id!,
+              taskId: _taskId,
+              answerId: _correct,
+            )
+            as TaskAnswerCompleted;
     expect(replay.wasAlreadyCompleted, isTrue);
     expect(replay.rewardAppliedNow, isFalse);
     expect(replay.gameState.walletBalance, 550);

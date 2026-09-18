@@ -95,11 +95,15 @@ void main() {
     expect(container.read(shopControllerProvider).pending, isNotNull);
     for (final checkpoint in started.requiredCheckpoints) {
       if (checkpoint == 'financial_task') {
-        await TaskService(games, content).submitAnswer(
+        await TaskService(
+          games,
+          SqliteTaskCompletionPort(database),
+          content,
+        ).submitAnswer(
           profileId: normal.id!,
           periodId: started.id!,
           taskId: 'task_period_1',
-          answerId: 'need_lunch',
+          answerId: 'apple',
         );
       } else {
         await periods.resolveCheckpoint(

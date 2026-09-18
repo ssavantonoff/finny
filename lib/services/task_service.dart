@@ -4,9 +4,14 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 
 class TaskService {
-  TaskService(this._gameRepository, this._contentRepository);
+  TaskService(
+    this._gameRepository,
+    this._taskCompletionPort,
+    this._contentRepository,
+  );
 
   final GameRepository _gameRepository;
+  final TaskCompletionPort _taskCompletionPort;
   final ContentRepository _contentRepository;
 
   Future<TaskSubmissionResult> submitAnswer({
@@ -41,7 +46,7 @@ class TaskService {
     if (!period.requiredCheckpoints.contains('financial_task')) {
       throw StateError('Period $periodId does not require a financial task.');
     }
-    return _gameRepository.submitFinancialTaskAnswer(
+    return _taskCompletionPort.submitFinancialTaskAnswer(
       profileId: profileId,
       periodId: periodId,
       task: task,

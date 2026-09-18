@@ -270,17 +270,24 @@ Future<GamePeriod> _resolveAll(
   GamePeriod period,
   PeriodService service,
   GameRepository games,
+  AppDatabase database,
   ContentRepository content,
 ) async {
   var current = period;
   for (final checkpoint in current.requiredCheckpoints) {
     current = checkpoint == 'financial_task'
-        ? (await TaskService(games, content).submitAnswer(
-            profileId: profileId,
-            periodId: period.id!,
-            taskId: 'task_period_1',
-            answerId: 'need_lunch',
-          ) as TaskAnswerCompleted).period
+        ? (await TaskService(
+                    games,
+                    SqliteTaskCompletionPort(database),
+                    content,
+                  ).submitAnswer(
+                    profileId: profileId,
+                    periodId: period.id!,
+                    taskId: 'task_period_1',
+                    answerId: 'apple',
+                  )
+                  as TaskAnswerCompleted)
+              .period
         : await service.resolveCheckpoint(
             profileId: profileId,
             periodId: period.id!,
@@ -350,7 +357,7 @@ void main() {
 
     final periods = PeriodService(games, content);
     period = (await tester.runAsync(
-      () => _resolveAll(profile.id!, period, periods, games, content),
+      () => _resolveAll(profile.id!, period, periods, games, database, content),
     ))!;
     await tester.runAsync(
       harness.container.read(homeControllerProvider.notifier).load,

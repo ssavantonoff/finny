@@ -98,7 +98,7 @@ void main() {
     budgets = BudgetService(games);
     purchases = PurchaseService(games, content);
     savings = SavingsService(games, content);
-    tasks = TaskService(games, content);
+    tasks = TaskService(games, SqliteTaskCompletionPort(database), content);
   });
 
   tearDown(() => database.close());
@@ -145,7 +145,7 @@ void main() {
               profileId: period.profileId,
               periodId: period.id!,
               taskId: 'task_period_${period.periodNumber}',
-              answerId: 'need_lunch',
+              answerId: 'apple',
             ) as TaskAnswerCompleted).period
           : await periods.resolveCheckpoint(
               profileId: period.profileId,
@@ -398,7 +398,7 @@ void main() {
         profileId: profile.id!,
         periodId: period.id!,
         taskId: 'task_period_1',
-        answerId: 'need_lunch',
+        answerId: 'apple',
       ),
       throwsStateError,
     );
@@ -487,7 +487,7 @@ void main() {
           profileId: profileA.id!,
           periodId: periodB.id!,
           taskId: 'task_period_1',
-          answerId: 'need_lunch',
+          answerId: 'apple',
         ),
         throwsStateError,
       );
@@ -556,7 +556,7 @@ void main() {
         profileId: profile.id!,
         periodId: period.id!,
         taskId: 'task_period_1',
-        answerId: 'need_lunch',
+        answerId: 'apple',
       );
       await purchases.purchase(
         profileId: profile.id!,
@@ -612,7 +612,7 @@ void main() {
           profileId: profile.id!,
           periodId: period.id!,
           taskId: 'task_period_1',
-          answerId: 'need_lunch',
+          answerId: 'apple',
         ),
         isA<TaskAnswerCompleted>().having(
           (result) => result.wasAlreadyCompleted,
@@ -737,7 +737,7 @@ void main() {
         profileId: profile.id!,
         periodId: period.id!,
         taskId: 'task_period_1',
-        answerId: 'need_lunch',
+        answerId: 'apple',
       ) as TaskAnswerCompleted).period;
       expect(period.status, GamePeriodStatus.active);
       period = await periods.resolveCheckpoint(
@@ -792,7 +792,7 @@ void main() {
         profileId: profile.id!,
         periodId: period.id!,
         taskId: 'task_period_1',
-        answerId: 'need_lunch',
+        answerId: 'apple',
       );
       expect((taskReplay as TaskAnswerCompleted).wasAlreadyCompleted, isTrue);
       final beforeCompletion = await periods.getSummary(
@@ -850,7 +850,7 @@ void main() {
           profileId: profile.id!,
           periodId: period.id!,
           taskId: 'task_period_1',
-          answerId: 'need_lunch',
+          answerId: 'apple',
         ) as TaskAnswerCompleted).wasAlreadyCompleted,
         isTrue,
       );
@@ -1001,7 +1001,7 @@ void main() {
       profileId: normal.id!,
       periodId: normalPeriod.id!,
       taskId: 'task_period_1',
-      answerId: 'need_lunch',
+      answerId: 'apple',
     );
 
     expect((await games.getGameState(demo.id!))?.walletBalance, 100);
@@ -1103,11 +1103,15 @@ void main() {
         amount: 50,
         operationId: 'persistent-savings',
       );
-      await TaskService(firstGames, persistentContent).submitAnswer(
+      await TaskService(
+        firstGames,
+        SqliteTaskCompletionPort(firstDatabase),
+        persistentContent,
+      ).submitAnswer(
         profileId: profile.id!,
         periodId: started.id!,
         taskId: 'task_period_1',
-        answerId: 'need_lunch',
+        answerId: 'apple',
       );
       await firstDatabase.close();
 

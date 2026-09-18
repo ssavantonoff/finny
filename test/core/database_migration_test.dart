@@ -157,12 +157,13 @@ void main() {
         final result =
             await TaskService(
               games,
+              SqliteTaskCompletionPort(migratedDatabase),
               TestContentRepository(testPeriodDefinitions(count: 1)),
             ).submitAnswer(
               profileId: 1,
               periodId: resumed.id!,
               taskId: 'task_period_1',
-              answerId: 'need_lunch',
+              answerId: 'apple',
             );
         resumed = (result as TaskAnswerCompleted).period;
       } else {

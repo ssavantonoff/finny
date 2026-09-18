@@ -281,11 +281,15 @@ void main() {
       final profileId = await createPlayer();
       await savings.selectGoal(profileId: profileId, goalId: 'goal_scooter');
       var period = await startActive(profileId);
-      await TaskService(games, content).submitAnswer(
+      await TaskService(
+        games,
+        SqliteTaskCompletionPort(database),
+        content,
+      ).submitAnswer(
         profileId: profileId,
         periodId: period.id!,
         taskId: 'task_period_1',
-        answerId: 'need_lunch',
+        answerId: 'apple',
       );
       period = await periods.resolveCheckpoint(
         profileId: profileId,

@@ -43,13 +43,14 @@ FinancialTask testFinancialTask(int periodNumber) => FinancialTask(
   reward: 50,
   period: periodNumber,
   choiceScenario: const ChoiceTaskScenario(
-    prompt: 'Что сначала?',
+    prompt: 'Финни проголодался. Что стоит купить в первую очередь?',
     options: [
-      ChoiceTaskOption(id: 'need_lunch', label: 'Обед'),
-      ChoiceTaskOption(id: 'want_toy', label: 'Игрушка'),
+      ChoiceTaskOption(id: 'apple', label: 'Яблоко'),
+      ChoiceTaskOption(id: 'ball', label: 'Мяч'),
+      ChoiceTaskOption(id: 'decoration', label: 'Украшение'),
     ],
-    correctOptionId: 'need_lunch',
-    explanation: 'Сначала нужное.',
+    correctOptionId: 'apple',
+    explanation: 'Когда Финни голоден, сначала стоит купить еду — яблоко.',
   ),
 );
 

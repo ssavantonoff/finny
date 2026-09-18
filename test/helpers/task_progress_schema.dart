@@ -49,7 +49,7 @@ Future<void> expectTaskProgressV4Schema(
       taskId: taskId,
       status: TaskProgressStatus.completed,
       rewardClaimed: true,
-      scenarioState: const {'answerId': 'need_lunch'},
+      scenarioState: const {'answerId': 'apple'},
       updatedAt: now,
     ).toMap(),
   );
@@ -59,7 +59,7 @@ Future<void> expectTaskProgressV4Schema(
   expect(progress?.taskId, taskId);
   expect(progress?.status, TaskProgressStatus.completed);
   expect(progress?.rewardClaimed, isTrue);
-  expect(progress?.scenarioState, {'answerId': 'need_lunch'});
+  expect(progress?.scenarioState, {'answerId': 'apple'});
   expect(progress?.updatedAt, now);
 
   await expectLater(
@@ -70,7 +70,7 @@ Future<void> expectTaskProgressV4Schema(
         taskId: taskId,
         status: TaskProgressStatus.completed,
         rewardClaimed: true,
-        scenarioState: const {'answerId': 'need_lunch'},
+        scenarioState: const {'answerId': 'apple'},
         updatedAt: now,
       ).toMap(),
     ),
