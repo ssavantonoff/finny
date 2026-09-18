@@ -85,6 +85,24 @@ restart и автоматически отделены новым period ID. `pe
 хранит durable proof для безопасного replay по `operationId`. Расчёт значений
 следующего утра детерминирован и не привязан к реальному календарному времени.
 
+## Shop и специальные покупки
+
+`PurchaseService` принимает только `itemId` и разрешает его через canonical
+`shop_items.json`; внутренний `PurchasePort` атомарно обновляет wallet,
+transaction и inventory. Runtime-объект `gameRepositoryProvider` не реализует
+`PurchasePort`. Покупка не применяет эффекты к Pet: использование предмета
+остаётся отдельной операцией `ItemUseService`. В каталоге display section
+отделена от финансовой категории NEED/WANT; аксессуары сохраняются в inventory,
+но не имеют эффектов использования.
+
+Day 3 story purchase и Day 4 promotion загружаются из отдельных JSON assets.
+Их сервисы принимают только IDs и `operationId`, а внутренний
+`SpecialPurchasePort` атомарно связывает финансовую операцию (или skip),
+`period_special_actions` proof и соответствующий checkpoint. Generic
+`resolveCheckpoint` не закрывает `changed_circumstance` и
+`discount_decision`. Повтор успешной операции проверяет durable proof до
+отказа по статусу периода.
+
 ## NORMAL и DEMO
 
 `ProfileType` поддерживает `NORMAL` и `DEMO`. Состояние всегда запрашивается и
@@ -128,7 +146,7 @@ Period Summary; следующий период запускается толь�
 
 ## Миграции
 
-Текущая schema version — 6. Миграция v1 → v2 добавляет period definition identity,
+Текущая schema version — 7. Миграция v1 → v2 добавляет period definition identity,
 required/resolved checkpoint snapshots и индекс period transactions, не удаляя
 существующие профили, balances, планы или историю. Для прежних периодов 1–5
 identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
@@ -139,6 +157,8 @@ v3 → v4 гарантирует canonical `task_progress`. Миграция v4 
 persisted active-time/decay и `pet_daily_usage`, сохраняя прежние характеристики
 питомца и всё финансовое состояние. Миграция v5 → v6 добавляет только durable
 proof операций использования предметов/взаимодействий и не изменяет inventory,
-usage или Pet. Следующие
+usage или Pet. Миграция v6 → v7 добавляет только `period_special_actions` с
+уникальными action/operation identities на профиль и период; существующие
+runtime-данные не переписываются. Следующие
 изменения схемы должны добавлять последовательные миграции; нельзя пересоздавать
 базу с потерей NORMAL-профиля.

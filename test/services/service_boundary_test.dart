@@ -30,6 +30,11 @@ void main() {
 
       final profiles = container.read(profileRepositoryProvider);
       final games = container.read(gameRepositoryProvider);
+      expect(games, isNot(isA<PurchasePort>()));
+      expect(games, isNot(isA<SpecialPurchasePort>()));
+      expect(() => (games as dynamic).purchase, throwsNoSuchMethodError);
+      expect(() => (games as dynamic).purchaseStory, throwsNoSuchMethodError);
+      expect(() => (games as dynamic).decidePromotion, throwsNoSuchMethodError);
       expect(games, isNot(isA<PetActionPort>()));
       const forgedItem = ShopItem(
         id: 'forged',
@@ -93,11 +98,7 @@ void main() {
             profileId: profile.id!,
             periodId: period.id!,
             operationId: 'service-boundary-purchase',
-            item:
-                (await container
-                        .read(contentRepositoryProvider)
-                        .loadShopItems())
-                    .first,
+            itemId: 'food_apple',
           );
 
       expect(state.walletBalance, 660);

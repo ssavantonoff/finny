@@ -101,62 +101,82 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                     const ShopNotice('Сначала начни игровой период.')
                   else if (state.period!.status == GamePeriodStatus.planning)
                     const ShopNotice('Сначала подтверди план.'),
-                  for (final item in state.items)
-                    Card(
-                      clipBehavior: Clip.antiAlias,
-                      child: InkWell(
-                        key: Key('shop-item-${item.id}'),
-                        onTap: () => _details(item, state),
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.medium),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
+                  for (final section in ShopDisplaySection.values)
+                    if (state.items.any(
+                      (item) => item.displaySection == section,
+                    )) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.medium),
+                        child: Text(switch (section) {
+                          ShopDisplaySection.food => 'Еда',
+                          ShopDisplaySection.care => 'Уход',
+                          ShopDisplaySection.toys => 'Игрушки',
+                          ShopDisplaySection.accessories => 'Аксессуары',
+                        }, style: Theme.of(context).textTheme.titleLarge),
+                      ),
+                      for (final item in state.items.where(
+                        (item) => item.displaySection == section,
+                      ))
+                        Card(
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            key: Key('shop-item-${item.id}'),
+                            onTap:
+                                item.persistent &&
+                                    (state.quantities[item.id] ?? 0) > 0
+                                ? null
+                                : () => _details(item, state),
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.medium),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  ShopItemIcon(item: item),
-                                  const SizedBox(width: AppSpacing.medium),
-                                  Expanded(
-                                    child: Text(
-                                      item.name,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleLarge,
+                                  Row(
+                                    children: [
+                                      ShopItemIcon(item: item),
+                                      const SizedBox(width: AppSpacing.medium),
+                                      Expanded(
+                                        child: Text(
+                                          item.name,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleLarge,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppSpacing.small),
+                                  Text(
+                                    '${item.price} монет • ${shopCategory(item)}',
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                  if (shopEffect(item) case final effect?)
+                                    Text(
+                                      effect,
+                                      style: const TextStyle(fontSize: 16),
+                                    ),
+                                  if (item.persistent &&
+                                      (state.quantities[item.id] ?? 0) > 0)
+                                    const Text(
+                                      '✓ Куплено',
+                                      style: TextStyle(fontSize: 16),
+                                    )
+                                  else if (item.unlockType != 'available')
+                                    const Text('Этот предмет пока недоступен.'),
+                                  const SizedBox(height: AppSpacing.small),
+                                  const Text(
+                                    'Посмотреть',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: AppSpacing.small),
-                              Text(
-                                '${item.price} монет • ${shopCategory(item)}',
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                              if (shopEffect(item) case final effect?)
-                                Text(
-                                  effect,
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                              if (item.persistent &&
-                                  (state.quantities[item.id] ?? 0) > 0)
-                                const Text(
-                                  '✓ Уже куплено',
-                                  style: TextStyle(fontSize: 16),
-                                )
-                              else if (item.unlockType != 'available')
-                                const Text('Этот предмет пока недоступен.'),
-                              const SizedBox(height: AppSpacing.small),
-                              const Text(
-                                'Посмотреть',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                    ],
                 ],
               ],
             ),

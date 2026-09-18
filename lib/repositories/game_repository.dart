@@ -10,6 +10,7 @@ import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/savings_exception.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/special_purchase.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/models/task_progress.dart';
 import 'package:finny/models/task_submission_result.dart';
@@ -67,12 +68,6 @@ abstract interface class GameRepository {
   });
   Future<GameState> applyWalletChange(GameTransaction transaction);
   Future<GameState> applyIdempotentWalletChange(GameTransaction transaction);
-  Future<GameState> purchase({
-    required int profileId,
-    required int periodId,
-    required ShopItem item,
-    required String operationId,
-  });
   Future<List<CompletedGoal>> getCompletedGoals(int profileId);
   Future<GameState> selectSavingsGoal({
     required int profileId,
@@ -115,6 +110,32 @@ abstract interface class TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required String answerId,
+  });
+}
+
+abstract interface class PurchasePort {
+  Future<GameState> purchase({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+  });
+}
+
+abstract interface class SpecialPurchasePort {
+  Future<GameState> purchaseStory({
+    required int profileId,
+    required int periodId,
+    required StoryPurchase story,
+    required String operationId,
+  });
+  Future<GameState> decidePromotion({
+    required int profileId,
+    required int periodId,
+    required ShopPromotion promotion,
+    required ShopItem item,
+    required String operationId,
+    required bool purchase,
   });
 }
 
@@ -581,9 +602,11 @@ class SqliteGameRepository implements GameRepository {
     required int periodId,
     required String checkpointId,
   }) async {
-    if (checkpointId == 'financial_task') {
+    if (checkpointId == 'financial_task' ||
+        checkpointId == 'changed_circumstance' ||
+        checkpointId == 'discount_decision') {
       throw StateError(
-        'Financial tasks must be completed through TaskService.',
+        'Protected checkpoints require their canonical service.',
       );
     }
     final db = await _appDatabase.database;
@@ -730,78 +753,6 @@ class SqliteGameRepository implements GameRepository {
       }
       _requireFinancialActionsAllowed(period);
       return _applyWalletTransaction(txn, transaction);
-    });
-  }
-
-  @override
-  Future<GameState> purchase({
-    required int profileId,
-    required int periodId,
-    required ShopItem item,
-    required String operationId,
-  }) async {
-    _validateOperationId(operationId);
-    if (item.price <= 0) {
-      throw ArgumentError.value(item.price, 'item.price', 'Must be positive.');
-    }
-    final now = DateTime.now().toUtc();
-    final transaction = GameTransaction(
-      profileId: profileId,
-      periodId: periodId,
-      type: item.category == ShopItemCategory.need
-          ? GameTransactionType.needExpense
-          : GameTransactionType.wantExpense,
-      amount: -item.price,
-      source: 'purchase_${item.id}',
-      description: 'Покупка: ${item.name}',
-      createdAt: now,
-      deduplicationKey: 'operation:$operationId',
-    );
-    final db = await _appDatabase.database;
-    return db.transaction((txn) async {
-      final period = await _requirePeriod(txn, profileId, periodId);
-      final existing = await _readTransactionByKey(
-        txn,
-        profileId,
-        transaction.deduplicationKey!,
-      );
-      if (existing != null) {
-        _requireSameCommand(existing, transaction);
-        return _requireState(txn, profileId);
-      }
-      _requireFinancialActionsAllowed(period);
-
-      if (item.persistent) {
-        final ownedQuantity = await _readInventoryQuantity(
-          txn,
-          profileId,
-          item.id,
-        );
-        if (ownedQuantity > 0) {
-          throw PersistentItemAlreadyOwnedException(itemId: item.id);
-        }
-      }
-
-      final state = await _requireState(txn, profileId);
-      if (state.walletBalance < item.price) {
-        throw InsufficientFundsException(
-          itemPrice: item.price,
-          availableBalance: state.walletBalance,
-        );
-      }
-
-      final updated = await _applyWalletTransaction(txn, transaction);
-      await txn.rawInsert(
-        '''
-        INSERT INTO inventory (profile_id, item_id, quantity, acquired_at)
-        VALUES (?, ?, 1, ?)
-        ON CONFLICT(profile_id, item_id) DO UPDATE SET
-          quantity = quantity + 1,
-          acquired_at = excluded.acquired_at
-        ''',
-        [profileId, item.id, now.toIso8601String()],
-      );
-      return updated;
     });
   }
 
@@ -1689,6 +1640,349 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
         gameState: state,
         period: resolved,
       );
+    });
+  }
+}
+
+class SqlitePurchasePort implements PurchasePort {
+  SqlitePurchasePort(AppDatabase database)
+    : _database = database,
+      _core = SqliteGameRepository(database);
+
+  final AppDatabase _database;
+  final SqliteGameRepository _core;
+
+  @override
+  Future<GameState> purchase({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+  }) async {
+    _core._validateOperationId(operationId);
+    if (item.price <= 0) {
+      throw ArgumentError.value(item.price, 'item.price', 'Must be positive.');
+    }
+    final now = DateTime.now().toUtc();
+    final transaction = GameTransaction(
+      profileId: profileId,
+      periodId: periodId,
+      type: item.category == ShopItemCategory.need
+          ? GameTransactionType.needExpense
+          : GameTransactionType.wantExpense,
+      amount: -item.price,
+      source: 'purchase_${item.id}',
+      description: 'Покупка: ${item.name}',
+      createdAt: now,
+      deduplicationKey: 'operation:$operationId',
+    );
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      final period = await _core._requirePeriod(txn, profileId, periodId);
+      final existing = await _core._readTransactionByKey(
+        txn,
+        profileId,
+        transaction.deduplicationKey!,
+      );
+      if (existing != null) {
+        _core._requireSameCommand(existing, transaction);
+        return _core._requireState(txn, profileId);
+      }
+      _core._requireFinancialActionsAllowed(period);
+      if (item.persistent &&
+          await _core._readInventoryQuantity(txn, profileId, item.id) > 0) {
+        throw PersistentItemAlreadyOwnedException(itemId: item.id);
+      }
+      final state = await _core._requireState(txn, profileId);
+      if (state.walletBalance < item.price) {
+        throw InsufficientFundsException(
+          itemPrice: item.price,
+          availableBalance: state.walletBalance,
+        );
+      }
+      final updated = await _core._applyWalletTransaction(txn, transaction);
+      await txn.rawInsert(
+        '''
+        INSERT INTO inventory (profile_id, item_id, quantity, acquired_at)
+        VALUES (?, ?, 1, ?)
+        ON CONFLICT(profile_id, item_id) DO UPDATE SET
+          quantity = quantity + 1,
+          acquired_at = excluded.acquired_at
+      ''',
+        [profileId, item.id, now.toIso8601String()],
+      );
+      return updated;
+    });
+  }
+}
+
+class SqliteSpecialPurchasePort implements SpecialPurchasePort {
+  SqliteSpecialPurchasePort(AppDatabase database)
+    : _database = database,
+      _core = SqliteGameRepository(database);
+
+  final AppDatabase _database;
+  final SqliteGameRepository _core;
+
+  Future<Map<String, Object?>?> _proof(
+    DatabaseExecutor txn,
+    int profileId,
+    String where,
+    List<Object?> args,
+  ) async {
+    final rows = await txn.query(
+      'period_special_actions',
+      where: 'profile_id = ? AND $where',
+      whereArgs: [profileId, ...args],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  Future<bool> _replayOrReject(
+    DatabaseExecutor txn, {
+    required int profileId,
+    required int periodId,
+    required String actionId,
+    required String outcome,
+    required String operationId,
+    required String checkpoint,
+    required GamePeriod period,
+    required String transactionSource,
+    required int transactionAmount,
+    required String transactionType,
+  }) async {
+    final existingOperation = await _proof(txn, profileId, 'operation_id = ?', [
+      operationId,
+    ]);
+    if (existingOperation != null) {
+      if (existingOperation['period_id'] != periodId ||
+          existingOperation['action_id'] != actionId ||
+          existingOperation['outcome'] != outcome) {
+        throw SpecialPurchaseConflictException(operationId);
+      }
+      if (!period.resolvedCheckpoints.contains(checkpoint)) {
+        throw StateError('Special purchase proof has no checkpoint.');
+      }
+      final transaction = await _core._readTransactionByKey(
+        txn,
+        profileId,
+        'special:$operationId',
+      );
+      if (outcome == 'skipped') {
+        if (transaction != null) {
+          throw SpecialPurchaseConflictException(operationId);
+        }
+      } else if (transaction == null ||
+          transaction.periodId != periodId ||
+          transaction.source != transactionSource ||
+          transaction.amount != transactionAmount ||
+          transaction.type != transactionType) {
+        throw SpecialPurchaseConflictException(operationId);
+      }
+      return true;
+    }
+    if (await _proof(txn, profileId, 'period_id = ? AND action_id = ?', [
+          periodId,
+          actionId,
+        ]) !=
+        null) {
+      throw SpecialPurchaseAlreadyDecidedException(actionId);
+    }
+    if (period.resolvedCheckpoints.contains(checkpoint)) {
+      throw StateError('Special checkpoint has no durable proof.');
+    }
+    return false;
+  }
+
+  Future<void> _writeProof(
+    DatabaseExecutor txn, {
+    required int profileId,
+    required int periodId,
+    required String actionId,
+    required String outcome,
+    required String operationId,
+    required DateTime now,
+  }) async {
+    await txn.insert('period_special_actions', {
+      'profile_id': profileId,
+      'period_id': periodId,
+      'action_id': actionId,
+      'outcome': outcome,
+      'operation_id': operationId,
+      'created_at': now.toIso8601String(),
+    });
+  }
+
+  @override
+  Future<GameState> purchaseStory({
+    required int profileId,
+    required int periodId,
+    required StoryPurchase story,
+    required String operationId,
+  }) async {
+    _core._validateOperationId(operationId);
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      final period = await _core._requirePeriod(txn, profileId, periodId);
+      if (period.periodNumber != story.period ||
+          story.id != 'day3_bowl_replacement' ||
+          story.period != 3 ||
+          story.price != 120 ||
+          story.category != ShopItemCategory.need ||
+          story.checkpoint != 'changed_circumstance' ||
+          !period.requiredCheckpoints.contains(story.checkpoint)) {
+        throw StateError('Story purchase does not match this period.');
+      }
+      final source = 'story_${story.id}';
+      if (await _replayOrReject(
+        txn,
+        profileId: profileId,
+        periodId: periodId,
+        actionId: story.id,
+        outcome: 'purchased',
+        operationId: operationId,
+        checkpoint: story.checkpoint,
+        period: period,
+        transactionSource: source,
+        transactionAmount: -story.price,
+        transactionType: GameTransactionType.needExpense,
+      )) {
+        return _core._requireState(txn, profileId);
+      }
+      _core._requireFinancialActionsAllowed(period);
+      final state = await _core._requireState(txn, profileId);
+      if (state.walletBalance < story.price) {
+        throw InsufficientFundsException(
+          itemPrice: story.price,
+          availableBalance: state.walletBalance,
+        );
+      }
+      final now = DateTime.now().toUtc();
+      final updated = await _core._applyWalletTransaction(
+        txn,
+        GameTransaction(
+          profileId: profileId,
+          periodId: periodId,
+          type: GameTransactionType.needExpense,
+          amount: -story.price,
+          source: source,
+          description: 'Покупка: ${story.name}',
+          createdAt: now,
+          deduplicationKey: 'special:$operationId',
+        ),
+      );
+      await _writeProof(
+        txn,
+        profileId: profileId,
+        periodId: periodId,
+        actionId: story.id,
+        outcome: 'purchased',
+        operationId: operationId,
+        now: now,
+      );
+      await _core._resolveCheckpointInTransaction(
+        txn,
+        period,
+        story.checkpoint,
+      );
+      return updated;
+    });
+  }
+
+  @override
+  Future<GameState> decidePromotion({
+    required int profileId,
+    required int periodId,
+    required ShopPromotion promotion,
+    required ShopItem item,
+    required String operationId,
+    required bool purchase,
+  }) async {
+    _core._validateOperationId(operationId);
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      final period = await _core._requirePeriod(txn, profileId, periodId);
+      if (period.periodNumber != promotion.period ||
+          promotion.id != 'day4_treat_discount' ||
+          promotion.period != 4 ||
+          promotion.itemId != 'food_treat' ||
+          item.id != promotion.itemId ||
+          item.price != 60 ||
+          item.category != ShopItemCategory.want ||
+          promotion.promoPrice != 35 ||
+          promotion.maxPromoQuantity != 1 ||
+          promotion.checkpoint != 'discount_decision' ||
+          !period.requiredCheckpoints.contains(promotion.checkpoint)) {
+        throw StateError('Promotion does not match this period.');
+      }
+      final outcome = purchase ? 'purchased' : 'skipped';
+      final source = 'promotion_${promotion.id}';
+      if (await _replayOrReject(
+        txn,
+        profileId: profileId,
+        periodId: periodId,
+        actionId: promotion.id,
+        outcome: outcome,
+        operationId: operationId,
+        checkpoint: promotion.checkpoint,
+        period: period,
+        transactionSource: source,
+        transactionAmount: -promotion.promoPrice,
+        transactionType: GameTransactionType.wantExpense,
+      )) {
+        return _core._requireState(txn, profileId);
+      }
+      _core._requireFinancialActionsAllowed(period);
+      final state = await _core._requireState(txn, profileId);
+      final now = DateTime.now().toUtc();
+      var updated = state;
+      if (purchase) {
+        if (state.walletBalance < promotion.promoPrice) {
+          throw InsufficientFundsException(
+            itemPrice: promotion.promoPrice,
+            availableBalance: state.walletBalance,
+          );
+        }
+        updated = await _core._applyWalletTransaction(
+          txn,
+          GameTransaction(
+            profileId: profileId,
+            periodId: periodId,
+            type: GameTransactionType.wantExpense,
+            amount: -promotion.promoPrice,
+            source: source,
+            description: 'Акция: ${item.name}',
+            createdAt: now,
+            deduplicationKey: 'special:$operationId',
+          ),
+        );
+        await txn.rawInsert(
+          '''
+          INSERT INTO inventory (profile_id, item_id, quantity, acquired_at)
+          VALUES (?, ?, 1, ?)
+          ON CONFLICT(profile_id, item_id) DO UPDATE SET
+            quantity = quantity + 1,
+            acquired_at = excluded.acquired_at
+        ''',
+          [profileId, item.id, now.toIso8601String()],
+        );
+      }
+      await _writeProof(
+        txn,
+        profileId: profileId,
+        periodId: periodId,
+        actionId: promotion.id,
+        outcome: outcome,
+        operationId: operationId,
+        now: now,
+      );
+      await _core._resolveCheckpointInTransaction(
+        txn,
+        period,
+        promotion.checkpoint,
+      );
+      return updated;
     });
   }
 }

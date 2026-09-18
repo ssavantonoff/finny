@@ -133,7 +133,7 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
                             setState(() => _confirming = false);
                             unawaited(
                               controller.buy(
-                                item,
+                                item.id,
                                 profileId: widget.profileId!,
                                 periodId: _periodId!,
                               ),

@@ -96,7 +96,7 @@ void main() {
     );
     periods = PeriodService(games, content);
     budgets = BudgetService(games);
-    purchases = PurchaseService(games, content);
+    purchases = PurchaseService(SqlitePurchasePort(database), content);
     savings = SavingsService(games, content);
     tasks = TaskService(games, SqliteTaskCompletionPort(database), content);
   });
@@ -379,7 +379,7 @@ void main() {
       purchases.purchase(
         profileId: profile.id!,
         periodId: period!.id!,
-        item: needItem,
+        itemId: needItem.id,
         operationId: 'planning-purchase',
       ),
       throwsStateError,
@@ -422,49 +422,35 @@ void main() {
     );
   });
 
-  test('purchase rejects caller-provided price and category changes', () async {
-    final profile = await createPlayer();
-    final period = await startActivePeriod(profile.id!);
-    const forgedPrice = ShopItem(
-      id: 'want_ball',
-      name: 'Мяч',
-      category: ShopItemCategory.want,
-      price: 1,
-      persistent: true,
-      effectType: 'mood',
-      effectValue: 8,
-      unlockType: 'available',
-    );
-    const forgedCategory = ShopItem(
-      id: 'want_ball',
-      name: 'Мяч',
-      category: ShopItemCategory.need,
-      price: 120,
-      persistent: true,
-      effectType: 'mood',
-      effectValue: 8,
-      unlockType: 'available',
-    );
-
-    for (final forged in [forgedPrice, forgedCategory]) {
+  test(
+    'purchase accepts only canonical item ID and uses canonical values',
+    () async {
+      final profile = await createPlayer();
+      final period = await startActivePeriod(profile.id!);
       await expectLater(
         purchases.purchase(
           profileId: profile.id!,
           periodId: period.id!,
-          item: forged,
-          operationId: 'forged-${forged.category.name}-${forged.price}',
+          itemId: 'unknown_item',
+          operationId: 'unknown-item',
         ),
         throwsStateError,
       );
-    }
-
-    expect((await games.getGameState(profile.id!))?.walletBalance, 500);
-    expect(await games.getInventoryQuantity(profile.id!, wantItem.id), 0);
-    expect(
-      await games.getTransactions(profile.id!, periodId: period.id),
-      hasLength(1),
-    );
-  });
+      expect((await games.getGameState(profile.id!))?.walletBalance, 500);
+      await purchases.purchase(
+        profileId: profile.id!,
+        periodId: period.id!,
+        itemId: wantItem.id,
+        operationId: 'canonical-item',
+      );
+      expect((await games.getGameState(profile.id!))?.walletBalance, 380);
+      expect(await games.getInventoryQuantity(profile.id!, wantItem.id), 1);
+      expect(
+        await games.getTransactions(profile.id!, periodId: period.id),
+        hasLength(2),
+      );
+    },
+  );
 
   test(
     'period-bound operations reject a period owned by another profile',
@@ -477,7 +463,7 @@ void main() {
         purchases.purchase(
           profileId: profileA.id!,
           periodId: periodB.id!,
-          item: needItem,
+          itemId: needItem.id,
           operationId: 'foreign-purchase',
         ),
         throwsStateError,
@@ -561,13 +547,13 @@ void main() {
       await purchases.purchase(
         profileId: profile.id!,
         periodId: period.id!,
-        item: needItem,
+        itemId: needItem.id,
         operationId: 'need-1',
       );
       await purchases.purchase(
         profileId: profile.id!,
         periodId: period.id!,
-        item: wantItem,
+        itemId: wantItem.id,
         operationId: 'want-1',
       );
       await savings.deposit(
@@ -589,7 +575,7 @@ void main() {
       await purchases.purchase(
         profileId: profile.id!,
         periodId: period.id!,
-        item: needItem,
+        itemId: needItem.id,
         operationId: 'need-1',
       );
       await savings.deposit(
@@ -602,7 +588,7 @@ void main() {
         purchases.purchase(
           profileId: profile.id!,
           periodId: period.id!,
-          item: wantItem,
+          itemId: wantItem.id,
           operationId: 'need-1',
         ),
         throwsStateError,
@@ -651,7 +637,7 @@ void main() {
         purchases.purchase(
           profileId: profile.id!,
           periodId: period.id!,
-          item: tooExpensiveItem,
+          itemId: tooExpensiveItem.id,
           operationId: 'insufficient',
         ),
         throwsStateError,
@@ -771,7 +757,7 @@ void main() {
       await purchases.purchase(
         profileId: profile.id!,
         periodId: period.id!,
-        item: needItem,
+        itemId: needItem.id,
         operationId: 'ready-purchase',
       );
       await savings.deposit(
@@ -820,7 +806,7 @@ void main() {
         purchases.purchase(
           profileId: profile.id!,
           periodId: period.id!,
-          item: wantItem,
+          itemId: wantItem.id,
           operationId: 'after-completed',
         ),
         throwsStateError,
@@ -896,7 +882,7 @@ void main() {
       await purchases.purchase(
         profileId: profile.id!,
         periodId: activeNext.id!,
-        item: wantItem,
+        itemId: wantItem.id,
         operationId: 'next-period-purchase',
       );
       expect((await games.getGameState(profile.id!))?.walletBalance, 785);
@@ -924,7 +910,7 @@ void main() {
       await purchases.purchase(
         profileId: profile.id!,
         periodId: period.id!,
-        item: carryExpenseItem,
+        itemId: carryExpenseItem.id,
         operationId: 'carry-expense',
       );
       await savings.deposit(
@@ -988,7 +974,7 @@ void main() {
     await purchases.purchase(
       profileId: normal.id!,
       periodId: normalPeriod.id!,
-      item: needItem,
+      itemId: needItem.id,
       operationId: 'normal-purchase',
     );
     await savings.deposit(
@@ -1048,7 +1034,10 @@ void main() {
       );
       final firstPeriods = PeriodService(firstGames, persistentContent);
       final firstBudgets = BudgetService(firstGames);
-      final firstPurchases = PurchaseService(firstGames, persistentContent);
+      final firstPurchases = PurchaseService(
+        SqlitePurchasePort(firstDatabase),
+        persistentContent,
+      );
       final firstSavings = SavingsService(firstGames, persistentContent);
       final profile = await firstProfiles.create(
         Profile(
@@ -1090,7 +1079,7 @@ void main() {
       await firstPurchases.purchase(
         profileId: profile.id!,
         periodId: started.id!,
-        item: needItem,
+        itemId: needItem.id,
         operationId: 'persistent-purchase',
       );
       await firstSavings.selectGoal(
@@ -1126,7 +1115,10 @@ void main() {
         goals: const [testSavingsGoal],
       );
       final reopenedPeriods = PeriodService(reopenedGames, reopenedContent);
-      final reopenedPurchases = PurchaseService(reopenedGames, reopenedContent);
+      final reopenedPurchases = PurchaseService(
+        SqlitePurchasePort(reopenedDatabase),
+        reopenedContent,
+      );
       final reopenedSavings = SavingsService(reopenedGames, reopenedContent);
       addTearDown(reopenedDatabase.close);
 
@@ -1160,7 +1152,7 @@ void main() {
       await reopenedPurchases.purchase(
         profileId: profile.id!,
         periodId: started.id!,
-        item: needItem,
+        itemId: needItem.id,
         operationId: 'persistent-purchase',
       );
       await reopenedSavings.deposit(
@@ -1198,7 +1190,7 @@ void main() {
         reopenedPurchases.purchase(
           profileId: profile.id!,
           periodId: started.id!,
-          item: wantItem,
+          itemId: wantItem.id,
           operationId: 'persistent-purchase',
         ),
         throwsStateError,

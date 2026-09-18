@@ -19,6 +19,7 @@ const apple = ShopItem(
   effectType: 'satiety',
   effectValue: 10,
   unlockType: 'available',
+  displaySection: ShopDisplaySection.food,
 );
 const ball = ShopItem(
   id: 'toy_ball',
@@ -29,6 +30,7 @@ const ball = ShopItem(
   effectType: 'mood',
   effectValue: 8,
   unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
 );
 
 GameState wallet(int profileId, [int balance = 500]) => GameState(
@@ -128,20 +130,23 @@ class ShopGames implements GameRepository {
 }
 
 class ShopPurchases extends PurchaseService {
-  ShopPurchases(super.games, super.content);
+  ShopPurchases(ShopContent content)
+    : _content = content,
+      super(_UnusedPurchasePort(), content);
+  final ShopContent _content;
   final calls = <PurchaseAttempt>[];
   Future<GameState> Function(PurchaseAttempt)? handler;
   @override
   Future<GameState> purchase({
     required int profileId,
     required int periodId,
-    required ShopItem item,
+    required String itemId,
     required String operationId,
   }) async {
     final attempt = PurchaseAttempt(
       profileId: profileId,
       periodId: periodId,
-      item: item,
+      item: _content.items.singleWhere((item) => item.id == itemId),
       operationId: operationId,
     );
     calls.add(attempt);
@@ -149,9 +154,15 @@ class ShopPurchases extends PurchaseService {
   }
 }
 
+class _UnusedPurchasePort implements PurchasePort {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
 class ShopHarness {
   ShopHarness({int? profileId = 1}) {
-    purchases = ShopPurchases(games, content);
+    purchases = ShopPurchases(content);
     container = ProviderContainer(
       overrides: [
         gameRepositoryProvider.overrideWithValue(games),
@@ -179,7 +190,7 @@ class ShopHarness {
   int generatedIds = 0;
   ShopState get state => container.read(shopControllerProvider);
   Future<void> buy([ShopItem item = apple]) =>
-      controller.buy(item, profileId: 1, periodId: 91);
+      controller.buy(item.id, profileId: 1, periodId: 91);
   void select(int? id) {
     final active = container.read(activeProfileIdProvider.notifier);
     id == null ? active.clear() : active.setActiveProfileId(id);

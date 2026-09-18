@@ -56,8 +56,8 @@ void main() {
         return wallet(1, 77);
       };
       await mount(tester);
-      expect(find.text('40 монет • Нужно'), findsOneWidget);
-      expect(find.text('120 монет • Хочется'), findsOneWidget);
+      expect(find.text('40 монет • Еда'), findsOneWidget);
+      expect(find.text('120 монет • Игрушки'), findsOneWidget);
       expect(find.text('Сытость Финни +10'), findsOneWidget);
       expect(find.text('Настроение Финни +8'), findsOneWidget);
       await details(tester);

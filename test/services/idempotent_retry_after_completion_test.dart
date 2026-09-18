@@ -52,7 +52,7 @@ void main() {
     );
     periods = PeriodService(games, content);
     budgets = BudgetService(games);
-    purchases = PurchaseService(games, content);
+    purchases = PurchaseService(SqlitePurchasePort(database), content);
     tasks = TaskService(games, SqliteTaskCompletionPort(database), content);
   });
 
@@ -104,7 +104,7 @@ void main() {
     final first = await purchases.purchase(
       profileId: player.profileId,
       periodId: player.periodId,
-      item: persistentItem,
+      itemId: persistentItem.id,
       operationId: 'purchase-retry',
     );
     expect(first.walletBalance, 380);
@@ -114,7 +114,7 @@ void main() {
     final replay = await purchases.purchase(
       profileId: player.profileId,
       periodId: player.periodId,
-      item: persistentItem,
+      itemId: persistentItem.id,
       operationId: 'purchase-retry',
     );
 
@@ -132,7 +132,7 @@ void main() {
       purchases.purchase(
         profileId: player.profileId,
         periodId: player.periodId,
-        item: persistentItem,
+        itemId: persistentItem.id,
         operationId: 'purchase-new-after-complete',
       ),
       throwsStateError,

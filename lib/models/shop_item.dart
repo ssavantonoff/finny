@@ -9,6 +9,28 @@ enum ShopItemCategory {
   };
 }
 
+enum ShopDisplaySection {
+  food,
+  care,
+  toys,
+  accessories;
+
+  static ShopDisplaySection fromJson(String value) => values.firstWhere(
+    (section) => section.name == value,
+    orElse: () => throw FormatException('Unknown shop section: $value'),
+  );
+}
+
+enum ShopEquipSlot {
+  head,
+  neck;
+
+  static ShopEquipSlot fromJson(String value) => values.firstWhere(
+    (slot) => slot.name == value,
+    orElse: () => throw FormatException('Unknown equip slot: $value'),
+  );
+}
+
 enum ItemUsagePolicy {
   none,
   unlimited,
@@ -33,11 +55,16 @@ class PetStatEffects {
 
   bool get isEmpty => satiety == 0 && care == 0 && mood == 0;
 
-  factory PetStatEffects.fromJson(Map<String, Object?> json) => PetStatEffects(
-    satiety: json['satiety'] as int? ?? 0,
-    care: json['care'] as int? ?? 0,
-    mood: json['mood'] as int? ?? 0,
-  );
+  factory PetStatEffects.fromJson(Map<String, Object?> json) {
+    if (json.keys.any((key) => !{'satiety', 'care', 'mood'}.contains(key))) {
+      throw const FormatException('Unsupported pet effect.');
+    }
+    return PetStatEffects(
+      satiety: json['satiety'] as int? ?? 0,
+      care: json['care'] as int? ?? 0,
+      mood: json['mood'] as int? ?? 0,
+    );
+  }
 
   static PetStatEffects fromLegacy(String type, int value) => switch (type) {
     'satiety' => PetStatEffects(satiety: value),
@@ -68,6 +95,8 @@ class ShopItem {
     required this.effectType,
     required this.effectValue,
     required this.unlockType,
+    this.displaySection = ShopDisplaySection.food,
+    this.equipSlot,
     this.usagePolicy = ItemUsagePolicy.none,
     this.effects,
   });
@@ -80,6 +109,8 @@ class ShopItem {
   final String effectType;
   final int effectValue;
   final String unlockType;
+  final ShopDisplaySection displaySection;
+  final ShopEquipSlot? equipSlot;
   final ItemUsagePolicy usagePolicy;
   final PetStatEffects? effects;
 
@@ -95,6 +126,14 @@ class ShopItem {
     effectType: json['effectType'] as String,
     effectValue: json['effectValue'] as int,
     unlockType: json['unlockType'] as String,
+    displaySection: ShopDisplaySection.fromJson(
+      json['displaySection'] as String,
+    ),
+    equipSlot: switch (json['equipSlot']) {
+      final String value => ShopEquipSlot.fromJson(value),
+      null => null,
+      _ => throw const FormatException('Invalid equip slot.'),
+    },
     usagePolicy: ItemUsagePolicy.fromJson(json['usagePolicy'] as String?),
     effects: switch (json['effects']) {
       final Map value => PetStatEffects.fromJson(
@@ -104,4 +143,43 @@ class ShopItem {
       _ => throw const FormatException('Item effects must be an object.'),
     },
   );
+}
+
+void validateShopContent(List<ShopItem> items) {
+  final ids = <String>{};
+  for (final item in items) {
+    if (item.id.trim().isEmpty || !ids.add(item.id)) {
+      throw const FormatException(
+        'Shop item IDs must be non-empty and unique.',
+      );
+    }
+    if (item.name.trim().isEmpty ||
+        item.price <= 0 ||
+        !{'none', 'satiety', 'care', 'mood'}.contains(item.effectType) ||
+        item.effectValue < 0 ||
+        item.petEffects.satiety < 0 ||
+        item.petEffects.care < 0 ||
+        item.petEffects.mood < 0) {
+      throw FormatException('Invalid shop item ${item.id}.');
+    }
+    if (item.unlockType != 'available') {
+      throw FormatException('Unsupported unlock type for ${item.id}.');
+    }
+    if (item.persistent && item.usagePolicy == ItemUsagePolicy.unlimited ||
+        !item.persistent && item.usagePolicy != ItemUsagePolicy.unlimited) {
+      throw FormatException('Invalid usage policy for ${item.id}.');
+    }
+    if (item.displaySection == ShopDisplaySection.accessories) {
+      if (item.equipSlot == null ||
+          item.usagePolicy != ItemUsagePolicy.none ||
+          !item.petEffects.isEmpty ||
+          !item.persistent) {
+        throw FormatException('Invalid accessory ${item.id}.');
+      }
+    } else if (item.equipSlot != null ||
+        item.petEffects.isEmpty ||
+        item.usagePolicy == ItemUsagePolicy.none) {
+      throw FormatException('Invalid usable item ${item.id}.');
+    }
+  }
 }

@@ -11,6 +11,7 @@ import 'package:finny/services/pet_progress_service.dart';
 import 'package:finny/services/pet_state_service.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:finny/services/savings_service.dart';
+import 'package:finny/services/special_purchase_service.dart';
 import 'package:finny/services/task_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -55,6 +56,14 @@ final _petActionPortProvider = Provider<PetActionPort>(
   (ref) => SqlitePetActionPort(ref.watch(appDatabaseProvider)),
 );
 
+final _purchasePortProvider = Provider<PurchasePort>(
+  (ref) => SqlitePurchasePort(ref.watch(appDatabaseProvider)),
+);
+
+final _specialPurchasePortProvider = Provider<SpecialPurchasePort>(
+  (ref) => SqliteSpecialPurchasePort(ref.watch(appDatabaseProvider)),
+);
+
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => AssetContentRepository(),
 );
@@ -65,7 +74,14 @@ final budgetServiceProvider = Provider<BudgetService>(
 
 final purchaseServiceProvider = Provider<PurchaseService>(
   (ref) => PurchaseService(
-    ref.watch(gameRepositoryProvider),
+    ref.watch(_purchasePortProvider),
+    ref.watch(contentRepositoryProvider),
+  ),
+);
+
+final specialPurchaseServiceProvider = Provider<SpecialPurchaseService>(
+  (ref) => SpecialPurchaseService(
+    ref.watch(_specialPurchasePortProvider),
     ref.watch(contentRepositoryProvider),
   ),
 );
