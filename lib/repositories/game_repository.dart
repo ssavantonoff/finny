@@ -4,6 +4,7 @@ import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/pet_state_rules.dart';
 import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/savings_exception.dart';
@@ -24,6 +25,25 @@ abstract interface class GameRepository {
     required int profileId,
     required int periodId,
     required Duration elapsed,
+  });
+  Future<Pet> useItem({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required PetActionSlot slot,
+  });
+  Future<Pet> performFreePetInteraction({
+    required int profileId,
+    required int periodId,
+    required FreePetInteraction interaction,
+    required String operationId,
+  });
+  Future<int> getPetDailyUsageCount({
+    required int profileId,
+    required int periodId,
+    required String actionId,
+    required PetActionSlot slot,
   });
   Future<GamePeriod?> getPeriod(int profileId, int periodNumber);
   Future<GamePeriod?> getPeriodById(int profileId, int periodId);
@@ -232,6 +252,171 @@ class SqliteGameRepository implements GameRepository {
       );
       await _writePet(txn, updatedPet);
       await _writePeriod(txn, updatedPeriod);
+      return updatedPet;
+    });
+  }
+
+  @override
+  Future<Pet> useItem({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required PetActionSlot slot,
+  }) {
+    final actionId = 'item:${item.id}';
+    return _applyPetAction(
+      profileId: profileId,
+      periodId: periodId,
+      actionId: actionId,
+      operationId: operationId,
+      slot: slot,
+      effects: item.petEffects,
+      item: item,
+    );
+  }
+
+  @override
+  Future<Pet> performFreePetInteraction({
+    required int profileId,
+    required int periodId,
+    required FreePetInteraction interaction,
+    required String operationId,
+  }) => _applyPetAction(
+    profileId: profileId,
+    periodId: periodId,
+    actionId: interaction.actionId,
+    operationId: operationId,
+    slot: PetActionSlot.defaultSlot,
+    effects: interaction.effects,
+  );
+
+  @override
+  Future<int> getPetDailyUsageCount({
+    required int profileId,
+    required int periodId,
+    required String actionId,
+    required PetActionSlot slot,
+  }) async {
+    final db = await _appDatabase.database;
+    await _requirePeriod(db, profileId, periodId);
+    return _readPetDailyUsageCount(
+      db,
+      profileId: profileId,
+      periodId: periodId,
+      actionId: actionId,
+      slot: slot,
+    );
+  }
+
+  Future<Pet> _applyPetAction({
+    required int profileId,
+    required int periodId,
+    required String actionId,
+    required String operationId,
+    required PetActionSlot slot,
+    required PetStatEffects effects,
+    ShopItem? item,
+  }) async {
+    _validateOperationId(operationId);
+    if (profileId <= 0 || periodId <= 0 || actionId.trim().isEmpty) {
+      throw ArgumentError('Pet action identity is invalid.');
+    }
+    if (effects.isEmpty ||
+        effects.satiety < 0 ||
+        effects.care < 0 ||
+        effects.mood < 0) {
+      throw ArgumentError('Pet action effects must be positive.');
+    }
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final existing = await _readPetActionOperation(
+        txn,
+        profileId: profileId,
+        operationId: operationId,
+      );
+      if (existing != null) {
+        if (existing['period_id'] != periodId ||
+            existing['action_id'] != actionId ||
+            existing['usage_slot'] != slot.storageValue) {
+          throw PetOperationConflictException(operationId);
+        }
+        return _requirePet(txn, profileId);
+      }
+
+      final period = await _requirePeriod(txn, profileId, periodId);
+      _requirePetActionsAllowed(period);
+      final pet = await _requirePet(txn, profileId);
+
+      final usagePolicy = item?.usagePolicy ?? ItemUsagePolicy.oncePerPeriod;
+      _requireValidPetActionSlot(
+        period: period,
+        actionId: actionId,
+        policy: usagePolicy,
+        slot: slot,
+      );
+
+      final usageCount = await _readPetDailyUsageCount(
+        txn,
+        profileId: profileId,
+        periodId: periodId,
+        actionId: actionId,
+        slot: slot,
+      );
+      if (usagePolicy != ItemUsagePolicy.unlimited && usageCount > 0) {
+        throw PetActionAlreadyUsedException(actionId: actionId, slot: slot);
+      }
+
+      int? ownedQuantity;
+      if (item != null) {
+        ownedQuantity = await _readInventoryQuantity(txn, profileId, item.id);
+        if (ownedQuantity <= 0) throw PetItemNotOwnedException(item.id);
+      }
+
+      final updatedPet = pet.copyWith(
+        satiety: PetStateRules.clampStat(pet.satiety + effects.satiety),
+        care: PetStateRules.clampStat(pet.care + effects.care),
+        mood: PetStateRules.clampStat(pet.mood + effects.mood),
+      );
+
+      if (item != null && !item.persistent) {
+        if (ownedQuantity == 1) {
+          await txn.delete(
+            'inventory',
+            where: 'profile_id = ? AND item_id = ?',
+            whereArgs: [profileId, item.id],
+          );
+        } else {
+          await txn.update(
+            'inventory',
+            {'quantity': ownedQuantity! - 1},
+            where: 'profile_id = ? AND item_id = ?',
+            whereArgs: [profileId, item.id],
+          );
+        }
+      }
+
+      final now = DateTime.now().toUtc().toIso8601String();
+      await txn.rawInsert(
+        '''
+        INSERT INTO pet_daily_usage (
+          profile_id, period_id, action_id, usage_slot, usage_count, updated_at
+        ) VALUES (?, ?, ?, ?, 1, ?)
+        ON CONFLICT(profile_id, period_id, action_id, usage_slot) DO UPDATE SET
+          usage_count = usage_count + 1,
+          updated_at = excluded.updated_at
+        ''',
+        [profileId, periodId, actionId, slot.storageValue, now],
+      );
+      await _writePet(txn, updatedPet);
+      await txn.insert('pet_action_operations', {
+        'profile_id': profileId,
+        'operation_id': operationId,
+        'period_id': periodId,
+        'action_id': actionId,
+        'usage_slot': slot.storageValue,
+        'created_at': now,
+      });
       return updatedPet;
     });
   }
@@ -996,6 +1181,7 @@ class SqliteGameRepository implements GameRepository {
       }
       for (final table in [
         'task_progress',
+        'pet_action_operations',
         'pet_daily_usage',
         'inventory',
         'transactions',
@@ -1168,6 +1354,37 @@ class SqliteGameRepository implements GameRepository {
     return rows.isEmpty ? 0 : rows.single['quantity'] as int;
   }
 
+  Future<Map<String, Object?>?> _readPetActionOperation(
+    DatabaseExecutor db, {
+    required int profileId,
+    required String operationId,
+  }) async {
+    final rows = await db.query(
+      'pet_action_operations',
+      where: 'profile_id = ? AND operation_id = ?',
+      whereArgs: [profileId, operationId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  Future<int> _readPetDailyUsageCount(
+    DatabaseExecutor db, {
+    required int profileId,
+    required int periodId,
+    required String actionId,
+    required PetActionSlot slot,
+  }) async {
+    final rows = await db.query(
+      'pet_daily_usage',
+      columns: ['usage_count'],
+      where: 'profile_id = ? AND period_id = ? AND action_id = ? AND usage_slot = ?',
+      whereArgs: [profileId, periodId, actionId, slot.storageValue],
+      limit: 1,
+    );
+    return rows.isEmpty ? 0 : rows.single['usage_count'] as int;
+  }
+
   Future<GameState> _requireState(DatabaseExecutor db, int profileId) async {
     final state = await _readState(db, profileId);
     if (state == null) {
@@ -1265,6 +1482,41 @@ class SqliteGameRepository implements GameRepository {
       throw StateError(
         'Financial actions require an active or ready-to-finish period.',
       );
+    }
+  }
+
+  void _requirePetActionsAllowed(GamePeriod period) {
+    if (period.status != GamePeriodStatus.active &&
+        period.status != GamePeriodStatus.readyToFinish) {
+      throw StateError(
+        'Pet actions require an active or ready-to-finish period.',
+      );
+    }
+  }
+
+  void _requireValidPetActionSlot({
+    required GamePeriod period,
+    required String actionId,
+    required ItemUsagePolicy policy,
+    required PetActionSlot slot,
+  }) {
+    if (policy == ItemUsagePolicy.none) {
+      throw PetItemNotUsableException(actionId.replaceFirst('item:', ''));
+    }
+    if (policy == ItemUsagePolicy.toothbrush) {
+      final available = switch (slot) {
+        PetActionSlot.morning => period.status == GamePeriodStatus.active,
+        PetActionSlot.evening =>
+          period.status == GamePeriodStatus.readyToFinish,
+        PetActionSlot.defaultSlot => false,
+      };
+      if (!available) {
+        throw PetActionSlotUnavailableException(actionId: actionId, slot: slot);
+      }
+      return;
+    }
+    if (slot != PetActionSlot.defaultSlot) {
+      throw PetActionSlotUnavailableException(actionId: actionId, slot: slot);
     }
   }
 

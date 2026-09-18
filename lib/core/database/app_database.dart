@@ -5,7 +5,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 5;
+  static const schemaVersion = 6;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -157,6 +157,7 @@ class AppDatabase {
       'CREATE UNIQUE INDEX idx_periods_profile_id_id ON game_periods(profile_id, id)',
     );
     await _createPetDailyUsageTable(db);
+    await _createPetActionOperationsTable(db);
   }
 
   static Future<void> _upgradeSchema(
@@ -245,6 +246,9 @@ class AppDatabase {
       );
       await _createPetDailyUsageTable(db);
     }
+    if (oldVersion < 6) {
+      await _createPetActionOperationsTable(db);
+    }
   }
 
   static Future<void> _createTaskProgressTable(sqflite.DatabaseExecutor db) =>
@@ -287,6 +291,23 @@ class AppDatabase {
       usage_count INTEGER NOT NULL DEFAULT 1 CHECK (usage_count > 0),
       updated_at TEXT NOT NULL,
       PRIMARY KEY (profile_id, period_id, action_id, usage_slot),
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+      FOREIGN KEY (profile_id, period_id)
+        REFERENCES game_periods(profile_id, id) ON DELETE CASCADE
+    )
+  ''');
+
+  static Future<void> _createPetActionOperationsTable(
+    sqflite.DatabaseExecutor db,
+  ) => db.execute('''
+    CREATE TABLE IF NOT EXISTS pet_action_operations (
+      profile_id INTEGER NOT NULL,
+      operation_id TEXT NOT NULL CHECK (length(trim(operation_id)) > 0),
+      period_id INTEGER NOT NULL,
+      action_id TEXT NOT NULL CHECK (length(trim(action_id)) > 0),
+      usage_slot TEXT NOT NULL CHECK (length(trim(usage_slot)) > 0),
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (profile_id, operation_id),
       FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
       FOREIGN KEY (profile_id, period_id)
         REFERENCES game_periods(profile_id, id) ON DELETE CASCADE

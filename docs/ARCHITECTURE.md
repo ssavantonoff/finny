@@ -77,9 +77,13 @@ Active-time и уже применённый decay сохраняются в к�
 За первые шесть минут активного игрового времени линейно набираются дневные
 максимумы `15/10/12`; после этого дальнейшее время состояние не снижает.
 `planning` и `completed` не принимают decay. Таблица `pet_daily_usage` является
-period-bound инфраструктурой будущих лимитов действий; сами item/free actions в
-этот Core-патч не входят. Расчёт значений следующего утра детерминирован и не
-привязан к реальному календарному времени.
+period-bound источником лимитов item/free actions. `ItemUseService` перечитывает
+canonical item по ID, а repository одной SQLite transaction обновляет Pet,
+quantity расходника и usage. Постоянные предметы не расходуются; их лимиты,
+morning/evening slots зубной щётки и бесплатные взаимодействия переживают
+restart и автоматически отделены новым period ID. `pet_action_operations`
+хранит durable proof для безопасного replay по `operationId`. Расчёт значений
+следующего утра детерминирован и не привязан к реальному календарному времени.
 
 ## NORMAL и DEMO
 
@@ -124,7 +128,7 @@ Period Summary; следующий период запускается толь�
 
 ## Миграции
 
-Текущая schema version — 5. Миграция v1 → v2 добавляет period definition identity,
+Текущая schema version — 6. Миграция v1 → v2 добавляет period definition identity,
 required/resolved checkpoint snapshots и индекс period transactions, не удаляя
 существующие профили, balances, планы или историю. Для прежних периодов 1–5
 identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
@@ -133,6 +137,8 @@ identity/checkpoint snapshot восстанавливается из зафик�
 из inventory и не сбрасывая wallet, savings, periods или историю. Миграция
 v3 → v4 гарантирует canonical `task_progress`. Миграция v4 → v5 добавляет care,
 persisted active-time/decay и `pet_daily_usage`, сохраняя прежние характеристики
-питомца и всё финансовое состояние. Следующие
+питомца и всё финансовое состояние. Миграция v5 → v6 добавляет только durable
+proof операций использования предметов/взаимодействий и не изменяет inventory,
+usage или Pet. Следующие
 изменения схемы должны добавлять последовательные миграции; нельзя пересоздавать
 базу с потерей NORMAL-профиля.

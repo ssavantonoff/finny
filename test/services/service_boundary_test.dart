@@ -4,6 +4,7 @@ import 'package:finny/models/game_state.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/services/item_use_service.dart';
 import 'package:finny/services/pet_state_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +29,7 @@ void main() {
       final profiles = container.read(profileRepositoryProvider);
       final games = container.read(gameRepositoryProvider);
       expect(container.read(petStateServiceProvider), isA<PetStateService>());
+      expect(container.read(itemUseServiceProvider), isA<ItemUseService>());
       final profile = await profiles.create(
         Profile(
           gameName: 'Игрок',

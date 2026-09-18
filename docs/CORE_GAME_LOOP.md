@@ -65,6 +65,23 @@ period-bound счётчики: за шесть минут foreground active-time
 счётчики исключают повторное применение после restart. Реальное wall-clock время
 между вызовами, planning и completed не учитываются.
 
+## Использование вещей и взаимодействия
+
+`ItemUseService.useItem` принимает item ID, перечитывает canonical content и не
+доверяет caller-значениям эффектов или usage policy. В `active` и
+`readyToFinish` repository атомарно применяет stat effect, уменьшает quantity
+расходника и фиксирует period-bound usage. Постоянные предметы не расходуются:
+расчёска и каждая игрушка доступны один раз за период, а зубная щётка имеет
+раздельные morning/evening slots. Morning доступен только в `active`, evening —
+после перехода в `readyToFinish`.
+
+Бесплатные действия `погладить` (+20 mood) и `поиграть` (+25 mood) имеют
+отдельные once-per-period usage records. Успешные item/free операции сохраняют
+`operationId`: тот же payload является безопасным replay даже после завершения
+периода, а повтор ID с другим action/slot отклоняется. Новый period получает
+новый namespace usage автоматически; restart текущего периода ничего не
+сбрасывает.
+
 ## Plan / Fact
 
 `PeriodSummary` объединяет immutable plan snapshot и persisted transactions

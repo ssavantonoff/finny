@@ -157,6 +157,12 @@ void main() {
       ),
       hasLength(1),
     );
+    expect(
+      await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'pet_action_operations'",
+      ),
+      hasLength(1),
+    );
     await migrated.close();
 
     final reopened = AppDatabase(

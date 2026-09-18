@@ -5,6 +5,7 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
+import 'package:finny/services/item_use_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/pet_progress_service.dart';
 import 'package:finny/services/pet_state_service.dart';
@@ -93,4 +94,11 @@ final petProgressServiceProvider = Provider<PetProgressService>(
 
 final petStateServiceProvider = Provider<PetStateService>(
   (ref) => PetStateService(ref.watch(gameRepositoryProvider)),
+);
+
+final itemUseServiceProvider = Provider<ItemUseService>(
+  (ref) => ItemUseService(
+    ref.watch(gameRepositoryProvider),
+    ref.watch(contentRepositoryProvider),
+  ),
 );
