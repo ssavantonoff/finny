@@ -8,7 +8,6 @@ import 'package:finny/models/game_period.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 class ShopScreen extends ConsumerStatefulWidget {
   const ShopScreen({super.key});
@@ -42,15 +41,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Магазин'),
-        leading: BackButton(
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              context.go('/home');
-            }
-          },
-        ),
         actions: [
           IconButton(
             tooltip: 'Обновить магазин',

@@ -141,7 +141,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Первый день'), findsOneWidget);
-    expect(find.text('Финни'), findsOneWidget);
+    expect(find.byKey(const Key('home-pet-name')), findsOneWidget);
     expect(find.text('Привет! Я Финни'), findsNothing);
     expect(container.read(activeProfileIdProvider), 1);
   });

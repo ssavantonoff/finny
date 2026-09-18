@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:finny/app/providers.dart';
+import 'package:finny/features/things/things_controller.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/purchase_exception.dart';
@@ -287,6 +288,7 @@ class ShopController extends Notifier<ShopState> {
         operationId: attempt.operationId,
       );
       result = const ShopResult(ShopResultKind.success);
+      unawaited(ref.read(thingsControllerProvider.notifier).load());
     } on InsufficientFundsException catch (error) {
       result = ShopResult(
         ShopResultKind.insufficientFunds,

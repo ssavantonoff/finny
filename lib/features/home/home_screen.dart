@@ -3,9 +3,65 @@ import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/game_period.dart';
+import 'package:finny/models/pet_action.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+class PetStatIndicator extends StatelessWidget {
+  const PetStatIndicator({
+    super.key,
+    required this.label,
+    required this.value,
+    this.barKey,
+  });
+
+  final String label;
+  final int value;
+  final Key? barKey;
+
+  static const Color red = Color(0xFFE57373);
+  static const Color yellow = Color(0xFFFFB74D);
+  static const Color green = Color(0xFF81C784);
+
+  static Color statColor(int value) {
+    if (value <= 39) return red;
+    if (value <= 69) return yellow;
+    return green;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = statColor(value);
+    final clamped = value.clamp(0, 100);
+    return Semantics(
+      label: label,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              height: 10,
+              child: LinearProgressIndicator(
+                key: barKey,
+                value: clamped / 100.0,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+                backgroundColor: color.withValues(alpha: 0.2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -33,11 +89,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       builder: (context) => _IncomeExplanation(period: period),
     );
     _incomeSheetOpen = false;
-  }
-
-  Future<void> _openSavings() async {
-    await context.push('/savings');
-    if (mounted) await ref.read(homeControllerProvider.notifier).load();
   }
 
   Future<void> _finishDay() async {
@@ -70,25 +121,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(homeControllerProvider);
+    final controller = ref.read(homeControllerProvider.notifier);
+
     ref.listen<int?>(activeProfileIdProvider, (_, _) {
-      ref.read(homeControllerProvider.notifier).load();
+      controller.load();
     });
+
     if (state is HomeNeedsBootstrap) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go('/startup');
       });
     }
+
     return switch (state) {
       HomeLoading() || HomeNeedsBootstrap() => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
-      HomeFailure() => _HomeError(
-        onRetry: ref.read(homeControllerProvider.notifier).load,
-      ),
+      HomeFailure() => _HomeError(onRetry: controller.load),
       HomeReady() => _HomeContent(
         state: state,
+        controller: controller,
         onStartDay: _startDay,
-        onSavings: _openSavings,
         onFinishDay: _finishDay,
       ),
     };
@@ -98,14 +151,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _HomeContent extends StatelessWidget {
   const _HomeContent({
     required this.state,
+    required this.controller,
     required this.onStartDay,
-    required this.onSavings,
     required this.onFinishDay,
   });
 
   final HomeReady state;
+  final HomeController controller;
   final VoidCallback onStartDay;
-  final VoidCallback onSavings;
   final VoidCallback onFinishDay;
 
   @override
@@ -113,9 +166,25 @@ class _HomeContent extends StatelessWidget {
     final period = state.period;
     final title = period == null
         ? state.completedDays == 0
-              ? 'Первый день'
-              : 'Дом Финни'
+            ? 'Первый день'
+            : 'Дом Финни'
         : 'День ${period.periodNumber} • ${state.definition!.title}';
+
+    final periodAllowsPetAction =
+        period != null &&
+        (period.status == GamePeriodStatus.active ||
+            period.status == GamePeriodStatus.readyToFinish);
+
+    final canPet =
+        periodAllowsPetAction &&
+        state.petUsageCount == 0 &&
+        !state.interacting;
+
+    final canPlay =
+        periodAllowsPetAction &&
+        state.playUsageCount == 0 &&
+        !state.interacting;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
@@ -141,32 +210,131 @@ class _HomeContent extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  FinnyPreview(
-                    colorId: state.pet.colorId,
-                    patternId: state.pet.patternId,
+                  // Pet Room Atmosphere
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.medium,
+                      vertical: AppSpacing.small,
+                    ),
+                    child: Column(
+                      children: [
+                        // 3 Stat Indicators
+                        Row(
+                          children: [
+                            Expanded(
+                              child: PetStatIndicator(
+                                key: const Key('home-stat-satiety'),
+                                barKey: const Key('home-stat-satiety-bar'),
+                                label: 'Сытость',
+                                value: state.pet.satiety,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.small),
+                            Expanded(
+                              child: PetStatIndicator(
+                                key: const Key('home-stat-care'),
+                                barKey: const Key('home-stat-care-bar'),
+                                label: 'Уход',
+                                value: state.pet.care,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.small),
+                            Expanded(
+                              child: PetStatIndicator(
+                                key: const Key('home-stat-mood'),
+                                barKey: const Key('home-stat-mood-bar'),
+                                label: 'Настроение',
+                                value: state.pet.mood,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.small),
+                        SizedBox(
+                          height: 140,
+                          child: FittedBox(
+                            fit: BoxFit.contain,
+                            child: FinnyPreview(
+                              colorId: state.pet.colorId,
+                              patternId: state.pet.patternId,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          state.pet.name,
+                          key: const Key('home-pet-name'),
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: AppSpacing.small),
+                        // Free Interactions
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                key: const Key('home-free-pet'),
+                                onPressed: canPet
+                                    ? () => controller.performFreeInteraction(
+                                          FreePetInteraction.pet,
+                                        )
+                                    : null,
+                                icon: const Icon(Icons.favorite_outline),
+                                label: Text(
+                                  state.petUsageCount > 0
+                                      ? 'Погладить ✓'
+                                      : 'Погладить',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.small),
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                key: const Key('home-free-play'),
+                                onPressed: canPlay
+                                    ? () => controller.performFreeInteraction(
+                                          FreePetInteraction.play,
+                                        )
+                                    : null,
+                                icon: const Icon(Icons.sports_baseball_outlined),
+                                label: Text(
+                                  state.playUsageCount > 0
+                                      ? 'Поиграть ✓'
+                                      : 'Поиграть',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
+                  if (state.interactionNotice case final notice?) ...[
+                    const SizedBox(height: AppSpacing.small),
+                    _Notice(notice),
+                  ],
                   const SizedBox(height: AppSpacing.small),
-                  Text(
-                    state.pet.name,
-                    key: const Key('home-pet-name'),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: AppSpacing.large),
                   _DayStatusCard(period: period),
                   if (state.startFailed) ...[
-                    const SizedBox(height: AppSpacing.medium),
+                    const SizedBox(height: AppSpacing.small),
                     const _Notice(
                       'Не получилось начать день. Попробуй ещё раз.',
                     ),
                   ],
                   if (state.finishFailed) ...[
-                    const SizedBox(height: AppSpacing.medium),
+                    const SizedBox(height: AppSpacing.small),
                     const _Notice(
                       'Не получилось завершить день. Попробуй ещё раз.',
                     ),
                   ],
-                  const SizedBox(height: AppSpacing.large),
+                  const SizedBox(height: AppSpacing.small),
                   if (state.allDaysCompleted)
                     const _Notice('Все дни завершены')
                   else if (period == null)
@@ -201,19 +369,147 @@ class _HomeContent extends StatelessWidget {
                         state.finishingDay ? 'Завершаем…' : 'Завершить день',
                       ),
                     ),
-                  const SizedBox(height: AppSpacing.small),
-                  OutlinedButton.icon(
-                    key: const Key('home-savings'),
-                    onPressed: onSavings,
-                    icon: const Icon(Icons.savings_outlined),
-                    label: const Text('Накопления'),
-                  ),
+                  // Compact "Today" block
+                  if (period != null) ...[
+                    const SizedBox(height: AppSpacing.medium),
+                    _TodayCard(period: period),
+                  ],
+                  // Active Savings Goal (Compact)
+                  if (state.activeGoal case final goal?) ...[
+                    const SizedBox(height: AppSpacing.medium),
+                    Card(
+                      key: const Key('home-savings-goal'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.medium),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.savings_outlined,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: AppSpacing.medium),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    goal.name,
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: (state.gameState.savedAmount /
+                                              goal.price)
+                                          .clamp(0.0, 1.0),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.medium),
+                            Text(
+                              '${state.gameState.savedAmount}/${goal.price} 🪙',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TodayCard extends StatelessWidget {
+  const _TodayCard({required this.period});
+
+  final GamePeriod period;
+
+  @override
+  Widget build(BuildContext context) {
+    final checkpoints = period.requiredCheckpoints
+        .where((id) => id != 'mandatory_need')
+        .toList(growable: false);
+
+    if (checkpoints.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      key: const Key('home-today-card'),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.medium),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Сегодня',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: AppSpacing.small),
+            Wrap(
+              spacing: AppSpacing.medium,
+              runSpacing: AppSpacing.small,
+              children: [
+                for (final cp in checkpoints) ...[
+                  _CheckpointChip(
+                    label: switch (cp) {
+                      'financial_task' => 'Задание',
+                      'savings_decision' => 'Накопления',
+                      'changed_circumstance' => 'Событие',
+                      'discount_decision' => 'Скидка',
+                      _ => cp,
+                    },
+                    resolved: period.resolvedCheckpoints.contains(cp),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CheckpointChip extends StatelessWidget {
+  const _CheckpointChip({required this.label, required this.resolved});
+
+  final String label;
+  final bool resolved;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          resolved ? Icons.check_circle : Icons.radio_button_unchecked,
+          size: 18,
+          color: resolved
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: resolved ? FontWeight.w600 : FontWeight.normal,
+            color: resolved
+                ? theme.colorScheme.onSurface
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -241,7 +537,7 @@ class _DayStatusCard extends StatelessWidget {
     return Card(
       key: const Key('home-day-status'),
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.large),
+        padding: const EdgeInsets.all(AppSpacing.medium),
         child: Column(
           children: [
             Text(

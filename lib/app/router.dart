@@ -1,4 +1,5 @@
 import 'package:finny/app/bootstrap_screen.dart';
+import 'package:finny/app/scaffold_with_nested_navigation.dart';
 import 'package:finny/features/adult/adult_screen.dart';
 import 'package:finny/features/budget/budget_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
@@ -10,6 +11,7 @@ import 'package:finny/features/savings/savings_screen.dart';
 import 'package:finny/features/settings/settings_screen.dart';
 import 'package:finny/features/shop/shop_screen.dart';
 import 'package:finny/features/tasks/tasks_screen.dart';
+import 'package:finny/features/things/things_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -24,11 +26,41 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/pet-creation',
         builder: (_, _) => const PetCreationScreen(),
       ),
-      GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            ScaffoldWithNestedNavigation(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/home', builder: (_, _) => const HomeScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/things', builder: (_, _) => const ThingsScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/shop', builder: (_, _) => const ShopScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(path: '/tasks', builder: (_, _) => const TasksScreen()),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/savings',
+                builder: (_, _) => const SavingsScreen(),
+              ),
+            ],
+          ),
+        ],
+      ),
       GoRoute(path: '/budget', builder: (_, _) => const BudgetScreen()),
-      GoRoute(path: '/shop', builder: (_, _) => const ShopScreen()),
-      GoRoute(path: '/savings', builder: (_, _) => const SavingsScreen()),
-      GoRoute(path: '/tasks', builder: (_, _) => const TasksScreen()),
       GoRoute(
         path: '/period-summary',
         builder: (_, _) => const PeriodSummaryScreen(),
