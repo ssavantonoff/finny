@@ -8,6 +8,7 @@ import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/purchase_service.dart';
+import 'package:finny/services/task_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_content_repository.dart';
@@ -39,6 +40,7 @@ void main() {
   late PeriodService periods;
   late BudgetService budgets;
   late PurchaseService purchases;
+  late TaskService tasks;
 
   setUp(() {
     database = createTestDatabase();
@@ -51,6 +53,7 @@ void main() {
     periods = PeriodService(games, content);
     budgets = BudgetService(games);
     purchases = PurchaseService(games, content);
+    tasks = TaskService(games, content);
   });
 
   tearDown(() => database.close());
@@ -76,11 +79,13 @@ void main() {
   Future<void> completePlayerPeriod(
     ({int profileId, int periodId}) player,
   ) async {
-    for (final checkpointId in const [
-      'financial_task',
-      'mandatory_need',
-      'savings_decision',
-    ]) {
+    await tasks.submitAnswer(
+      profileId: player.profileId,
+      periodId: player.periodId,
+      taskId: 'task_period_1',
+      answerId: 'need_lunch',
+    );
+    for (final checkpointId in const ['mandatory_need', 'savings_decision']) {
       await periods.resolveCheckpoint(
         profileId: player.profileId,
         periodId: player.periodId,
@@ -113,14 +118,14 @@ void main() {
       operationId: 'purchase-retry',
     );
 
-    expect(replay.walletBalance, 380);
+    expect(replay.walletBalance, 430);
     expect(
       await games.getInventoryQuantity(player.profileId, persistentItem.id),
       1,
     );
     expect(
       await games.getTransactions(player.profileId, periodId: player.periodId),
-      hasLength(2),
+      hasLength(3),
     );
 
     await expectLater(
@@ -158,10 +163,10 @@ void main() {
       description: 'Награда за задание',
     );
 
-    expect(replay.walletBalance, 550);
+    expect(replay.walletBalance, 600);
     expect(
       await games.getTransactions(player.profileId, periodId: player.periodId),
-      hasLength(2),
+      hasLength(3),
     );
 
     await expectLater(
@@ -204,11 +209,11 @@ void main() {
       operationId: 'savings-retry',
     );
 
-    expect(replay.walletBalance, 400);
+    expect(replay.walletBalance, 450);
     expect(replay.savedAmount, 100);
     expect(
       await games.getTransactions(player.profileId, periodId: player.periodId),
-      hasLength(2),
+      hasLength(3),
     );
 
     await expectLater(

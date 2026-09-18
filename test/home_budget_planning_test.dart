@@ -15,6 +15,8 @@ import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
 import 'package:finny/services/period_service.dart';
+import 'package:finny/services/task_service.dart';
+import 'package:finny/models/task_submission_result.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -267,14 +269,23 @@ Future<GamePeriod> _resolveAll(
   int profileId,
   GamePeriod period,
   PeriodService service,
+  GameRepository games,
+  ContentRepository content,
 ) async {
   var current = period;
   for (final checkpoint in current.requiredCheckpoints) {
-    current = await service.resolveCheckpoint(
-      profileId: profileId,
-      periodId: period.id!,
-      checkpointId: checkpoint,
-    );
+    current = checkpoint == 'financial_task'
+        ? (await TaskService(games, content).submitAnswer(
+            profileId: profileId,
+            periodId: period.id!,
+            taskId: 'task_period_1',
+            answerId: 'need_lunch',
+          ) as TaskAnswerCompleted).period
+        : await service.resolveCheckpoint(
+            profileId: profileId,
+            periodId: period.id!,
+            checkpointId: checkpoint,
+          );
   }
   return current;
 }
@@ -339,7 +350,7 @@ void main() {
 
     final periods = PeriodService(games, content);
     period = (await tester.runAsync(
-      () => _resolveAll(profile.id!, period, periods),
+      () => _resolveAll(profile.id!, period, periods, games, content),
     ))!;
     await tester.runAsync(
       harness.container.read(homeControllerProvider.notifier).load,

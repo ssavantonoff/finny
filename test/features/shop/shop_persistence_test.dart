@@ -8,6 +8,7 @@ import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/purchase_service.dart';
+import 'package:finny/services/task_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -93,11 +94,20 @@ void main() {
     await controller.buy(ball, profileId: normal.id!, periodId: started.id!);
     expect(container.read(shopControllerProvider).pending, isNotNull);
     for (final checkpoint in started.requiredCheckpoints) {
-      await periods.resolveCheckpoint(
-        profileId: normal.id!,
-        periodId: started.id!,
-        checkpointId: checkpoint,
-      );
+      if (checkpoint == 'financial_task') {
+        await TaskService(games, content).submitAnswer(
+          profileId: normal.id!,
+          periodId: started.id!,
+          taskId: 'task_period_1',
+          answerId: 'need_lunch',
+        );
+      } else {
+        await periods.resolveCheckpoint(
+          profileId: normal.id!,
+          periodId: started.id!,
+          checkpointId: checkpoint,
+        );
+      }
     }
     await periods.completePeriod(profileId: normal.id!, periodId: started.id!);
     await controller.load();
@@ -107,9 +117,9 @@ void main() {
     final result = container.read(shopControllerProvider);
     expect(result.result?.kind, ShopResultKind.success);
     expect(result.pending, isNull);
-    expect(result.gameState?.walletBalance, 380);
+    expect(result.gameState?.walletBalance, 430);
     expect(await games.getInventoryQuantity(normal.id!, ball.id), 1);
-    expect(await games.getTransactions(normal.id!), hasLength(2));
+    expect(await games.getTransactions(normal.id!), hasLength(3));
     expect((await games.getGameState(demo.id!))!.toMap(), demoBefore.toMap());
     expect(await games.getInventoryQuantity(demo.id!, ball.id), 0);
     expect(await games.getTransactions(demo.id!), isEmpty);

@@ -1,5 +1,5 @@
 import 'package:finny/app/providers.dart';
-import 'package:finny/models/financial_task.dart';
+import 'package:finny/models/task_submission_result.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/profile.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -101,31 +101,22 @@ void main() {
     await container
         .read(budgetServiceProvider)
         .confirmPlan(profileId: profile.id!, periodId: period!.id!);
-    const task = FinancialTask(
-      id: 'task_once',
-      title: 'Одно задание',
-      topic: 'budget',
-      description: 'Тестовое задание',
-      type: 'choice',
-      reward: 50,
-      period: 1,
-      scenarioData: {},
-    );
     final service = container.read(taskServiceProvider);
 
-    await service.rewardCompletedTask(
+    final first = await service.submitAnswer(
       profileId: profile.id!,
       periodId: period.id!,
-      task: task,
+      taskId: 'task_need_or_want_01',
+      answerId: 'need_lunch',
     );
-    await expectLater(
-      service.rewardCompletedTask(
-        profileId: profile.id!,
-        periodId: period.id!,
-        task: task,
-      ),
-      throwsStateError,
+    final replay = await service.submitAnswer(
+      profileId: profile.id!,
+      periodId: period.id!,
+      taskId: 'task_need_or_want_01',
+      answerId: 'need_lunch',
     );
+    expect((first as TaskAnswerCompleted).rewardAppliedNow, isTrue);
+    expect((replay as TaskAnswerCompleted).wasAlreadyCompleted, isTrue);
 
     expect((await games.getGameState(profile.id!))?.walletBalance, 550);
     expect(await games.getTransactions(profile.id!), hasLength(2));

@@ -1,5 +1,6 @@
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/completed_goal.dart';
+import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -8,6 +9,8 @@ import 'package:finny/models/savings_exception.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/transaction.dart';
+import 'package:finny/models/task_progress.dart';
+import 'package:finny/models/task_submission_result.dart';
 import 'package:sqflite/sqflite.dart';
 
 abstract interface class GameRepository {
@@ -43,6 +46,13 @@ abstract interface class GameRepository {
     required int profileId,
     required int periodId,
     required String checkpointId,
+  });
+  Future<TaskProgress?> getTaskProgress(int profileId, String taskId);
+  Future<TaskSubmissionResult> submitFinancialTaskAnswer({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required String answerId,
   });
   Future<GamePeriod> completePeriod({
     required int profileId,
@@ -346,6 +356,11 @@ class SqliteGameRepository implements GameRepository {
     required int periodId,
     required String checkpointId,
   }) async {
+    if (checkpointId == 'financial_task') {
+      throw StateError(
+        'Financial tasks must be completed through TaskService.',
+      );
+    }
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
       final period = await _requirePeriod(txn, profileId, periodId);
@@ -355,36 +370,178 @@ class SqliteGameRepository implements GameRepository {
           'Checkpoints can only be resolved during an active period.',
         );
       }
-      if (!period.requiredCheckpoints.contains(checkpointId)) {
-        throw StateError(
-          'Checkpoint $checkpointId is not required for this period.',
+      return _resolveCheckpointInTransaction(txn, period, checkpointId);
+    });
+  }
+
+  Future<GamePeriod> _resolveCheckpointInTransaction(
+    DatabaseExecutor txn,
+    GamePeriod period,
+    String checkpointId,
+  ) async {
+    if (!period.requiredCheckpoints.contains(checkpointId)) {
+      throw StateError(
+        'Checkpoint $checkpointId is not required for this period.',
+      );
+    }
+    if (period.resolvedCheckpoints.contains(checkpointId)) return period;
+    if (period.status != GamePeriodStatus.active) {
+      throw StateError('Only an active period accepts new checkpoints.');
+    }
+    final resolved = [
+      for (final required in period.requiredCheckpoints)
+        if (required == checkpointId ||
+            period.resolvedCheckpoints.contains(required))
+          required,
+    ];
+    final updated = period.copyWith(
+      resolvedCheckpoints: List.unmodifiable(resolved),
+      status: resolved.length == period.requiredCheckpoints.length
+          ? GamePeriodStatus.readyToFinish
+          : GamePeriodStatus.active,
+    );
+    await _writePeriod(txn, updated);
+    return updated;
+  }
+
+  @override
+  Future<TaskProgress?> getTaskProgress(int profileId, String taskId) async {
+    final db = await _appDatabase.database;
+    return _readTaskProgress(db, profileId, taskId);
+  }
+
+  @override
+  Future<TaskSubmissionResult> submitFinancialTaskAnswer({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required String answerId,
+  }) async {
+    task.validate();
+    if (profileId <= 0 ||
+        periodId <= 0 ||
+        !task.choiceScenario.options.any((option) => option.id == answerId)) {
+      throw ArgumentError('Invalid financial task submission.');
+    }
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final period = await _requirePeriod(txn, profileId, periodId);
+      if (task.period != period.periodNumber) {
+        throw StateError('Task ${task.id} does not belong to this period.');
+      }
+      if (!period.requiredCheckpoints.contains('financial_task')) {
+        throw StateError('This period does not require a financial task.');
+      }
+
+      final rewardKey = 'task_reward_${periodId}_${task.id}';
+      final rewardSource = 'task_reward_${task.id}';
+      TaskProgress? progress;
+      try {
+        progress = await _readTaskProgress(txn, profileId, task.id);
+      } on FormatException catch (error) {
+        throw TaskIntegrityException('Invalid task progress: $error');
+      }
+      final rewardRows = await txn.query(
+        'transactions',
+        where: 'profile_id = ? AND (source = ? OR deduplication_key = ?)',
+        whereArgs: [profileId, rewardSource, rewardKey],
+      );
+      final checkpointResolved = period.resolvedCheckpoints.contains(
+        'financial_task',
+      );
+      if (progress != null || rewardRows.isNotEmpty || checkpointResolved) {
+        if (progress == null ||
+            progress.status != TaskProgressStatus.completed ||
+            !progress.rewardClaimed ||
+            progress.scenarioState['answerId'] !=
+                task.choiceScenario.correctOptionId ||
+            !checkpointResolved ||
+            rewardRows.length != 1) {
+          throw const TaskIntegrityException(
+            'Task completion is inconsistent.',
+          );
+        }
+        final reward = GameTransaction.fromMap(rewardRows.single);
+        if (reward.profileId != profileId ||
+            reward.periodId != periodId ||
+            reward.type != GameTransactionType.taskReward ||
+            reward.amount != task.reward ||
+            reward.source != rewardSource ||
+            reward.deduplicationKey != rewardKey) {
+          throw const TaskIntegrityException('Task reward is inconsistent.');
+        }
+        return TaskAnswerCompleted(
+          explanation: task.choiceScenario.explanation,
+          canonicalReward: task.reward,
+          rewardAppliedNow: false,
+          wasAlreadyCompleted: true,
+          gameState: await _requireState(txn, profileId),
+          period: period,
         );
       }
-      if (period.resolvedCheckpoints.contains(checkpointId)) {
-        return period;
+      if (period.status != GamePeriodStatus.active) {
+        throw StateError('New task completion requires an active period.');
       }
-      if (period.status == GamePeriodStatus.readyToFinish) {
-        throw StateError(
-          'A ready period cannot accept new checkpoint changes.',
+      if (answerId != task.choiceScenario.correctOptionId) {
+        return TaskAnswerIncorrect(
+          explanation: task.choiceScenario.explanation,
         );
       }
 
-      final resolved = [
-        for (final required in period.requiredCheckpoints)
-          if (required == checkpointId ||
-              period.resolvedCheckpoints.contains(required))
-            required,
-      ];
-      final allResolved = resolved.length == period.requiredCheckpoints.length;
-      final updated = period.copyWith(
-        resolvedCheckpoints: List.unmodifiable(resolved),
-        status: allResolved
-            ? GamePeriodStatus.readyToFinish
-            : GamePeriodStatus.active,
+      final now = DateTime.now().toUtc();
+      final state = await _applyWalletTransaction(
+        txn,
+        GameTransaction(
+          profileId: profileId,
+          periodId: periodId,
+          type: GameTransactionType.taskReward,
+          amount: task.reward,
+          source: rewardSource,
+          description: 'Награда за задание: ${task.title}',
+          createdAt: now,
+          deduplicationKey: rewardKey,
+        ),
       );
-      await _writePeriod(txn, updated);
-      return updated;
+      await txn.insert(
+        'task_progress',
+        TaskProgress(
+          profileId: profileId,
+          taskId: task.id,
+          status: TaskProgressStatus.completed,
+          rewardClaimed: true,
+          scenarioState: {'answerId': task.choiceScenario.correctOptionId},
+          updatedAt: now,
+        ).toMap(),
+      );
+      final afterReward = await _requirePeriod(txn, profileId, periodId);
+      final resolved = await _resolveCheckpointInTransaction(
+        txn,
+        afterReward,
+        'financial_task',
+      );
+      return TaskAnswerCompleted(
+        explanation: task.choiceScenario.explanation,
+        canonicalReward: task.reward,
+        rewardAppliedNow: true,
+        wasAlreadyCompleted: false,
+        gameState: state,
+        period: resolved,
+      );
     });
+  }
+
+  Future<TaskProgress?> _readTaskProgress(
+    DatabaseExecutor db,
+    int profileId,
+    String taskId,
+  ) async {
+    final rows = await db.query(
+      'task_progress',
+      where: 'profile_id = ? AND task_id = ?',
+      whereArgs: [profileId, taskId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : TaskProgress.fromMap(rows.single);
   }
 
   @override
@@ -411,6 +568,9 @@ class SqliteGameRepository implements GameRepository {
 
   @override
   Future<GameState> applyWalletChange(GameTransaction transaction) async {
+    if (transaction.type == GameTransactionType.taskReward) {
+      throw StateError('Task rewards require atomic task completion.');
+    }
     _validateNewTransaction(transaction);
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
@@ -439,6 +599,9 @@ class SqliteGameRepository implements GameRepository {
   Future<GameState> applyIdempotentWalletChange(
     GameTransaction transaction,
   ) async {
+    if (transaction.type == GameTransactionType.taskReward) {
+      throw StateError('Task rewards require atomic task completion.');
+    }
     _validateNewTransaction(transaction);
     final key = transaction.deduplicationKey;
     if (key == null || key.trim().isEmpty) {

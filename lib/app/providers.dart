@@ -75,7 +75,10 @@ final periodServiceProvider = Provider<PeriodService>(
 );
 
 final taskServiceProvider = Provider<TaskService>(
-  (ref) => TaskService(ref.watch(gameRepositoryProvider)),
+  (ref) => TaskService(
+    ref.watch(gameRepositoryProvider),
+    ref.watch(contentRepositoryProvider),
+  ),
 );
 
 final petProgressServiceProvider = Provider<PetProgressService>(
