@@ -26,19 +26,6 @@ abstract interface class GameRepository {
     required int periodId,
     required Duration elapsed,
   });
-  Future<Pet> useItem({
-    required int profileId,
-    required int periodId,
-    required ShopItem item,
-    required String operationId,
-    required PetActionSlot slot,
-  });
-  Future<Pet> performFreePetInteraction({
-    required int profileId,
-    required int periodId,
-    required FreePetInteraction interaction,
-    required String operationId,
-  });
   Future<int> getPetDailyUsageCount({
     required int profileId,
     required int periodId,
@@ -128,6 +115,23 @@ abstract interface class TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required String answerId,
+  });
+}
+
+abstract interface class PetActionPort {
+  Future<Pet> useItem({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required PetActionSlot slot,
+  });
+
+  Future<Pet> performFreePetInteraction({
+    required int profileId,
+    required int periodId,
+    required FreePetInteraction interaction,
+    required String operationId,
   });
 }
 
@@ -255,41 +259,6 @@ class SqliteGameRepository implements GameRepository {
       return updatedPet;
     });
   }
-
-  @override
-  Future<Pet> useItem({
-    required int profileId,
-    required int periodId,
-    required ShopItem item,
-    required String operationId,
-    required PetActionSlot slot,
-  }) {
-    final actionId = 'item:${item.id}';
-    return _applyPetAction(
-      profileId: profileId,
-      periodId: periodId,
-      actionId: actionId,
-      operationId: operationId,
-      slot: slot,
-      effects: item.petEffects,
-      item: item,
-    );
-  }
-
-  @override
-  Future<Pet> performFreePetInteraction({
-    required int profileId,
-    required int periodId,
-    required FreePetInteraction interaction,
-    required String operationId,
-  }) => _applyPetAction(
-    profileId: profileId,
-    periodId: periodId,
-    actionId: interaction.actionId,
-    operationId: operationId,
-    slot: PetActionSlot.defaultSlot,
-    effects: interaction.effects,
-  );
 
   @override
   Future<int> getPetDailyUsageCount({
@@ -1554,6 +1523,45 @@ class SqliteGameRepository implements GameRepository {
       throw ArgumentError('Pet identity or state is invalid.');
     }
   }
+}
+
+class SqlitePetActionPort implements PetActionPort {
+  SqlitePetActionPort(AppDatabase database)
+    : _core = SqliteGameRepository(database);
+
+  final SqliteGameRepository _core;
+
+  @override
+  Future<Pet> useItem({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required PetActionSlot slot,
+  }) => _core._applyPetAction(
+    profileId: profileId,
+    periodId: periodId,
+    actionId: 'item:${item.id}',
+    operationId: operationId,
+    slot: slot,
+    effects: item.petEffects,
+    item: item,
+  );
+
+  @override
+  Future<Pet> performFreePetInteraction({
+    required int profileId,
+    required int periodId,
+    required FreePetInteraction interaction,
+    required String operationId,
+  }) => _core._applyPetAction(
+    profileId: profileId,
+    periodId: periodId,
+    actionId: interaction.actionId,
+    operationId: operationId,
+    slot: PetActionSlot.defaultSlot,
+    effects: interaction.effects,
+  );
 }
 
 class SqliteTaskCompletionPort implements TaskCompletionPort {

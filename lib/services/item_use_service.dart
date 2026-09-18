@@ -5,9 +5,9 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 
 class ItemUseService {
-  ItemUseService(this._gameRepository, this._contentRepository);
+  ItemUseService(this._petActionPort, this._contentRepository);
 
-  final GameRepository _gameRepository;
+  final PetActionPort _petActionPort;
   final ContentRepository _contentRepository;
 
   Future<Pet> useItem({
@@ -32,7 +32,7 @@ class ItemUseService {
         !item.persistent && item.usagePolicy != ItemUsagePolicy.unlimited) {
       throw StateError('Shop item ${item.id} has an invalid usage policy.');
     }
-    return _gameRepository.useItem(
+    return _petActionPort.useItem(
       profileId: profileId,
       periodId: periodId,
       item: item,
@@ -46,7 +46,7 @@ class ItemUseService {
     required int periodId,
     required FreePetInteraction interaction,
     required String operationId,
-  }) => _gameRepository.performFreePetInteraction(
+  }) => _petActionPort.performFreePetInteraction(
     profileId: profileId,
     periodId: periodId,
     interaction: interaction,

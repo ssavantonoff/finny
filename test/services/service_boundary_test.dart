@@ -1,7 +1,9 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/models/task_submission_result.dart';
 import 'package:finny/models/game_state.dart';
+import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/profile.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/services/item_use_service.dart';
@@ -28,6 +30,37 @@ void main() {
 
       final profiles = container.read(profileRepositoryProvider);
       final games = container.read(gameRepositoryProvider);
+      expect(games, isNot(isA<PetActionPort>()));
+      const forgedItem = ShopItem(
+        id: 'forged',
+        name: 'Forged item',
+        category: ShopItemCategory.need,
+        price: 0,
+        persistent: false,
+        effectType: 'mood',
+        effectValue: 100,
+        unlockType: 'available',
+        usagePolicy: ItemUsagePolicy.unlimited,
+      );
+      expect(
+        () => (games as dynamic).useItem(
+          profileId: 1,
+          periodId: 1,
+          item: forgedItem,
+          operationId: 'forged-item-use',
+          slot: PetActionSlot.defaultSlot,
+        ),
+        throwsNoSuchMethodError,
+      );
+      expect(
+        () => (games as dynamic).performFreePetInteraction(
+          profileId: 1,
+          periodId: 1,
+          interaction: FreePetInteraction.play,
+          operationId: 'forged-free-interaction',
+        ),
+        throwsNoSuchMethodError,
+      );
       expect(container.read(petStateServiceProvider), isA<PetStateService>());
       expect(container.read(itemUseServiceProvider), isA<ItemUseService>());
       final profile = await profiles.create(

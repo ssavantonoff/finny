@@ -103,7 +103,7 @@ void main() {
     profiles = SqliteProfileRepository(database);
     games = SqliteGameRepository(database);
     service = ItemUseService(
-      games,
+      SqlitePetActionPort(database),
       TestContentRepository(const [], shopItems: items),
     );
   });
@@ -645,7 +645,7 @@ void main() {
       'acquired_at': DateTime.utc(2026, 9, 18).toIso8601String(),
     });
     final firstService = ItemUseService(
-      firstGames,
+      SqlitePetActionPort(first),
       TestContentRepository(const [], shopItems: items),
     );
     await firstService.useItem(
@@ -675,7 +675,7 @@ void main() {
     addTearDown(reopened.close);
     final reopenedGames = SqliteGameRepository(reopened);
     final reopenedService = ItemUseService(
-      reopenedGames,
+      SqlitePetActionPort(reopened),
       TestContentRepository(const [], shopItems: items),
     );
     await reopenedService.useItem(

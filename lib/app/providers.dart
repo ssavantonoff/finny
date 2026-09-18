@@ -51,6 +51,10 @@ final _taskCompletionPortProvider = Provider<TaskCompletionPort>(
   (ref) => SqliteTaskCompletionPort(ref.watch(appDatabaseProvider)),
 );
 
+final _petActionPortProvider = Provider<PetActionPort>(
+  (ref) => SqlitePetActionPort(ref.watch(appDatabaseProvider)),
+);
+
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => AssetContentRepository(),
 );
@@ -98,7 +102,7 @@ final petStateServiceProvider = Provider<PetStateService>(
 
 final itemUseServiceProvider = Provider<ItemUseService>(
   (ref) => ItemUseService(
-    ref.watch(gameRepositoryProvider),
+    ref.watch(_petActionPortProvider),
     ref.watch(contentRepositoryProvider),
   ),
 );
