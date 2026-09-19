@@ -53,6 +53,7 @@ FinancialTask testFinancialTask(int periodNumber) => FinancialTask(
   type: 'choice',
   reward: 50,
   period: periodNumber,
+  requiredForCheckpoint: true,
   choiceScenario: const ChoiceTaskScenario(
     prompt: 'Финни проголодался. Что стоит купить в первую очередь?',
     options: [

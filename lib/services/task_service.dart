@@ -43,7 +43,8 @@ class TaskService {
     if (task.period != period.periodNumber) {
       throw StateError('Task ${task.id} does not belong to this period.');
     }
-    if (!period.requiredCheckpoints.contains('financial_task')) {
+    if (task.requiredForCheckpoint &&
+        !period.requiredCheckpoints.contains('financial_task')) {
       throw StateError('Period $periodId does not require a financial task.');
     }
     return _taskCompletionPort.submitFinancialTaskAnswer(

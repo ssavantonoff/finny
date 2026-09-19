@@ -38,6 +38,16 @@ class _ThingsScreenState extends ConsumerState<ThingsScreen> {
     final state = ref.watch(thingsControllerProvider);
     final controller = ref.read(thingsControllerProvider.notifier);
 
+    ref.listen<ThingsState>(thingsControllerProvider, (previous, next) {
+      final wasSuccess = previous?.result?.kind == ItemUseResultKind.success;
+      final isSuccess = next.result?.kind == ItemUseResultKind.success;
+      if (!wasSuccess && isSuccess) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) GoRouter.maybeOf(context)?.go('/home');
+        });
+      }
+    });
+
     ref.listen<int?>(activeProfileIdProvider, (_, _) {
       controller.load();
     });

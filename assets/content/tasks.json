@@ -3,19 +3,36 @@
     "id": "task_need_or_want_01",
     "title": "Нужно или хочется?",
     "topic": "needs_and_wants",
-    "description": "Финни проголодался. Помоги ему выбрать, что купить сначала.",
+    "description": "Помоги Финни выбрать, что купить сначала.",
     "type": "choice",
     "reward": 50,
     "period": 1,
+    "requiredForCheckpoint": true,
     "scenarioData": {
       "prompt": "Финни проголодался. Что стоит купить в первую очередь?",
-      "options": [
-        {"id": "apple", "label": "Яблоко"},
-        {"id": "ball", "label": "Мяч"},
-        {"id": "decoration", "label": "Украшение"}
-      ],
+      "options": [{"id":"apple","label":"Яблоко"},{"id":"ball","label":"Мяч"},{"id":"decoration","label":"Украшение"}],
       "correctOptionId": "apple",
       "explanation": "Когда Финни голоден, сначала стоит купить еду — яблоко. Мяч и украшение могут подождать."
     }
+  },
+  {
+    "id":"task_priority_02","title":"Что важнее сейчас?","topic":"priorities","description":"Сначала выбери самое важное.","type":"choice","reward":50,"period":2,"requiredForCheckpoint":true,
+    "scenarioData":{"prompt":"У Финни осталось 100 монет. Корм закончился, а ещё ему понравился бантик. Что стоит купить сначала?","options":[{"id":"food","label":"Корм"},{"id":"bow","label":"Бантик"},{"id":"other","label":"Потратить деньги на что-нибудь другое"}],"correctOptionId":"food","explanation":"Сначала стоит закрыть необходимость — купить корм. Желание можно оставить на потом."}
+  },
+  {
+    "id":"task_changed_plan_03","title":"Планы изменились","topic":"adapting_plan","description":"Реши, как поступить с неожиданной тратой.","type":"choice","reward":50,"period":3,"requiredForCheckpoint":true,
+    "scenarioData":{"prompt":"Ты уже составил план, но миска Финни неожиданно сломалась. Что разумнее сделать?","options":[{"id":"adapt","label":"Купить новую миску и пересмотреть оставшиеся траты"},{"id":"ignore","label":"Оставить старый план и не покупать миску"},{"id":"savings","label":"Сразу потратить все накопления"}],"correctOptionId":"adapt","explanation":"Неожиданные нужные траты иногда требуют изменить первоначальный план. Сам план при этом всё равно помогает понять, от каких расходов можно отказаться."}
+  },
+  {
+    "id":"task_discount_04","title":"Скидка — это выгодно?","topic":"discounts","description":"Подумай, как скидка влияет на решение.","type":"choice","reward":50,"period":4,"requiredForCheckpoint":true,
+    "scenarioData":{"prompt":"Лакомство стоило 60 монет, а по акции стоит 35. Что означает скидка?","options":[{"id":"must_buy","label":"Теперь его обязательно нужно купить"},{"id":"need","label":"Из-за скидки лакомство стало необходимостью"},{"id":"consider","label":"Цена стала выгоднее, но покупать всё равно стоит с учётом плана и целей"}],"correctOptionId":"consider","explanation":"Скидка снижает цену, но не делает покупку обязательной. Сначала стоит подумать, нужна ли вещь и подходит ли она твоему плану."}
+  },
+  {
+    "id":"task_final_choice_05","title":"Самостоятельный выбор","topic":"planning","description":"Сочетай нужную покупку и накопления.","type":"choice","reward":50,"period":5,"requiredForCheckpoint":true,
+    "scenarioData":{"prompt":"У тебя 200 монет. Финни нужен шампунь за 60, ты хочешь отложить 100, а игрушка стоит 140. Что разумнее?","options":[{"id":"balanced","label":"Купить шампунь и отложить 100"},{"id":"toy","label":"Купить игрушку"},{"id":"all","label":"Потратить все 200 сразу"}],"correctOptionId":"balanced","explanation":"Так ты сначала закрываешь нужную трату и одновременно продолжаешь двигаться к цели накоплений."}
+  },
+  {
+    "id":"task_bonus_reserve_05","title":"Что делать с остатком?","topic":"reserve","description":"Реши, что делать со свободными монетами.","type":"choice","reward":30,"period":5,"requiredForCheckpoint":false,
+    "scenarioData":{"prompt":"После важных покупок осталось 50 монет. Срочных нужд сейчас нет. Что можно сделать?","options":[{"id":"spend","label":"Сразу потратить остаток"},{"id":"keep","label":"Оставить деньги на потом или добавить к накоплениям"},{"id":"random","label":"Купить случайную вещь только потому, что деньги остались"}],"correctOptionId":"keep","explanation":"Необязательно тратить все деньги сразу. Остаток можно сохранить на будущие расходы или приблизить финансовую цель."}
   }
 ]

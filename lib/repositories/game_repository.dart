@@ -1810,7 +1810,8 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       if (task.period != period.periodNumber) {
         throw StateError('Task ${task.id} does not belong to this period.');
       }
-      if (!period.requiredCheckpoints.contains('financial_task')) {
+      if (task.requiredForCheckpoint &&
+          !period.requiredCheckpoints.contains('financial_task')) {
         throw StateError('This period does not require a financial task.');
       }
 
@@ -1830,13 +1831,15 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       final checkpointResolved = period.resolvedCheckpoints.contains(
         'financial_task',
       );
-      if (progress != null || rewardRows.isNotEmpty || checkpointResolved) {
+      final hasCompletionProof = progress != null || rewardRows.isNotEmpty;
+      if (hasCompletionProof ||
+          (task.requiredForCheckpoint && checkpointResolved)) {
         if (progress == null ||
             progress.status != TaskProgressStatus.completed ||
             !progress.rewardClaimed ||
             progress.scenarioState['answerId'] !=
                 task.choiceScenario.correctOptionId ||
-            !checkpointResolved ||
+            (task.requiredForCheckpoint && !checkpointResolved) ||
             rewardRows.length != 1) {
           throw const TaskIntegrityException(
             'Task completion is inconsistent.',
@@ -1860,8 +1863,12 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
           period: period,
         );
       }
-      if (period.status != GamePeriodStatus.active) {
-        throw StateError('New task completion requires an active period.');
+      final canComplete = task.requiredForCheckpoint
+          ? period.status == GamePeriodStatus.active
+          : period.status == GamePeriodStatus.active ||
+                period.status == GamePeriodStatus.readyToFinish;
+      if (!canComplete) {
+        throw StateError('New task completion is unavailable for this period.');
       }
       if (answerId != task.choiceScenario.correctOptionId) {
         return TaskAnswerIncorrect(
@@ -1895,11 +1902,13 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
         ).toMap(),
       );
       final afterReward = await _core._requirePeriod(txn, profileId, periodId);
-      final resolved = await _core._resolveCheckpointInTransaction(
-        txn,
-        afterReward,
-        'financial_task',
-      );
+      final resolved = task.requiredForCheckpoint
+          ? await _core._resolveCheckpointInTransaction(
+              txn,
+              afterReward,
+              'financial_task',
+            )
+          : afterReward;
       return TaskAnswerCompleted(
         explanation: task.choiceScenario.explanation,
         canonicalReward: task.reward,
@@ -2151,7 +2160,7 @@ class SqliteSpecialPurchasePort implements SpecialPurchasePort {
       );
       await _core._resolveCheckpointInTransaction(
         txn,
-        period,
+        await _core._requirePeriod(txn, profileId, periodId),
         story.checkpoint,
       );
       return updated;
@@ -2247,7 +2256,7 @@ class SqliteSpecialPurchasePort implements SpecialPurchasePort {
       );
       await _core._resolveCheckpointInTransaction(
         txn,
-        period,
+        await _core._requirePeriod(txn, profileId, periodId),
         promotion.checkpoint,
       );
       return updated;

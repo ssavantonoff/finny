@@ -684,4 +684,118 @@ void main() {
       hasLength(1),
     );
   });
+
+  test('optional task rewards once in active or readyToFinish without resolving checkpoint', () async {
+    final required = testFinancialTask(1);
+    final optional = FinancialTask(
+      id: 'task_bonus_reserve_05',
+      title: 'Что делать с остатком?',
+      topic: 'reserve',
+      description: 'Тестовое дополнительное задание',
+      type: 'choice',
+      reward: 30,
+      period: 1,
+      requiredForCheckpoint: false,
+      choiceScenario: required.choiceScenario,
+    );
+    final optionalService = TaskService(
+      games,
+      SqliteTaskCompletionPort(database),
+      TestContentRepository(
+        testPeriodDefinitions(count: 1),
+        tasks: [required, optional],
+      ),
+    );
+    final player = await createPeriod(
+      checkpoints: const ['financial_task', 'savings_decision'],
+    );
+
+    await optionalService.submitAnswer(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      taskId: required.id,
+      answerId: _correct,
+    );
+    var period = await games.resolveCheckpoint(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      checkpointId: 'savings_decision',
+    );
+    expect(period.status, GamePeriodStatus.readyToFinish);
+
+    final completed = await optionalService.submitAnswer(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      taskId: optional.id,
+      answerId: _correct,
+    ) as TaskAnswerCompleted;
+    expect(completed.canonicalReward, 30);
+    expect(completed.period.status, GamePeriodStatus.readyToFinish);
+    expect(
+      completed.period.resolvedCheckpoints,
+      containsAll(['financial_task', 'savings_decision']),
+    );
+    expect(completed.gameState.walletBalance, 580);
+
+    final replay = await optionalService.submitAnswer(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      taskId: optional.id,
+      answerId: _correct,
+    ) as TaskAnswerCompleted;
+    expect(replay.wasAlreadyCompleted, isTrue);
+    expect(replay.rewardAppliedNow, isFalse);
+    expect(replay.gameState.walletBalance, 580);
+    expect(
+      (await games.getTransactions(player.profileId))
+          .where((entry) => entry.source == 'task_reward_${optional.id}'),
+      hasLength(1),
+    );
+  });
+
+  test(
+    'optional task does not depend on a financial_task checkpoint',
+    () async {
+      final required = testFinancialTask(1);
+      final optional = FinancialTask(
+        id: 'task_bonus_without_checkpoint',
+        title: 'Дополнительное задание',
+        topic: 'reserve',
+        description: 'Тестовое дополнительное задание',
+        type: 'choice',
+        reward: 30,
+        period: 1,
+        requiredForCheckpoint: false,
+        choiceScenario: required.choiceScenario,
+      );
+      final optionalService = TaskService(
+        games,
+        SqliteTaskCompletionPort(database),
+        TestContentRepository(
+          testPeriodDefinitions(count: 1),
+          tasks: [optional],
+        ),
+      );
+      final player = await createPeriod(
+        checkpoints: const ['savings_decision'],
+      );
+
+      final completed = await optionalService.submitAnswer(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+        taskId: optional.id,
+        answerId: _correct,
+      ) as TaskAnswerCompleted;
+
+      expect(completed.canonicalReward, 30);
+      expect(completed.gameState.walletBalance, 530);
+      expect(completed.period.resolvedCheckpoints, isEmpty);
+      expect(completed.period.status, GamePeriodStatus.active);
+      expect(
+        (await games.getTransactions(player.profileId))
+            .where((entry) => entry.source == 'task_reward_${optional.id}'),
+        hasLength(1),
+      );
+    },
+  );
 }

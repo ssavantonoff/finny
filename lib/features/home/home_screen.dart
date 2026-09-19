@@ -1,6 +1,7 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
+import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/game_period.dart';
@@ -73,6 +74,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _incomeSheetOpen = false;
+  bool _eventDialogOpen = false;
+  String? _eventLoadKey;
 
   @override
   void initState() {
@@ -183,6 +186,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (completed && mounted) context.go('/period-summary');
   }
 
+  Future<void> _showCampaignEvent(int walletBalance) async {
+    if (_eventDialogOpen || !mounted) return;
+    _eventDialogOpen = true;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => CampaignEventDialog(walletBalance: walletBalance),
+    );
+    _eventDialogOpen = false;
+    if (mounted) {
+      await ref.read(homeControllerProvider.notifier).load();
+    }
+  }
+
   String _statLabels(Set<PetStat> stats) => [
     if (stats.contains(PetStat.satiety)) 'Сытость',
     if (stats.contains(PetStat.care)) 'Уход',
@@ -194,6 +211,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final state = ref.watch(homeControllerProvider);
     final controller = ref.read(homeControllerProvider.notifier);
 
+    ref.listen<CampaignEventState>(campaignEventControllerProvider, (_, next) {
+      if (next is CampaignEventReady && !_eventDialogOpen) {
+        final home = ref.read(homeControllerProvider);
+        if (home is HomeReady) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _showCampaignEvent(home.gameState.walletBalance),
+          );
+        }
+      }
+    });
+
     ref.listen<int?>(activeProfileIdProvider, (_, _) {
       controller.load();
     });
@@ -202,6 +230,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go('/startup');
       });
+    }
+    if (state is HomeReady && state.period?.id != null) {
+      final key =
+          '${state.profile.id}:${state.period!.id}:'
+          '${state.period!.resolvedCheckpoints.join(',')}';
+      if (_eventLoadKey != key) {
+        _eventLoadKey = key;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ref.read(campaignEventControllerProvider.notifier).load();
+          }
+        });
+      }
     }
 
     return switch (state) {
@@ -654,7 +695,7 @@ class _IncomeExplanation extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: AppSpacing.large),
-          if (period.startWalletBalance == 0) ...[
+          if (period.periodNumber == 1) ...[
             Text(
               'Ты получил ${period.baseIncome} 🪙',
               textAlign: TextAlign.center,
@@ -662,10 +703,20 @@ class _IncomeExplanation extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.small),
             const Text(
-              'Теперь реши, как ими распорядиться.',
+              'Каждый день у тебя есть монеты на Финни.\n\n'
+              'Сначала составь план: сколько потратить на нужное, '
+              'сколько на желания, сколько отложить и сколько оставить '
+              'на потом.\n\nПлан помогает принимать решения, но не '
+              'запрещает изменить траты позже.',
               textAlign: TextAlign.center,
             ),
           ] else ...[
+            Text(
+              'День ${period.periodNumber}',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppSpacing.small),
             _MoneyRow('Было с прошлого дня', period.startWalletBalance),
             _MoneyRow('Получено в начале дня', period.baseIncome, prefix: '+'),
             const Divider(),
@@ -684,6 +735,85 @@ class _IncomeExplanation extends StatelessWidget {
       ),
     ),
   );
+}
+
+class CampaignEventDialog extends ConsumerWidget {
+  const CampaignEventDialog({super.key, required this.walletBalance});
+
+  final int walletBalance;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(campaignEventControllerProvider);
+    if (state is! CampaignEventReady) {
+      return const PopScope(
+        canPop: false,
+        child: AlertDialog(content: Center(child: CircularProgressIndicator())),
+      );
+    }
+    final controller = ref.read(campaignEventControllerProvider.notifier);
+    final isBowl = state.kind == CampaignEventKind.day3Bowl;
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: Text(isBowl ? 'Ой! Миска Финни сломалась' : 'Сегодня акция!'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              isBowl
+                  ? 'Это неожиданная нужная трата. Новая миска стоит 120 монет.'
+                  : 'Лакомство обычно стоит 60 монет, а сейчас одну штуку '
+                        'можно купить за 35. Купить по акции?',
+            ),
+            if (state.message case final message?) ...[
+              const SizedBox(height: AppSpacing.small),
+              Text(message),
+            ],
+          ],
+        ),
+        actions: [
+          if (!isBowl)
+            TextButton(
+              key: const Key('campaign-promo-skip'),
+              onPressed: state.mutating
+                  ? null
+                  : () async {
+                      if (await controller.skipPromotion() && context.mounted) {
+                        Navigator.pop(context);
+                      }
+                    },
+              child: const Text('Пропустить'),
+            ),
+          FilledButton(
+            key: Key(isBowl ? 'campaign-buy-bowl' : 'campaign-promo-buy'),
+            onPressed: state.mutating || (!isBowl && walletBalance < 35)
+                ? null
+                : () async {
+                    final success = isBowl
+                        ? await controller.purchaseBowl()
+                        : await controller.buyPromotion();
+                    if (success && context.mounted) Navigator.pop(context);
+                  },
+            child: Text(isBowl ? 'Купить новую миску — 120' : 'Купить за 35'),
+          ),
+          if (state.pending != null && state.message != null)
+            FilledButton.tonal(
+              key: const Key('campaign-retry'),
+              onPressed: state.mutating
+                  ? null
+                  : () async {
+                      if (await controller.retry() && context.mounted) {
+                        Navigator.pop(context);
+                      }
+                    },
+              child: const Text('Проверить ещё раз'),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _MoneyRow extends StatelessWidget {
