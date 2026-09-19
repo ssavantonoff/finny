@@ -11,17 +11,40 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ShopScreen extends ConsumerStatefulWidget {
   const ShopScreen({super.key});
+
   @override
   ConsumerState<ShopScreen> createState() => _ShopScreenState();
 }
 
 class _ShopScreenState extends ConsumerState<ShopScreen> {
+  static const _categoryBarHeight = 64.0;
+
+  final _catalogController = ScrollController();
+  final _catalogKey = GlobalKey();
+  final _categoryBarKey = GlobalKey();
+  final _sectionKeys = {
+    for (final section in ShopDisplaySection.values) section: GlobalKey(),
+  };
+
+  ShopDisplaySection _activeSection = ShopDisplaySection.food;
+  ShopDisplaySection? _programmaticSection;
+  bool _activeUpdateScheduled = false;
+
   @override
   void initState() {
     super.initState();
+    _catalogController.addListener(_scheduleActiveSectionUpdate);
     Future.microtask(() {
       if (mounted) unawaited(ref.read(shopControllerProvider.notifier).load());
     });
+  }
+
+  @override
+  void dispose() {
+    _catalogController
+      ..removeListener(_scheduleActiveSectionUpdate)
+      ..dispose();
+    super.dispose();
   }
 
   void _details(ShopItem item, ShopState state) {
@@ -34,10 +57,107 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     );
   }
 
+  void _scheduleActiveSectionUpdate() {
+    if (_activeUpdateScheduled || !mounted) return;
+    _activeUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _activeUpdateScheduled = false;
+      _updateActiveSection();
+    });
+  }
+
+  void _updateActiveSection() {
+    if (!mounted ||
+        !_catalogController.hasClients ||
+        _programmaticSection != null) {
+      return;
+    }
+    final available = _sectionKeys.entries
+        .where((entry) => entry.value.currentContext != null)
+        .toList(growable: false);
+    if (available.isEmpty) return;
+
+    var next = available.first.key;
+    if (_catalogController.position.pixels >=
+        _catalogController.position.maxScrollExtent - 1) {
+      next = available.last.key;
+    } else {
+      final barBox = _categoryBarKey.currentContext?.findRenderObject();
+      final threshold = barBox is RenderBox
+          ? barBox.localToGlobal(Offset.zero).dy + barBox.size.height + 1
+          : MediaQuery.paddingOf(context).top + _categoryBarHeight;
+      for (final entry in available) {
+        final renderObject = entry.value.currentContext!.findRenderObject();
+        if (renderObject is! RenderBox) continue;
+        if (renderObject.localToGlobal(Offset.zero).dy <= threshold) {
+          next = entry.key;
+        } else {
+          break;
+        }
+      }
+    }
+    if (next != _activeSection) setState(() => _activeSection = next);
+  }
+
+  Future<void> _scrollToSection(ShopDisplaySection section) async {
+    final sectionBox = _sectionKeys[section]?.currentContext
+        ?.findRenderObject();
+    final catalogBox = _catalogKey.currentContext?.findRenderObject();
+    if (sectionBox is! RenderBox ||
+        catalogBox is! RenderBox ||
+        !_catalogController.hasClients) {
+      return;
+    }
+    _programmaticSection = section;
+    setState(() => _activeSection = section);
+    final sectionY = sectionBox.localToGlobal(Offset.zero).dy;
+    final catalogY = catalogBox.localToGlobal(Offset.zero).dy;
+    final target =
+        (_catalogController.offset + sectionY - catalogY - _categoryBarHeight)
+            .clamp(
+              _catalogController.position.minScrollExtent,
+              _catalogController.position.maxScrollExtent,
+            );
+    await _catalogController.animateTo(
+      target.toDouble(),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+    );
+    if (mounted && _activeSection != section) {
+      setState(() => _activeSection = section);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _programmaticSection = null;
+    });
+  }
+
+  void _listenForPurchaseSuccess(ShopState? previous, ShopState next) {
+    if (next.result?.kind != ShopResultKind.success ||
+        previous?.result?.kind == ShopResultKind.success) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Готово! Предмет куплен.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      ref.read(shopControllerProvider.notifier).clearResult();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<ShopState>(shopControllerProvider, _listenForPurchaseSuccess);
     final state = ref.watch(shopControllerProvider);
     final controller = ref.read(shopControllerProvider.notifier);
+    final readyWithItems =
+        state.load == ShopLoad.ready && state.items.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Магазин'),
@@ -53,121 +173,89 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
-            child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.medium),
-              children: [
-                if (state.gameState != null) ...[
-                  Text(
-                    'У тебя: ${state.gameState!.walletBalance} монет',
-                    key: const Key('shop-wallet'),
-                    style: Theme.of(context).textTheme.titleLarge,
+            child: CustomScrollView(
+              key: _catalogKey,
+              controller: _catalogController,
+              slivers: [
+                if (state.gameState != null)
+                  _padded(
+                    Text(
+                      'У тебя: ${state.gameState!.walletBalance} монет',
+                      key: const Key('shop-wallet'),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    top: AppSpacing.medium,
                   ),
-                  const SizedBox(height: AppSpacing.medium),
-                ],
-                if (state.result != null || state.purchasing)
-                  ShopPurchaseNotice(state: state),
+                if (state.purchasing ||
+                    (state.result != null &&
+                        state.result!.kind != ShopResultKind.success))
+                  _padded(ShopPurchaseNotice(state: state)),
+                if (readyWithItems)
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _CategoryHeaderDelegate(
+                      height: _categoryBarHeight,
+                      active: _activeSection,
+                      barKey: _categoryBarKey,
+                      onSelected: _scrollToSection,
+                    ),
+                  ),
                 if (state.load == ShopLoad.loading)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: CircularProgressIndicator(),
+                  _padded(
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(),
+                      ),
                     ),
                   )
                 else if (state.load != ShopLoad.ready) ...[
-                  ShopNotice(switch (state.load) {
-                    ShopLoad.noProfile => 'Профиль пока не выбран.',
-                    ShopLoad.contentError =>
-                      'Не получилось открыть магазин. Попробуй ещё раз.',
-                    _ => 'Не получилось обновить магазин. Попробуй ещё раз.',
-                  }),
-                  FilledButton.tonal(
-                    onPressed: state.purchasing ? null : controller.load,
-                    child: const Text('Обновить'),
+                  _padded(
+                    ShopNotice(switch (state.load) {
+                      ShopLoad.noProfile => 'Профиль пока не выбран.',
+                      ShopLoad.contentError =>
+                        'Не получилось открыть магазин. Попробуй ещё раз.',
+                      _ => 'Не получилось обновить магазин. Попробуй ещё раз.',
+                    }),
+                  ),
+                  _padded(
+                    FilledButton.tonal(
+                      onPressed: state.purchasing ? null : controller.load,
+                      child: const Text('Обновить'),
+                    ),
                   ),
                 ] else ...[
                   if (state.items.isEmpty)
-                    const Text('В магазине пока нет товаров.'),
+                    _padded(const Text('В магазине пока нет товаров.')),
                   if (state.period == null)
-                    const ShopNotice('Сначала начни игровой период.')
+                    _padded(const ShopNotice('Сначала начни игровой период.'))
                   else if (state.period!.status == GamePeriodStatus.planning)
-                    const ShopNotice('Сначала подтверди план.'),
-                  for (final section in ShopDisplaySection.values)
-                    if (state.items.any(
-                      (item) => item.displaySection == section,
-                    )) ...[
-                      Padding(
-                        padding: const EdgeInsets.only(top: AppSpacing.medium),
-                        child: Text(switch (section) {
-                          ShopDisplaySection.food => 'Еда',
-                          ShopDisplaySection.care => 'Уход',
-                          ShopDisplaySection.toys => 'Игрушки',
-                          ShopDisplaySection.accessories => 'Аксессуары',
-                        }, style: Theme.of(context).textTheme.titleLarge),
-                      ),
-                      for (final item in state.items.where(
-                        (item) => item.displaySection == section,
-                      ))
-                        Card(
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            key: Key('shop-item-${item.id}'),
-                            onTap:
-                                item.persistent &&
-                                    (state.quantities[item.id] ?? 0) > 0
-                                ? null
-                                : () => _details(item, state),
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.medium),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Row(
-                                    children: [
-                                      ShopItemIcon(item: item),
-                                      const SizedBox(width: AppSpacing.medium),
-                                      Expanded(
-                                        child: Text(
-                                          item.name,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleLarge,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: AppSpacing.small),
-                                  Text(
-                                    '${item.price} монет • ${shopCategory(item)}',
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                  if (shopEffect(item) case final effect?)
-                                    Text(
-                                      effect,
-                                      style: const TextStyle(fontSize: 16),
-                                    ),
-                                  if (item.persistent &&
-                                      (state.quantities[item.id] ?? 0) > 0)
-                                    const Text(
-                                      '✓ Куплено',
-                                      style: TextStyle(fontSize: 16),
-                                    )
-                                  else if (item.unlockType != 'available')
-                                    const Text('Этот предмет пока недоступен.'),
-                                  const SizedBox(height: AppSpacing.small),
-                                  const Text(
-                                    'Посмотреть',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    _padded(const ShopNotice('Сначала подтверди план.')),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        for (final section in ShopDisplaySection.values)
+                          if (state.items.any(
+                            (item) => item.displaySection == section,
+                          ))
+                            _ShopSection(
+                              key: _sectionKeys[section],
+                              section: section,
+                              items: state.items
+                                  .where(
+                                    (item) => item.displaySection == section,
+                                  )
+                                  .toList(growable: false),
+                              state: state,
+                              onItemTap: _details,
                             ),
-                          ),
-                        ),
-                    ],
+                      ],
+                    ),
+                  ),
                 ],
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.large),
+                ),
               ],
             ),
           ),
@@ -175,4 +263,151 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
       ),
     );
   }
+
+  SliverPadding _padded(Widget child, {double top = 0}) => SliverPadding(
+    padding: EdgeInsets.fromLTRB(AppSpacing.medium, top, AppSpacing.medium, 0),
+    sliver: SliverToBoxAdapter(child: child),
+  );
+}
+
+class _CategoryHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _CategoryHeaderDelegate({
+    required this.height,
+    required this.active,
+    required this.barKey,
+    required this.onSelected,
+  });
+
+  final double height;
+  final ShopDisplaySection active;
+  final GlobalKey barKey;
+  final ValueChanged<ShopDisplaySection> onSelected;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => Material(
+    key: barKey,
+    color: Theme.of(context).scaffoldBackgroundColor,
+    elevation: overlapsContent ? 2 : 0,
+    child: SingleChildScrollView(
+      key: const Key('shop-category-navigation'),
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.medium,
+        vertical: AppSpacing.small,
+      ),
+      child: Row(
+        children: [
+          for (final section in ShopDisplaySection.values) ...[
+            ChoiceChip(
+              key: Key('shop-category-${section.name}'),
+              label: Text(shopSectionLabel(section)),
+              selected: active == section,
+              showCheckmark: true,
+              onSelected: (_) => onSelected(section),
+            ),
+            if (section != ShopDisplaySection.values.last)
+              const SizedBox(width: AppSpacing.small),
+          ],
+        ],
+      ),
+    ),
+  );
+
+  @override
+  bool shouldRebuild(covariant _CategoryHeaderDelegate oldDelegate) =>
+      active != oldDelegate.active || height != oldDelegate.height;
+}
+
+class _ShopSection extends StatelessWidget {
+  const _ShopSection({
+    super.key,
+    required this.section,
+    required this.items,
+    required this.state,
+    required this.onItemTap,
+  });
+
+  final ShopDisplaySection section;
+  final List<ShopItem> items;
+  final ShopState state;
+  final void Function(ShopItem item, ShopState state) onItemTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.medium,
+      AppSpacing.medium,
+      AppSpacing.medium,
+      0,
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          shopSectionLabel(section),
+          key: Key('shop-section-${section.name}'),
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        for (final item in items)
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              key: Key('shop-item-${item.id}'),
+              onTap: item.persistent && (state.quantities[item.id] ?? 0) > 0
+                  ? null
+                  : () => onItemTap(item, state),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.medium),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        ShopItemIcon(item: item),
+                        const SizedBox(width: AppSpacing.medium),
+                        Expanded(
+                          child: Text(
+                            item.name,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.small),
+                    Text(
+                      '${item.price} монет • ${shopCategory(item)}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    if (shopEffect(item) case final effect?)
+                      Text(effect, style: const TextStyle(fontSize: 16)),
+                    if (item.persistent && (state.quantities[item.id] ?? 0) > 0)
+                      const Text('✓ Куплено', style: TextStyle(fontSize: 16))
+                    else if (item.unlockType != 'available')
+                      const Text('Этот предмет пока недоступен.'),
+                    const SizedBox(height: AppSpacing.small),
+                    const Text(
+                      'Посмотреть',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }

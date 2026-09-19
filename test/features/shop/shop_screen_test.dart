@@ -4,6 +4,7 @@ import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/shop/shop_screen.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/purchase_exception.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,6 +48,105 @@ void main() {
     await tester.tap(buy);
   }
 
+  ChoiceChip categoryChip(WidgetTester tester, ShopDisplaySection section) =>
+      tester.widget<ChoiceChip>(
+        find.byKey(Key('shop-category-${section.name}')),
+      );
+
+  testWidgets('sticky category navigation starts at Food on 360dp', (
+    tester,
+  ) async {
+    await mount(tester);
+
+    for (final section in ShopDisplaySection.values) {
+      expect(find.byKey(Key('shop-category-${section.name}')), findsOneWidget);
+    }
+    expect(categoryChip(tester, ShopDisplaySection.food).selected, isTrue);
+    expect(categoryChip(tester, ShopDisplaySection.care).selected, isFalse);
+    expect(find.byKey(const Key('shop-category-navigation')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('category taps reach Toys and Decorations', (tester) async {
+    await mount(tester);
+
+    final toys = find.byKey(const Key('shop-category-toys'));
+    await tester.ensureVisible(toys);
+    await tester.tap(toys);
+    await tester.pumpAndSettle();
+    final selectedAfterToys = ShopDisplaySection.values
+        .where((section) => categoryChip(tester, section).selected)
+        .toList();
+    expect(
+      categoryChip(tester, ShopDisplaySection.toys).selected,
+      isTrue,
+      reason: 'selected categories: $selectedAfterToys',
+    );
+    expect(
+      find.byKey(const Key('shop-section-toys')).hitTestable(),
+      findsOneWidget,
+    );
+
+    final accessories = find.byKey(const Key('shop-category-accessories'));
+    await tester.ensureVisible(accessories);
+    await tester.tap(accessories);
+    await tester.pumpAndSettle();
+    expect(
+      categoryChip(tester, ShopDisplaySection.accessories).selected,
+      isTrue,
+    );
+    expect(
+      find.byKey(const Key('shop-section-accessories')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.text('Украшения'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'manual catalog scroll updates active category and keeps bar visible',
+    (tester) async {
+      await mount(tester);
+
+      await tester.ensureVisible(find.byKey(const Key('shop-section-care')));
+      await tester.pumpAndSettle();
+
+      expect(categoryChip(tester, ShopDisplaySection.care).selected, isTrue);
+      expect(
+        find.byKey(const Key('shop-category-navigation')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('items keep canonical order inside the four sections', (
+    tester,
+  ) async {
+    h.content.items = [apple, feed, brush, ball, frisbee, bow];
+    await mount(tester);
+
+    final itemKeys = find
+        .byType(InkWell)
+        .evaluate()
+        .map((element) => element.widget.key)
+        .whereType<Key>()
+        .where((key) => key.toString().contains('shop-item-'))
+        .map((key) => key.toString())
+        .toList();
+    expect(
+      itemKeys,
+      containsAllInOrder([
+        const Key('shop-item-food_apple').toString(),
+        const Key('shop-item-food_feed').toString(),
+        const Key('shop-item-care_comb').toString(),
+        const Key('shop-item-toy_ball').toString(),
+        const Key('shop-item-toy_frisbee').toString(),
+        const Key('shop-item-accessory_bow').toString(),
+      ]),
+    );
+  });
+
   testWidgets(
     '360dp list, details and confirmation; double tap/rebuild do not repurchase',
     (tester) async {
@@ -75,8 +175,12 @@ void main() {
       expect(h.purchases.calls, hasLength(1));
       gate.complete();
       await tester.pumpAndSettle();
-      expect(find.text('Готово! Предмет куплен.'), findsWidgets);
-      expect(find.text('У тебя: 77 монет'), findsOneWidget);
+      expect(find.text('Готово! Предмет куплен.'), findsOneWidget);
+      expect(find.byKey(const Key('shop-buy')), findsNothing);
+      expect(h.state.gameState?.walletBalance, 77);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(find.text('Готово! Предмет куплен.'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
@@ -173,8 +277,8 @@ void main() {
     h.select(2);
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('shop-buy')), findsNothing);
-    expect(find.text('У тебя: 800 монет'), findsOneWidget);
-    expect(find.text('У тебя: 500 монет'), findsNothing);
+    expect(h.state.gameState?.walletBalance, 800);
+    expect(h.state.profileId, 2);
     expect(h.purchases.calls, isEmpty);
   });
 

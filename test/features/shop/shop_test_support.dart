@@ -21,6 +21,18 @@ const apple = ShopItem(
   unlockType: 'available',
   displaySection: ShopDisplaySection.food,
 );
+const feed = ShopItem(
+  id: 'food_feed',
+  name: 'Корм',
+  category: ShopItemCategory.need,
+  price: 90,
+  persistent: false,
+  effectType: 'satiety',
+  effectValue: 50,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.food,
+  usagePolicy: ItemUsagePolicy.unlimited,
+);
 const ball = ShopItem(
   id: 'toy_ball',
   name: 'Мяч',
@@ -31,6 +43,43 @@ const ball = ShopItem(
   effectValue: 8,
   unlockType: 'available',
   displaySection: ShopDisplaySection.toys,
+);
+const frisbee = ShopItem(
+  id: 'toy_frisbee',
+  name: 'Фрисби',
+  category: ShopItemCategory.want,
+  price: 140,
+  persistent: true,
+  effectType: 'mood',
+  effectValue: 40,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+const brush = ShopItem(
+  id: 'care_comb',
+  name: 'Расчёска',
+  category: ShopItemCategory.need,
+  price: 70,
+  persistent: true,
+  effectType: 'care',
+  effectValue: 25,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.care,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+const bow = ShopItem(
+  id: 'accessory_bow',
+  name: 'Бантик',
+  category: ShopItemCategory.want,
+  price: 80,
+  persistent: true,
+  effectType: 'none',
+  effectValue: 0,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.accessories,
+  equipSlot: ShopEquipSlot.head,
+  usagePolicy: ItemUsagePolicy.none,
 );
 
 GameState wallet(int profileId, [int balance = 500]) => GameState(
@@ -67,7 +116,7 @@ GamePeriod period(
 );
 
 class ShopContent implements ContentRepository {
-  List<ShopItem> items = [apple, ball];
+  List<ShopItem> items = [apple, brush, ball, bow];
   Object? error;
   Completer<void>? gate;
   @override

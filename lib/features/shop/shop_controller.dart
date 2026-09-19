@@ -327,12 +327,14 @@ bool sameShopItem(ShopItem? a, ShopItem b) =>
     a.displaySection == b.displaySection &&
     a.equipSlot == b.equipSlot;
 
-String shopCategory(ShopItem item) => switch (item.displaySection) {
+String shopSectionLabel(ShopDisplaySection section) => switch (section) {
   ShopDisplaySection.food => 'Еда',
   ShopDisplaySection.care => 'Уход',
   ShopDisplaySection.toys => 'Игрушки',
-  ShopDisplaySection.accessories => 'Аксессуары',
+  ShopDisplaySection.accessories => 'Украшения',
 };
+
+String shopCategory(ShopItem item) => shopSectionLabel(item.displaySection);
 
 String? shopEffect(ShopItem item) {
   final effects = item.petEffects;
