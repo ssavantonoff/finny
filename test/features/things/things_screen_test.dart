@@ -23,7 +23,7 @@ const itemApple = ShopItem(
   price: 40,
   persistent: false,
   effectType: 'satiety',
-  effectValue: 10,
+  effectValue: 20,
   unlockType: 'available',
   displaySection: ShopDisplaySection.food,
   usagePolicy: ItemUsagePolicy.unlimited,
@@ -33,10 +33,10 @@ const itemBrush = ShopItem(
   id: 'care_toothbrush',
   name: 'Зубная щётка',
   category: ShopItemCategory.need,
-  price: 50,
+  price: 80,
   persistent: true,
   effectType: 'care',
-  effectValue: 15,
+  effectValue: 8,
   unlockType: 'available',
   displaySection: ShopDisplaySection.care,
   usagePolicy: ItemUsagePolicy.toothbrush,
@@ -49,14 +49,14 @@ const itemBall = ShopItem(
   price: 120,
   persistent: true,
   effectType: 'mood',
-  effectValue: 8,
+  effectValue: 35,
   unlockType: 'available',
   displaySection: ShopDisplaySection.toys,
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
 );
 
 const itemBow = ShopItem(
-  id: 'acc_bow',
+  id: 'accessory_bow',
   name: 'Бантик',
   category: ShopItemCategory.want,
   price: 80,
@@ -100,7 +100,6 @@ class _ThingsGames extends SqliteGameRepository {
   @override
   Future<int> getInventoryQuantity(int profileId, String itemId) async =>
       inventory[itemId] ?? 0;
-
 
   @override
   Future<int> getPetDailyUsageCount({
@@ -160,105 +159,110 @@ void main() {
     createdAt: DateTime.utc(2026, 1, 1),
   );
 
-  testWidgets('empty state displays when no items are owned with go-to-shop button', (
-    tester,
-  ) async {
-    final database = createTestDatabase();
-    addTearDown(database.close);
+  testWidgets(
+    'empty state displays when no items are owned with go-to-shop button',
+    (tester) async {
+      final database = createTestDatabase();
+      addTearDown(database.close);
 
-    final games = _ThingsGames(database, activePeriod);
-    final content = TestContentRepository(
-      const [],
-      shopItems: [itemApple, itemBrush],
-    );
+      final games = _ThingsGames(database, activePeriod);
+      final content = TestContentRepository(
+        const [],
+        shopItems: [itemApple, itemBrush],
+      );
 
-    final container = ProviderContainer(
-      overrides: [
-        activeProfileIdProvider.overrideWith(
-          () => _ActiveThingsProfileMock(1),
+      final container = ProviderContainer(
+        overrides: [
+          activeProfileIdProvider.overrideWith(
+            () => _ActiveThingsProfileMock(1),
+          ),
+          profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+          gameRepositoryProvider.overrideWithValue(games),
+          contentRepositoryProvider.overrideWithValue(content),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
         ),
-        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
-        gameRepositoryProvider.overrideWithValue(games),
-        contentRepositoryProvider.overrideWithValue(content),
-      ],
-    );
-    addTearDown(container.dispose);
+      );
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
+      expect(find.byKey(const Key('things-empty')), findsOneWidget);
+      expect(find.text('У тебя пока нет вещей'), findsOneWidget);
+      expect(find.byKey(const Key('things-go-to-shop')), findsOneWidget);
+      expect(find.text('Заглянуть в магазин'), findsOneWidget);
+    },
+  );
 
-    expect(find.byKey(const Key('things-empty')), findsOneWidget);
-    expect(find.text('У тебя пока нет вещей'), findsOneWidget);
-    expect(find.byKey(const Key('things-go-to-shop')), findsOneWidget);
-    expect(find.text('Заглянуть в магазин'), findsOneWidget);
-  });
+  testWidgets(
+    'inventory renders owned items with counts, effects and sections',
+    (tester) async {
+      final database = createTestDatabase();
+      addTearDown(database.close);
 
-  testWidgets('inventory renders owned items with counts, effects and sections', (
-    tester,
-  ) async {
-    final database = createTestDatabase();
-    addTearDown(database.close);
+      final games = _ThingsGames(database, activePeriod);
+      games.inventory = {
+        itemApple.id: 3,
+        itemBrush.id: 1,
+        itemBall.id: 1,
+        itemBow.id: 1,
+      };
 
-    final games = _ThingsGames(database, activePeriod);
-    games.inventory = {
-      itemApple.id: 3,
-      itemBrush.id: 1,
-      itemBall.id: 1,
-      itemBow.id: 1,
-    };
+      final content = TestContentRepository(
+        const [],
+        shopItems: [itemApple, itemBrush, itemBall, itemBow],
+      );
 
-    final content = TestContentRepository(
-      const [],
-      shopItems: [itemApple, itemBrush, itemBall, itemBow],
-    );
+      final container = ProviderContainer(
+        overrides: [
+          activeProfileIdProvider.overrideWith(
+            () => _ActiveThingsProfileMock(1),
+          ),
+          profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+          gameRepositoryProvider.overrideWithValue(games),
+          contentRepositoryProvider.overrideWithValue(content),
+        ],
+      );
+      addTearDown(container.dispose);
 
-    final container = ProviderContainer(
-      overrides: [
-        activeProfileIdProvider.overrideWith(
-          () => _ActiveThingsProfileMock(1),
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
         ),
-        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
-        gameRepositoryProvider.overrideWithValue(games),
-        contentRepositoryProvider.overrideWithValue(content),
-      ],
-    );
-    addTearDown(container.dispose);
+      );
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
+      // Section headers
+      expect(find.byKey(const Key('things-section-food')), findsOneWidget);
+      expect(find.byKey(const Key('things-section-care')), findsOneWidget);
+      expect(find.byKey(const Key('things-section-toys')), findsOneWidget);
+      expect(
+        find.byKey(const Key('things-section-accessories')),
+        findsOneWidget,
+      );
 
-    // Section headers
-    expect(find.byKey(const Key('things-section-food')), findsOneWidget);
-    expect(find.byKey(const Key('things-section-care')), findsOneWidget);
-    expect(find.byKey(const Key('things-section-toys')), findsOneWidget);
-    expect(find.byKey(const Key('things-section-accessories')), findsOneWidget);
+      // Consumable count ×3 and effect
+      expect(find.text('Яблоко ×3'), findsOneWidget);
+      expect(find.text('Сытость +20'), findsOneWidget);
 
-    // Consumable count ×3 and effect
-    expect(find.text('Яблоко ×3'), findsOneWidget);
-    expect(find.text('Сытость +10'), findsOneWidget);
+      // Persistent toothbrush: label "Почистить зубы"
+      expect(find.text('Зубная щётка'), findsOneWidget);
+      expect(find.text('Почистить зубы'), findsOneWidget);
 
-    // Persistent toothbrush: label "Почистить зубы"
-    expect(find.text('Зубная щётка'), findsOneWidget);
-    expect(find.text('Почистить зубы'), findsOneWidget);
+      // Persistent ball: label "Использовать"
+      expect(find.text('Мяч'), findsOneWidget);
 
-    // Persistent ball: label "Использовать"
-    expect(find.text('Мяч'), findsOneWidget);
-
-    // Accessory: shows 'Аксессуар' without use button
-    expect(find.text('Бантик'), findsOneWidget);
-    expect(find.text('Аксессуар'), findsOneWidget);
-    expect(find.byKey(const Key('things-use-acc_bow')), findsNothing);
-  });
+      // Accessory: shows 'Аксессуар' without use button
+      expect(find.text('Бантик'), findsOneWidget);
+      expect(find.text('Аксессуар'), findsOneWidget);
+      expect(find.byKey(const Key('things-use-accessory_bow')), findsNothing);
+    },
+  );
 
   testWidgets('using consumable decrements count and removes when 0', (
     tester,
@@ -269,10 +273,7 @@ void main() {
     final games = _ThingsGames(database, activePeriod);
     games.inventory = {itemApple.id: 1};
 
-    final content = TestContentRepository(
-      const [],
-      shopItems: [itemApple],
-    );
+    final content = TestContentRepository(const [], shopItems: [itemApple]);
 
     final mockItemUse = _ThingsMockItemUse(
       SqlitePetActionPort(database),
@@ -295,9 +296,7 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
-        activeProfileIdProvider.overrideWith(
-          () => _ActiveThingsProfileMock(1),
-        ),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
         profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
         gameRepositoryProvider.overrideWithValue(games),
         contentRepositoryProvider.overrideWithValue(content),
@@ -326,46 +325,45 @@ void main() {
     expect(find.text('Яблоко ×1'), findsNothing);
   });
 
-  testWidgets('persistent item used today shows «Сегодня использовано» and disables use', (
-    tester,
-  ) async {
-    final database = createTestDatabase();
-    addTearDown(database.close);
+  testWidgets(
+    'persistent item used today shows «Сегодня использовано» and disables use',
+    (tester) async {
+      final database = createTestDatabase();
+      addTearDown(database.close);
 
-    final games = _ThingsGames(database, activePeriod);
-    games.inventory = {itemBall.id: 1};
-    // Mark ball as used today
-    games.usages['item:${itemBall.id}:${PetActionSlot.defaultSlot.storageValue}'] = 1;
+      final games = _ThingsGames(database, activePeriod);
+      games.inventory = {itemBall.id: 1};
+      // Mark ball as used today
+      games.usages['item:${itemBall.id}:${PetActionSlot.defaultSlot.storageValue}'] =
+          1;
 
-    final content = TestContentRepository(
-      const [],
-      shopItems: [itemBall],
-    );
+      final content = TestContentRepository(const [], shopItems: [itemBall]);
 
-    final container = ProviderContainer(
-      overrides: [
-        activeProfileIdProvider.overrideWith(
-          () => _ActiveThingsProfileMock(1),
+      final container = ProviderContainer(
+        overrides: [
+          activeProfileIdProvider.overrideWith(
+            () => _ActiveThingsProfileMock(1),
+          ),
+          profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+          gameRepositoryProvider.overrideWithValue(games),
+          contentRepositoryProvider.overrideWithValue(content),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
         ),
-        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
-        gameRepositoryProvider.overrideWithValue(games),
-        contentRepositoryProvider.overrideWithValue(content),
-      ],
-    );
-    addTearDown(container.dispose);
+      );
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Мяч'), findsOneWidget);
-    expect(find.text('Сегодня использовано'), findsOneWidget);
-    expect(find.byKey(const Key('things-use-toy_ball')), findsNothing);
-  });
+      expect(find.text('Мяч'), findsOneWidget);
+      expect(find.text('Сегодня использовано'), findsOneWidget);
+      expect(find.byKey(const Key('things-use-toy_ball')), findsNothing);
+    },
+  );
 }
 
 class _ActiveThingsProfileMock extends ActiveProfileIdController {

@@ -325,33 +325,22 @@ class HomeController extends Notifier<HomeViewState> {
           period.id != null &&
           (period.status == GamePeriodStatus.active ||
               period.status == GamePeriodStatus.readyToFinish)) {
-        try {
-          final counts = await Future.wait([
-            ref
-                .read(gameRepositoryProvider)
-                .getPetDailyUsageCount(
-                  profileId: profileId,
-                  periodId: period.id!,
-                  actionId: FreePetInteraction.pet.actionId,
-                  slot: PetActionSlot.defaultSlot,
-                )
-                .timeout(const Duration(milliseconds: 100)),
-            ref
-                .read(gameRepositoryProvider)
-                .getPetDailyUsageCount(
-                  profileId: profileId,
-                  periodId: period.id!,
-                  actionId: FreePetInteraction.play.actionId,
-                  slot: PetActionSlot.defaultSlot,
-                )
-                .timeout(const Duration(milliseconds: 100)),
-          ]);
-          petUsageCount = counts[0];
-          playUsageCount = counts[1];
-        } catch (_) {
-          petUsageCount = 0;
-          playUsageCount = 0;
-        }
+        petUsageCount = await ref
+            .read(gameRepositoryProvider)
+            .getPetDailyUsageCount(
+              profileId: profileId,
+              periodId: period.id!,
+              actionId: FreePetInteraction.pet.actionId,
+              slot: PetActionSlot.defaultSlot,
+            );
+        playUsageCount = await ref
+            .read(gameRepositoryProvider)
+            .getPetDailyUsageCount(
+              profileId: profileId,
+              periodId: period.id!,
+              actionId: FreePetInteraction.play.actionId,
+              slot: PetActionSlot.defaultSlot,
+            );
       }
 
       return HomeReady(

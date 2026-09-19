@@ -23,7 +23,7 @@ const syncApple = ShopItem(
   price: 40,
   persistent: false,
   effectType: 'satiety',
-  effectValue: 10,
+  effectValue: 20,
   unlockType: 'available',
   displaySection: ShopDisplaySection.food,
   usagePolicy: ItemUsagePolicy.unlimited,
@@ -150,10 +150,7 @@ void main() {
     );
 
     final games = _SyncGames(database, pet, gameState, period);
-    final content = TestContentRepository(
-      const [],
-      shopItems: [syncApple],
-    );
+    final content = TestContentRepository(const [], shopItems: [syncApple]);
 
     final container = ProviderContainer(
       overrides: [
@@ -166,17 +163,14 @@ void main() {
     addTearDown(container.dispose);
 
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const FinnyApp(),
-      ),
+      UncontrolledProviderScope(container: container, child: const FinnyApp()),
     );
     await tester.pumpAndSettle();
 
     Finder navItem(String label) => find.descendant(
-          of: find.byType(NavigationBar),
-          matching: find.text(label),
-        );
+      of: find.byType(NavigationBar),
+      matching: find.text(label),
+    );
 
     // 1. Visit Things tab first: empty state
     await tester.tap(navItem('Вещи'));
