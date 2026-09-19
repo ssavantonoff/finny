@@ -288,7 +288,8 @@ Future<GamePeriod> _resolveAll(
                   )
                   as TaskAnswerCompleted)
               .period
-        : await service.resolveCheckpoint(
+        : await resolveCheckpointForTest(
+            database,
             profileId: profileId,
             periodId: period.id!,
             checkpointId: checkpoint,

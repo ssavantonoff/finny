@@ -105,7 +105,8 @@ void main() {
           answerId: 'apple',
         );
       } else {
-        await periods.resolveCheckpoint(
+        await resolveCheckpointForTest(
+          database,
           profileId: normal.id!,
           periodId: started.id!,
           checkpointId: checkpoint,

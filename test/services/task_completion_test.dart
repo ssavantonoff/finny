@@ -726,7 +726,8 @@ void main() {
       taskId: required.id,
       answerId: _correct,
     );
-    var period = await games.resolveCheckpoint(
+    var period = await resolveCheckpointForTest(
+      database,
       profileId: player.profileId,
       periodId: player.period.id!,
       checkpointId: 'savings_decision',

@@ -61,3 +61,50 @@ Future<GamePeriod> completePeriodForTest(
     return completed;
   });
 }
+
+Future<GamePeriod> resolveCheckpointForTest(
+  AppDatabase database, {
+  required int profileId,
+  required int periodId,
+  required String checkpointId,
+}) async {
+  final db = await database.database;
+  return db.transaction((transaction) async {
+    final rows = await transaction.query(
+      'game_periods',
+      where: 'id = ? AND profile_id = ?',
+      whereArgs: [periodId, profileId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw StateError(
+        'Period $periodId does not exist for profile $profileId.',
+      );
+    }
+    final period = GamePeriod.fromMap(rows.single);
+    if (!period.requiredCheckpoints.contains(checkpointId)) {
+      throw StateError('Checkpoint $checkpointId is not required.');
+    }
+    if (period.resolvedCheckpoints.contains(checkpointId)) return period;
+    final resolved = [
+      for (final required in period.requiredCheckpoints)
+        if (required == checkpointId ||
+            period.resolvedCheckpoints.contains(required))
+          required,
+    ];
+    final updated = period.copyWith(
+      resolvedCheckpoints: List.unmodifiable(resolved),
+      status: resolved.length == period.requiredCheckpoints.length
+          ? GamePeriodStatus.readyToFinish
+          : GamePeriodStatus.active,
+    );
+    final values = updated.toMap()..remove('id');
+    await transaction.update(
+      'game_periods',
+      values,
+      where: 'id = ? AND profile_id = ?',
+      whereArgs: [periodId, profileId],
+    );
+    return updated;
+  });
+}

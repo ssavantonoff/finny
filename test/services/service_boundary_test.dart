@@ -237,4 +237,106 @@ void main() {
     expect((await games.getGameState(profile.id!))?.walletBalance, 550);
     expect(await games.getTransactions(profile.id!), hasLength(2));
   });
+
+  test(
+    'savings decision is only resolved by the canonical savings flow',
+    () async {
+      final database = createTestDatabase();
+      final container = ProviderContainer(
+        overrides: [appDatabaseProvider.overrideWithValue(database)],
+      );
+      addTearDown(() async {
+        container.dispose();
+        await database.close();
+      });
+
+      final profiles = container.read(profileRepositoryProvider);
+      final games = container.read(gameRepositoryProvider);
+      final periods = container.read(periodServiceProvider);
+      final savings = container.read(savingsServiceProvider);
+      final profile = await profiles.create(
+        Profile(
+          gameName: 'Игрок',
+          profileType: ProfileType.normal,
+          onboardingCompleted: true,
+          createdAt: DateTime.utc(2026, 1, 1),
+        ),
+      );
+      await games.createInitialState(
+        GameState(
+          profileId: profile.id!,
+          walletBalance: 200,
+          currentPeriod: 1,
+          savedAmount: 0,
+          updatedAt: DateTime.utc(2026, 1, 1),
+        ),
+      );
+      await games.savePet(
+        Pet(
+          profileId: profile.id!,
+          name: 'Финни',
+          colorId: 'blue',
+          patternId: 'plain',
+          developmentStage: 1,
+          growthPoints: 0,
+          satiety: 55,
+          care: 80,
+          mood: 80,
+        ),
+      );
+      final planning = await periods.startNextPeriod(profileId: profile.id!);
+      final active = await container
+          .read(budgetServiceProvider)
+          .confirmPlan(profileId: profile.id!, periodId: planning!.id!);
+      await savings.selectGoal(
+        profileId: profile.id!,
+        goalId: 'goal_night_light',
+      );
+      final petBefore = (await games.getPet(profile.id!))!;
+
+      await expectLater(
+        games.resolveCheckpoint(
+          profileId: profile.id!,
+          periodId: active.id!,
+          checkpointId: 'savings_decision',
+        ),
+        throwsStateError,
+      );
+      await expectLater(
+        periods.resolveCheckpoint(
+          profileId: profile.id!,
+          periodId: active.id!,
+          checkpointId: 'savings_decision',
+        ),
+        throwsStateError,
+      );
+
+      var stored = (await games.getPeriodById(profile.id!, active.id!))!;
+      final petAfterRejectedCalls = (await games.getPet(profile.id!))!;
+      expect(stored.resolvedCheckpoints, isNot(contains('savings_decision')));
+      expect(stored.dayProgress, active.dayProgress);
+      expect(petAfterRejectedCalls.satiety, petBefore.satiety);
+      expect(petAfterRejectedCalls.care, petBefore.care);
+      expect(petAfterRejectedCalls.mood, petBefore.mood);
+
+      await savings.deposit(
+        profileId: profile.id!,
+        periodId: active.id!,
+        amount: 10,
+        operationId: 'canonical-first-savings-decision',
+      );
+      stored = (await games.getPeriodById(profile.id!, active.id!))!;
+      expect(stored.resolvedCheckpoints, contains('savings_decision'));
+      expect(stored.dayProgress, active.dayProgress + 8);
+
+      await savings.deposit(
+        profileId: profile.id!,
+        periodId: active.id!,
+        amount: 10,
+        operationId: 'canonical-first-savings-decision',
+      );
+      stored = (await games.getPeriodById(profile.id!, active.id!))!;
+      expect(stored.dayProgress, active.dayProgress + 8);
+    },
+  );
 }

@@ -140,18 +140,24 @@ void main() {
   Future<GamePeriod> resolveAll(GamePeriod period) async {
     var current = period;
     for (final checkpoint in period.requiredCheckpoints) {
-      current = checkpoint == 'financial_task'
-          ? (await tasks.submitAnswer(
-              profileId: period.profileId,
-              periodId: period.id!,
-              taskId: 'task_period_${period.periodNumber}',
-              answerId: 'apple',
-            ) as TaskAnswerCompleted).period
-          : await periods.resolveCheckpoint(
-              profileId: period.profileId,
-              periodId: period.id!,
-              checkpointId: checkpoint,
-            );
+      if (current.resolvedCheckpoints.contains(checkpoint)) continue;
+      current = switch (checkpoint) {
+        'financial_task' => (await tasks.submitAnswer(
+          profileId: period.profileId,
+          periodId: period.id!,
+          taskId: 'task_period_${period.periodNumber}',
+          answerId: 'apple',
+        ) as TaskAnswerCompleted).period,
+        'savings_decision' => await savings.skipToday(
+          profileId: period.profileId,
+          periodId: period.id!,
+        ),
+        _ => await periods.resolveCheckpoint(
+          profileId: period.profileId,
+          periodId: period.id!,
+          checkpointId: checkpoint,
+        ),
+      };
     }
     return current;
   }
@@ -734,18 +740,16 @@ void main() {
         answerId: 'apple',
       ) as TaskAnswerCompleted).period;
       expect(period.status, GamePeriodStatus.active);
-      period = await periods.resolveCheckpoint(
+      period = await savings.skipToday(
         profileId: profile.id!,
         periodId: period.id!,
-        checkpointId: 'savings_decision',
       );
       expect(period.status, GamePeriodStatus.readyToFinish);
       expect((await games.getGameState(profile.id!))?.savedAmount, 0);
 
-      final repeated = await periods.resolveCheckpoint(
+      final repeated = await savings.skipToday(
         profileId: profile.id!,
         periodId: period.id!,
-        checkpointId: 'savings_decision',
       );
       expect(repeated.resolvedCheckpoints, period.resolvedCheckpoints);
       await expectLater(

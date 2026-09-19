@@ -174,7 +174,8 @@ void main() {
     );
     period = (await games.getPeriodById(profile.id!, period.id!))!;
     if (resolveCheckpoints) {
-      period = await games.resolveCheckpoint(
+      period = await resolveCheckpointForTest(
+        database,
         profileId: profile.id!,
         periodId: period.id!,
         checkpointId: 'savings_decision',
@@ -542,7 +543,8 @@ void main() {
         profileId: player.profileId,
         periodId: day2.id!,
       );
-      day2 = await games.resolveCheckpoint(
+      day2 = await resolveCheckpointForTest(
+        database,
         profileId: player.profileId,
         periodId: day2.id!,
         checkpointId: 'savings_decision',
@@ -624,7 +626,8 @@ void main() {
         profileId: profile.id!,
         periodId: day1.id!,
       );
-      day1 = await firstGames.resolveCheckpoint(
+      day1 = await resolveCheckpointForTest(
+        firstDatabase,
         profileId: profile.id!,
         periodId: day1.id!,
         checkpointId: 'savings_decision',

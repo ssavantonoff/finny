@@ -629,6 +629,7 @@ class SqliteGameRepository implements GameRepository {
     required String checkpointId,
   }) async {
     if (checkpointId == 'financial_task' ||
+        checkpointId == 'savings_decision' ||
         checkpointId == 'changed_circumstance' ||
         checkpointId == 'discount_decision') {
       throw StateError(
