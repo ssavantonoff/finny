@@ -25,6 +25,7 @@ Map<String, Object?> _validTaskJson() => {
   'type': 'choice',
   'reward': 50,
   'period': 1,
+  'requiredForCheckpoint': true,
   'scenarioData': <String, Object?>{
     'prompt': 'Финни проголодался. Что стоит купить в первую очередь?',
     'options': [
@@ -51,6 +52,20 @@ Map<String, Object?> _validShopJson() => {
   'unlockType': 'available',
 };
 
+FinancialTask _copyTask(FinancialTask task, {bool? requiredForCheckpoint}) =>
+    FinancialTask(
+      id: task.id,
+      title: task.title,
+      topic: task.topic,
+      description: task.description,
+      type: task.type,
+      reward: task.reward,
+      period: task.period,
+      requiredForCheckpoint:
+          requiredForCheckpoint ?? task.requiredForCheckpoint,
+      choiceScenario: task.choiceScenario,
+    );
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -65,17 +80,31 @@ void main() {
     final periods = await repository.loadPeriods();
     final glossary = await repository.loadGlossary();
 
-    expect(tasks, isNotEmpty);
-    expect(tasks.single.id, 'task_need_or_want_01');
-    expect(tasks.single.period, 1);
-    expect(tasks.single.reward, 50);
-    expect(tasks.single.choiceScenario.options.map((option) => option.id), [
+    expect(tasks, hasLength(6));
+    final dayOne = tasks.singleWhere(
+      (task) => task.id == 'task_need_or_want_01',
+    );
+    expect(dayOne.period, 1);
+    expect(dayOne.reward, 50);
+    expect(dayOne.requiredForCheckpoint, isTrue);
+    expect(dayOne.choiceScenario.options.map((option) => option.id), [
       'apple',
       'ball',
       'decoration',
     ]);
-    expect(tasks.single.choiceScenario.correctOptionId, 'apple');
-    expect(tasks.single.choiceScenario.explanation, isNotEmpty);
+    expect(dayOne.choiceScenario.correctOptionId, 'apple');
+    expect(dayOne.choiceScenario.explanation, isNotEmpty);
+    expect(tasks.where((task) => task.requiredForCheckpoint), hasLength(5));
+    expect(
+      tasks
+          .singleWhere((task) => task.id == 'task_bonus_reserve_05')
+          .requiredForCheckpoint,
+      isFalse,
+    );
+    expect(
+      tasks.map((task) => task.topic).toSet().length,
+      greaterThanOrEqualTo(3),
+    );
     expect(items, hasLength(12));
     expect(
       (
@@ -444,6 +473,37 @@ void main() {
     );
     await expectLater(repository.loadTasks(), throwsFormatException);
   });
+
+  test(
+    'campaign requires exactly one required task on each of five days',
+    () async {
+      final tasks = await AssetContentRepository().loadTasks();
+      expect(() => validateCampaignTaskContent(tasks), returnsNormally);
+
+      final withoutDayThree = tasks
+          .where((task) => task.period != 3)
+          .toList(growable: false);
+      expect(
+        () => validateCampaignTaskContent(withoutDayThree),
+        throwsFormatException,
+      );
+
+      final bonus = tasks.singleWhere(
+        (task) => task.id == 'task_bonus_reserve_05',
+      );
+      final twoRequiredOnDayFive = [
+        for (final task in tasks)
+          if (task.id == bonus.id)
+            _copyTask(task, requiredForCheckpoint: true)
+          else
+            task,
+      ];
+      expect(
+        () => validateCampaignTaskContent(twoRequiredOnDayFive),
+        throwsFormatException,
+      );
+    },
+  );
 
   test('choice task content rejects malformed canonical fields', () {
     final invalidCases = <String, void Function(Map<String, Object?>)>{

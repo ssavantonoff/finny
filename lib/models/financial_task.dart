@@ -77,6 +77,7 @@ class FinancialTask {
     required this.type,
     required this.reward,
     required this.period,
+    this.requiredForCheckpoint = true,
     required this.choiceScenario,
   });
 
@@ -89,6 +90,7 @@ class FinancialTask {
   final String type;
   final int reward;
   final int period;
+  final bool requiredForCheckpoint;
   final ChoiceTaskScenario choiceScenario;
 
   factory FinancialTask.fromJson(Map<String, Object?> json) {
@@ -104,6 +106,7 @@ class FinancialTask {
       type: _requiredString(json, 'type'),
       reward: _requiredInt(json, 'reward'),
       period: _requiredInt(json, 'period'),
+      requiredForCheckpoint: _requiredBool(json, 'requiredForCheckpoint'),
       choiceScenario: ChoiceTaskScenario.fromJson(
         Map<String, Object?>.from(scenario),
       ),
@@ -136,6 +139,27 @@ void validateTaskContent(List<FinancialTask> tasks) {
   }
 }
 
+void validateCampaignTaskContent(List<FinancialTask> tasks) {
+  validateTaskContent(tasks);
+  if (tasks.length < 6) {
+    throw const FormatException('Campaign needs at least six tasks.');
+  }
+  if (tasks.map((task) => task.topic).toSet().length < 3) {
+    throw const FormatException('Campaign needs at least three task topics.');
+  }
+  for (var day = 1; day <= 5; day++) {
+    final required = tasks.where(
+      (task) => task.period == day && task.requiredForCheckpoint,
+    );
+    if (required.length != 1) {
+      throw FormatException('Day $day must have exactly one required task.');
+    }
+  }
+  if (tasks.any((task) => task.period < 1 || task.period > 5)) {
+    throw const FormatException('Campaign task period must be from 1 to 5.');
+  }
+}
+
 String _requiredString(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is! String) throw FormatException('$key must be a string.');
@@ -145,5 +169,11 @@ String _requiredString(Map<String, Object?> json, String key) {
 int _requiredInt(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is! int) throw FormatException('$key must be an integer.');
+  return value;
+}
+
+bool _requiredBool(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is! bool) throw FormatException('$key must be a boolean.');
   return value;
 }

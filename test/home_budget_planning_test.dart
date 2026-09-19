@@ -402,10 +402,11 @@ void main() {
       await _settleFeature(tester, harness.container);
 
       expect(find.text('Новый день начался!'), findsOneWidget);
-      expect(find.text('Было с прошлого дня'), findsOneWidget);
-      expect(find.text('125'), findsOneWidget);
-      expect(find.text('+375'), findsOneWidget);
-      expect(find.text('500'), findsOneWidget);
+      expect(find.text('Ты получил 375 🪙'), findsOneWidget);
+      expect(
+        find.textContaining('Сначала составь план'),
+        findsOneWidget,
+      );
       final persisted = (await tester.runAsync(
         () async => (
           await games.getPeriods(profile.id!),

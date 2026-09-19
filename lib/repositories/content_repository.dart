@@ -29,7 +29,7 @@ class AssetContentRepository implements ContentRepository {
       'assets/content/tasks.json',
       FinancialTask.fromJson,
     );
-    validateTaskContent(tasks);
+    validateCampaignTaskContent(tasks);
     return tasks;
   }
 
