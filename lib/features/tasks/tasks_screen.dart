@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/tasks/tasks_controller.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/task_submission_result.dart';
@@ -137,17 +140,17 @@ class _TaskCard extends StatelessWidget {
   }
 }
 
-class _TaskDialog extends StatefulWidget {
+class _TaskDialog extends ConsumerStatefulWidget {
   const _TaskDialog({required this.task, required this.controller});
 
   final FinancialTask task;
   final TasksController controller;
 
   @override
-  State<_TaskDialog> createState() => _TaskDialogState();
+  ConsumerState<_TaskDialog> createState() => _TaskDialogState();
 }
 
-class _TaskDialogState extends State<_TaskDialog> {
+class _TaskDialogState extends ConsumerState<_TaskDialog> {
   String? selected;
   TaskSubmissionResult? result;
   bool submitting = false;
@@ -222,10 +225,12 @@ class _TaskDialogState extends State<_TaskDialog> {
         else if (completed)
           FilledButton(
             onPressed: () {
+              final refreshDayFour =
+                  widget.task.period == 4 && widget.task.requiredForCheckpoint;
               Navigator.pop(context);
-              if (widget.task.period == 4 &&
-                  widget.task.requiredForCheckpoint) {
+              if (refreshDayFour) {
                 context.go('/home');
+                unawaited(ref.read(homeControllerProvider.notifier).load());
               }
             },
             child: const Text('Готово'),
