@@ -112,7 +112,11 @@ void main() {
         );
       }
     }
-    await periods.completePeriod(profileId: normal.id!, periodId: started.id!);
+    await completePeriodForTest(
+      database,
+      profileId: normal.id!,
+      periodId: started.id!,
+    );
     await controller.load();
     expect(container.read(shopControllerProvider).period, isNull);
     await controller.retry();

@@ -40,6 +40,7 @@ void main() {
       expect(games, isNot(isA<DayLifecyclePort>()));
       expect(() => (games as dynamic).evaluateBedtime, throwsNoSuchMethodError);
       expect(() => (games as dynamic).sleep, throwsNoSuchMethodError);
+      expect(() => (games as dynamic).completePeriod, throwsNoSuchMethodError);
       expect(
         container.read(dayLifecycleServiceProvider),
         isA<DayLifecycleService>(),

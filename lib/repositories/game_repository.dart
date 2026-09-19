@@ -63,10 +63,6 @@ abstract interface class GameRepository {
     required String checkpointId,
   });
   Future<TaskProgress?> getTaskProgress(int profileId, String taskId);
-  Future<GamePeriod> completePeriod({
-    required int profileId,
-    required int periodId,
-  });
   Future<GameState> applyWalletChange(GameTransaction transaction);
   Future<GameState> applyIdempotentWalletChange(GameTransaction transaction);
   Future<List<CompletedGoal>> getCompletedGoals(int profileId);
@@ -709,28 +705,6 @@ class SqliteGameRepository implements GameRepository {
       limit: 1,
     );
     return rows.isEmpty ? null : TaskProgress.fromMap(rows.single);
-  }
-
-  @override
-  Future<GamePeriod> completePeriod({
-    required int profileId,
-    required int periodId,
-  }) async {
-    final db = await _appDatabase.database;
-    return db.transaction((txn) async {
-      final period = await _requirePeriod(txn, profileId, periodId);
-      if (period.status != GamePeriodStatus.readyToFinish) {
-        throw StateError('Period must be ready before it can be completed.');
-      }
-      final state = await _requireState(txn, profileId);
-      final completed = period.copyWith(
-        endWalletBalance: state.walletBalance,
-        status: GamePeriodStatus.completed,
-        completedAt: DateTime.now().toUtc(),
-      );
-      await _writePeriod(txn, completed);
-      return completed;
-    });
   }
 
   @override

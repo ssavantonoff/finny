@@ -172,7 +172,8 @@ void main() {
       periodId: player.period.id!,
       checkpointId: 'done',
     );
-    await games.completePeriod(
+    await completePeriodForTest(
+      database,
       profileId: player.profileId,
       periodId: player.period.id!,
     );
@@ -474,7 +475,8 @@ void main() {
         periodId: player.period.id!,
         checkpointId: 'done',
       );
-      await games.completePeriod(
+      await completePeriodForTest(
+        database,
         profileId: player.profileId,
         periodId: player.period.id!,
       );

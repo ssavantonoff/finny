@@ -185,7 +185,8 @@ void main() {
       ))!.resolvedCheckpoints,
       [story.checkpoint],
     );
-    await games.completePeriod(
+    await completePeriodForTest(
+      database,
       profileId: player.profileId,
       periodId: player.periodId,
     );
@@ -277,7 +278,8 @@ void main() {
       ))!.resolvedCheckpoints,
       [promotion.checkpoint],
     );
-    await games.completePeriod(
+    await completePeriodForTest(
+      database,
       profileId: player.profileId,
       periodId: player.periodId,
     );
@@ -393,7 +395,8 @@ void main() {
     () async {
       final player = await active(3);
       await buyStory(player, 'shared-special-operation');
-      await games.completePeriod(
+      await completePeriodForTest(
+        database,
         profileId: player.profileId,
         periodId: player.periodId,
       );

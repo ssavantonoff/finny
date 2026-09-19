@@ -287,7 +287,8 @@ void main() {
         periodId: period.id!,
         checkpointId: 'decision',
       );
-      await customPeriods.completePeriod(
+      await completePeriodForTest(
+        database,
         profileId: profile.id!,
         periodId: period.id!,
       );
@@ -715,7 +716,11 @@ void main() {
       var period = await startActivePeriod(profile.id!);
 
       await expectLater(
-        periods.completePeriod(profileId: profile.id!, periodId: period.id!),
+        completePeriodForTest(
+          database,
+          profileId: profile.id!,
+          periodId: period.id!,
+        ),
         throwsStateError,
       );
 
@@ -785,7 +790,8 @@ void main() {
       expect(beforeCompletion.additionalIncome, 65);
       expect(beforeCompletion.factRemainder, 405);
 
-      final completed = await periods.completePeriod(
+      final completed = await completePeriodForTest(
+        database,
         profileId: profile.id!,
         periodId: period.id!,
       );
@@ -844,7 +850,11 @@ void main() {
         throwsStateError,
       );
       await expectLater(
-        periods.completePeriod(profileId: profile.id!, periodId: period.id!),
+        completePeriodForTest(
+          database,
+          profileId: profile.id!,
+          periodId: period.id!,
+        ),
         throwsStateError,
       );
 
@@ -915,7 +925,8 @@ void main() {
         operationId: 'carry-savings',
       );
       period = await resolveAll(period);
-      await periods.completePeriod(
+      await completePeriodForTest(
+        database,
         profileId: profile.id!,
         periodId: period.id!,
       );
@@ -942,7 +953,8 @@ void main() {
           periodId: next!.id!,
         );
         next = await resolveAll(next);
-        await periods.completePeriod(
+        await completePeriodForTest(
+          database,
           profileId: profile.id!,
           periodId: next.id!,
         );

@@ -92,7 +92,8 @@ void main() {
         checkpointId: checkpointId,
       );
     }
-    await periods.completePeriod(
+    await completePeriodForTest(
+      database,
       profileId: player.profileId,
       periodId: player.periodId,
     );

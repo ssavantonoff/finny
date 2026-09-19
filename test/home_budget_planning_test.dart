@@ -368,8 +368,11 @@ void main() {
     expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
 
     await tester.runAsync(
-      () =>
-          periods.completePeriod(profileId: profile.id!, periodId: period.id!),
+      () => completePeriodForTest(
+        database,
+        profileId: profile.id!,
+        periodId: period.id!,
+      ),
     );
     await tester.runAsync(
       harness.container.read(homeControllerProvider.notifier).load,
