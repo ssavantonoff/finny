@@ -1,4 +1,3 @@
-import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/pet_action.dart';

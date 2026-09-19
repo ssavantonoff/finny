@@ -7,7 +7,6 @@ import 'package:finny/models/profile.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/special_purchase.dart';
 import 'package:finny/repositories/game_repository.dart';
-import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/special_purchase_service.dart';
 import 'package:finny/services/task_service.dart';
@@ -57,8 +56,7 @@ class _ActiveProfile extends ActiveProfileIdController {
 }
 
 class _RetrySpecialService extends SpecialPurchaseService {
-  _RetrySpecialService(SpecialPurchasePort port, ContentRepository content)
-    : super(port, content);
+  _RetrySpecialService(super.port, super.content);
 
   bool failNext = true;
   final operationIds = <String>[];

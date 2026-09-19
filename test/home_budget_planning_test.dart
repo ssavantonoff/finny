@@ -403,10 +403,7 @@ void main() {
 
       expect(find.text('Новый день начался!'), findsOneWidget);
       expect(find.text('Ты получил 375 🪙'), findsOneWidget);
-      expect(
-        find.textContaining('Сначала составь план'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Сначала составь план'), findsOneWidget);
       final persisted = (await tester.runAsync(
         () async => (
           await games.getPeriods(profile.id!),
