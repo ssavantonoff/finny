@@ -27,7 +27,7 @@ void main() {
     expect(h.state.load, ShopLoad.loading);
     h.content.gate!.complete();
     await load;
-    expect(h.state.items, [apple, ball]);
+    expect(h.state.items, [apple, brush, ball, bow]);
     h.content.items = [];
     await h.controller.load();
     expect(h.state.load, ShopLoad.ready);
