@@ -29,8 +29,15 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
   void initState() {
     super.initState();
     ref.listenManual(shopControllerProvider, (_, next) {
-      if (!_confirming || _closing) return;
       if (next.profileId != widget.profileId) return;
+      if (next.result?.kind == ShopResultKind.success && !_closing) {
+        _closing = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Navigator.of(context).pop();
+        });
+        return;
+      }
+      if (!_confirming || _closing) return;
       if (next.load != ShopLoad.ready) return;
       final periodChanged = next.period?.id != _periodId;
       final statusInvalid =
@@ -99,7 +106,9 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
                 const Text('Ожидаемый эффект', style: TextStyle(fontSize: 16)),
                 Text(effect, style: const TextStyle(fontSize: 18)),
               ],
-              if (state.result != null || state.purchasing)
+              if (state.purchasing ||
+                  (state.result != null &&
+                      state.result!.kind != ShopResultKind.success))
                 ShopPurchaseNotice(state: state),
               if (state.unavailableReason(item) case final reason?)
                 ShopNotice(reason),
