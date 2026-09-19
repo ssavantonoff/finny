@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../helpers/test_content_repository.dart';
+import '../helpers/test_database.dart';
 
 const _story = StoryPurchase(
   id: 'day3_bowl_replacement',
@@ -124,7 +125,11 @@ void main() {
         }
 
         await perform(service);
-        await games.completePeriod(profileId: profileId, periodId: periodId);
+        await completePeriodForTest(
+          initial,
+          profileId: profileId,
+          periodId: periodId,
+        );
         final wallet = (await games.getGameState(profileId))!.walletBalance;
         final transactions = await games.getTransactions(profileId);
         final quantity = await games.getInventoryQuantity(profileId, _treat.id);

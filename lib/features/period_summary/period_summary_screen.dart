@@ -23,7 +23,13 @@ class _PeriodSummaryScreenState extends ConsumerState<PeriodSummaryScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(periodSummaryControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Итоги дня')),
+      appBar: AppBar(
+        title: Text(
+          state is PeriodSummaryReady
+              ? 'Итоги дня ${state.period.periodNumber}'
+              : 'Итоги дня',
+        ),
+      ),
       body: switch (state) {
         PeriodSummaryLoading() => const Center(
           child: CircularProgressIndicator(),
@@ -80,22 +86,40 @@ class _SummaryBody extends StatelessWidget {
           state.summary.plannedNeed,
           state.summary.factNeed,
         ),
-        _SummaryRow('Хочу', state.summary.plannedWant, state.summary.factWant),
+        _SummaryRow(
+          'Желания',
+          state.summary.plannedWant,
+          state.summary.factWant,
+        ),
         _SummaryRow(
           'Накопления',
           state.summary.plannedSavings,
           state.summary.factSavings,
         ),
         _SummaryRow(
-          'Остаток',
+          'На потом',
           state.summary.plannedRemainder,
           state.summary.factRemainder,
         ),
+        if (state.summary.additionalIncome > 0) ...[
+          const SizedBox(height: AppSpacing.medium),
+          Text(
+            'Дополнительный доход: +${state.summary.additionalIncome}',
+            key: const Key('summary-additional-income'),
+          ),
+        ],
         const SizedBox(height: AppSpacing.large),
         FilledButton(
           key: const Key('summary-home'),
-          onPressed: () => context.go('/home'),
-          child: const Text('На главную'),
+          onPressed: () {
+            final day = state.period.periodNumber;
+            context.go(day == 2 || day == 5 ? '/progress?day=$day' : '/home');
+          },
+          child: Text(
+            state.period.periodNumber == 2 || state.period.periodNumber == 5
+                ? 'Продолжить'
+                : 'На главную',
+          ),
         ),
       ],
     ),

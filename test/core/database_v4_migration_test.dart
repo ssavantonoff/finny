@@ -26,20 +26,22 @@ void main() {
     await expectTaskProgressV4Schema(database, profileId: profile.id!);
   });
 
-  test('v3 without task_progress upgrades to current without losing data', () async {
-    sqfliteFfiInit();
-    final directory = await Directory.systemTemp.createTemp('finny_v4_');
-    final path = '${directory.path}/finny.sqlite';
-    addTearDown(() async {
-      if (await directory.exists()) await directory.delete(recursive: true);
-    });
+  test(
+    'v3 without task_progress upgrades to current without losing data',
+    () async {
+      sqfliteFfiInit();
+      final directory = await Directory.systemTemp.createTemp('finny_v4_');
+      final path = '${directory.path}/finny.sqlite';
+      addTearDown(() async {
+        if (await directory.exists()) await directory.delete(recursive: true);
+      });
 
-    final legacy = await databaseFactoryFfi.openDatabase(
-      path,
-      options: OpenDatabaseOptions(
-        version: 3,
-        onCreate: (db, version) async {
-          await db.execute('''
+      final legacy = await databaseFactoryFfi.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 3,
+          onCreate: (db, version) async {
+            await db.execute('''
             CREATE TABLE profiles (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               game_name TEXT NOT NULL,
@@ -48,7 +50,7 @@ void main() {
               created_at TEXT NOT NULL
             )
           ''');
-          await db.execute('''
+            await db.execute('''
             CREATE TABLE game_states (
               profile_id INTEGER PRIMARY KEY,
               wallet_balance INTEGER NOT NULL,
@@ -59,7 +61,7 @@ void main() {
               updated_at TEXT NOT NULL
             )
           ''');
-          await db.execute('''
+            await db.execute('''
             CREATE TABLE pets (
               profile_id INTEGER PRIMARY KEY,
               name TEXT NOT NULL,
@@ -71,7 +73,7 @@ void main() {
               mood INTEGER NOT NULL
             )
           ''');
-          await db.execute('''
+            await db.execute('''
             CREATE TABLE game_periods (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               profile_id INTEGER NOT NULL,
@@ -96,7 +98,7 @@ void main() {
               completed_at TEXT
             )
           ''');
-          await db.execute('''
+            await db.execute('''
             CREATE TABLE transactions (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               profile_id INTEGER NOT NULL,
@@ -109,87 +111,91 @@ void main() {
               deduplication_key TEXT
             )
           ''');
-        },
-      ),
-    );
-    final created = DateTime.utc(2026, 1, 1).toIso8601String();
-    await legacy.insert('profiles', {
-      'id': 1,
-      'game_name': 'Existing player',
-      'profile_type': 'NORMAL',
-      'onboarding_completed': 1,
-      'created_at': created,
-    });
-    await legacy.insert('game_states', {
-      'profile_id': 1,
-      'wallet_balance': 321,
-      'current_period': 1,
-      'active_goal_id': 'goal_scooter',
-      'saved_amount': 123,
-      'goal_change_used': 0,
-      'updated_at': created,
-    });
-    await legacy.insert('pets', {
-      'profile_id': 1,
-      'name': 'Existing Finny',
-      'color_id': 'mint',
-      'pattern_id': 'spots',
-      'development_stage': 1,
-      'growth_points': 20,
-      'satiety': 66,
-      'mood': 77,
-    });
-    await legacy.insert('game_periods', {
-      'id': 7,
-      'profile_id': 1,
-      'definition_id': 'period_1_needs_vs_wants',
-      'period_number': 1,
-      'start_wallet_balance': 0,
-      'base_income': 500,
-      'extra_income': 0,
-      'planned_need': 100,
-      'planned_want': 100,
-      'planned_savings': 100,
-      'planned_free': 200,
-      'actual_need': 20,
-      'actual_want': 30,
-      'actual_savings': 40,
-      'required_checkpoints': '["financial_task"]',
-      'resolved_checkpoints': '[]',
-      'end_wallet_balance': null,
-      'growth_points_earned': 0,
-      'status': 'active',
-      'created_at': created,
-      'completed_at': null,
-    });
-    await legacy.insert('transactions', {
-      'id': 8,
-      'profile_id': 1,
-      'period_id': 7,
-      'type': 'savings_deposit',
-      'amount': -40,
-      'source': 'legacy',
-      'description': 'Legacy',
-      'created_at': created,
-      'deduplication_key': 'legacy-1',
-    });
-    await legacy.close();
+          },
+        ),
+      );
+      final created = DateTime.utc(2026, 1, 1).toIso8601String();
+      await legacy.insert('profiles', {
+        'id': 1,
+        'game_name': 'Existing player',
+        'profile_type': 'NORMAL',
+        'onboarding_completed': 1,
+        'created_at': created,
+      });
+      await legacy.insert('game_states', {
+        'profile_id': 1,
+        'wallet_balance': 321,
+        'current_period': 1,
+        'active_goal_id': 'goal_scooter',
+        'saved_amount': 123,
+        'goal_change_used': 0,
+        'updated_at': created,
+      });
+      await legacy.insert('pets', {
+        'profile_id': 1,
+        'name': 'Existing Finny',
+        'color_id': 'mint',
+        'pattern_id': 'spots',
+        'development_stage': 1,
+        'growth_points': 20,
+        'satiety': 66,
+        'mood': 77,
+      });
+      await legacy.insert('game_periods', {
+        'id': 7,
+        'profile_id': 1,
+        'definition_id': 'period_1_needs_vs_wants',
+        'period_number': 1,
+        'start_wallet_balance': 0,
+        'base_income': 500,
+        'extra_income': 0,
+        'planned_need': 100,
+        'planned_want': 100,
+        'planned_savings': 100,
+        'planned_free': 200,
+        'actual_need': 20,
+        'actual_want': 30,
+        'actual_savings': 40,
+        'required_checkpoints': '["financial_task"]',
+        'resolved_checkpoints': '[]',
+        'end_wallet_balance': null,
+        'growth_points_earned': 0,
+        'status': 'active',
+        'created_at': created,
+        'completed_at': null,
+      });
+      await legacy.insert('transactions', {
+        'id': 8,
+        'profile_id': 1,
+        'period_id': 7,
+        'type': 'savings_deposit',
+        'amount': -40,
+        'source': 'legacy',
+        'description': 'Legacy',
+        'created_at': created,
+        'deduplication_key': 'legacy-1',
+      });
+      await legacy.close();
 
-    final migrated = AppDatabase(
-      factory: databaseFactoryFfi,
-      databasePath: path,
-    );
-    addTearDown(migrated.close);
-    await expectTaskProgressV4Schema(migrated, profileId: 1);
-    final db = await migrated.database;
-    final games = SqliteGameRepository(migrated);
-    expect((await db.query('profiles')).single['game_name'], 'Existing player');
-    expect((await games.getGameState(1))?.walletBalance, 321);
-    expect((await games.getGameState(1))?.savedAmount, 123);
-    expect((await games.getGameState(1))?.activeGoalId, 'goal_scooter');
-    expect((await games.getPeriodById(1, 7))?.actualSavings, 40);
-    expect((await games.getTransactions(1)).single.amount, -40);
-  });
+      final migrated = AppDatabase(
+        factory: databaseFactoryFfi,
+        databasePath: path,
+      );
+      addTearDown(migrated.close);
+      await expectTaskProgressV4Schema(migrated, profileId: 1);
+      final db = await migrated.database;
+      final games = SqliteGameRepository(migrated);
+      expect(
+        (await db.query('profiles')).single['game_name'],
+        'Existing player',
+      );
+      expect((await games.getGameState(1))?.walletBalance, 321);
+      expect((await games.getGameState(1))?.savedAmount, 123);
+      expect((await games.getGameState(1))?.activeGoalId, 'goal_scooter');
+      expect((await games.getPeriodById(1, 7))?.actualSavings, 40);
+      expect((await games.getTransactions(1)).single.amount, -40);
+    },
+  );
 
   test(
     'v3 with task_progress preserves existing rows during upgrade',

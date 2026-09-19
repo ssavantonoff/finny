@@ -172,7 +172,8 @@ void main() {
       periodId: player.period.id!,
       checkpointId: 'done',
     );
-    await games.completePeriod(
+    await completePeriodForTest(
+      database,
       profileId: player.profileId,
       periodId: player.period.id!,
     );
@@ -279,7 +280,7 @@ void main() {
       itemId: comb.id,
       operationId: 'comb-next-day',
     );
-    expect(nextUse.care, 90);
+    expect(nextUse.care, 60);
     expect(await games.getInventoryQuantity(player.profileId, comb.id), 1);
   });
 
@@ -415,7 +416,7 @@ void main() {
         interaction: FreePetInteraction.pet,
         operationId: 'free-pet-next',
       );
-      expect(nextPet.mood, 100);
+      expect(nextPet.mood, 60);
     },
   );
 
@@ -474,7 +475,8 @@ void main() {
         periodId: player.period.id!,
         checkpointId: 'done',
       );
-      await games.completePeriod(
+      await completePeriodForTest(
+        database,
         profileId: player.profileId,
         periodId: player.period.id!,
       );

@@ -163,12 +163,6 @@ class PeriodService {
     );
   }
 
-  Future<GamePeriod> completePeriod({
-    required int profileId,
-    required int periodId,
-  }) =>
-      _gameRepository.completePeriod(profileId: profileId, periodId: periodId);
-
   Future<List<PeriodDefinition>> _loadValidDefinitions() async {
     final definitions = await _contentRepository.loadPeriods();
     final ids = <String>{};

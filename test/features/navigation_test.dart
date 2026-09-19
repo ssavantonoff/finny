@@ -54,7 +54,6 @@ class _NavGames extends SqliteGameRepository {
 
   @override
   Future<int> getInventoryQuantity(int profileId, String itemId) async => 0;
-
 }
 
 void main() {
@@ -120,15 +119,24 @@ void main() {
       // Verify exact destination labels and icons in order
       expect((navBar.destinations[0] as NavigationDestination).label, 'Финни');
       expect((navBar.destinations[1] as NavigationDestination).label, 'Вещи');
-      expect((navBar.destinations[2] as NavigationDestination).label, 'Магазин');
-      expect((navBar.destinations[3] as NavigationDestination).label, 'Задания');
-      expect((navBar.destinations[4] as NavigationDestination).label, 'Накопления');
+      expect(
+        (navBar.destinations[2] as NavigationDestination).label,
+        'Магазин',
+      );
+      expect(
+        (navBar.destinations[3] as NavigationDestination).label,
+        'Задания',
+      );
+      expect(
+        (navBar.destinations[4] as NavigationDestination).label,
+        'Накопления',
+      );
       expect(navBar.selectedIndex, 0);
 
       Finder navItem(String label) => find.descendant(
-            of: find.byType(NavigationBar),
-            matching: find.text(label),
-          );
+        of: find.byType(NavigationBar),
+        matching: find.text(label),
+      );
 
       // Tap "Вещи" (index 1)
       await tester.tap(navItem('Вещи'));

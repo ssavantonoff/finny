@@ -231,7 +231,7 @@ void main() {
       expect(pet?.name, 'Пушок');
       expect(pet?.colorId, 'purple');
       expect(pet?.patternId, 'spots');
-      expect(pet?.developmentStage, 0);
+      expect(pet?.developmentStage, 1);
       expect(pet?.growthPoints, 0);
       expect(pet?.satiety, 40);
       expect(pet?.care, 40);

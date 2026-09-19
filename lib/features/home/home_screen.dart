@@ -2,6 +2,7 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
+import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:flutter/material.dart';
@@ -92,31 +93,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _finishDay() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Завершить день?'),
-        content: const Text(
-          'После завершения изменить решения этого дня нельзя.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
+    final controller = ref.read(homeControllerProvider.notifier);
+    final decision = await controller.evaluateBedtime();
+    if (!mounted || decision == null) return;
+    var allowFallback = false;
+    switch (decision.type) {
+      case BedtimeDecisionType.blockedByCheckpoints:
+        return;
+      case BedtimeDecisionType.ready:
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Финни готов отдыхать.'),
+            content: const Text('Завершить день?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Вернуться'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Уложить спать'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Завершить'),
+        );
+        if (confirmed != true) return;
+        break;
+      case BedtimeDecisionType.carePossible:
+        final action = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Финни ещё не готов спать.'),
+            content: Text(
+              'Подними ${_statLabels(decision.statsNeedingCare)} '
+              'в зелёную зону.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Вернуться'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'things'),
+                child: const Text('Открыть Вещи'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, 'shop'),
+                child: const Text('Открыть Магазин'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+        );
+        if (!mounted) return;
+        if (action == 'things') context.go('/things');
+        if (action == 'shop') context.go('/shop');
+        return;
+      case BedtimeDecisionType.fallbackAllowed:
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Сегодня Финни нужна помощь'),
+            content: const Text(
+              'Сегодня уже не хватает доступных вещей и монет, чтобы '
+              'привести все показатели Финни в зелёную зону.\n\n'
+              'Можно завершить день сейчас. Завтра Финни начнёт день '
+              'с более низким состоянием.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Вернуться'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Завершить день'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+        allowFallback = true;
+        break;
+    }
+    if (!mounted) return;
     final completed = await ref
         .read(homeControllerProvider.notifier)
-        .finishDay();
+        .sleep(allowFallback: allowFallback);
     if (completed && mounted) context.go('/period-summary');
   }
+
+  String _statLabels(Set<PetStat> stats) => [
+    if (stats.contains(PetStat.satiety)) 'Сытость',
+    if (stats.contains(PetStat.care)) 'Уход',
+    if (stats.contains(PetStat.mood)) 'Настроение',
+  ].join(', ');
 
   @override
   Widget build(BuildContext context) {
@@ -166,8 +237,8 @@ class _HomeContent extends StatelessWidget {
     final period = state.period;
     final title = period == null
         ? state.completedDays == 0
-            ? 'Первый день'
-            : 'Дом Финни'
+              ? 'Первый день'
+              : 'Дом Финни'
         : 'День ${period.periodNumber} • ${state.definition!.title}';
 
     final periodAllowsPetAction =
@@ -176,9 +247,7 @@ class _HomeContent extends StatelessWidget {
             period.status == GamePeriodStatus.readyToFinish);
 
     final canPet =
-        periodAllowsPetAction &&
-        state.petUsageCount == 0 &&
-        !state.interacting;
+        periodAllowsPetAction && state.petUsageCount == 0 && !state.interacting;
 
     final canPlay =
         periodAllowsPetAction &&
@@ -264,6 +333,7 @@ class _HomeContent extends StatelessWidget {
                             child: FinnyPreview(
                               colorId: state.pet.colorId,
                               patternId: state.pet.patternId,
+                              developmentStage: state.pet.developmentStage,
                             ),
                           ),
                         ),
@@ -283,8 +353,8 @@ class _HomeContent extends StatelessWidget {
                                 key: const Key('home-free-pet'),
                                 onPressed: canPet
                                     ? () => controller.performFreeInteraction(
-                                          FreePetInteraction.pet,
-                                        )
+                                        FreePetInteraction.pet,
+                                      )
                                     : null,
                                 icon: const Icon(Icons.favorite_outline),
                                 label: Text(
@@ -300,10 +370,12 @@ class _HomeContent extends StatelessWidget {
                                 key: const Key('home-free-play'),
                                 onPressed: canPlay
                                     ? () => controller.performFreeInteraction(
-                                          FreePetInteraction.play,
-                                        )
+                                        FreePetInteraction.play,
+                                      )
                                     : null,
-                                icon: const Icon(Icons.sports_baseball_outlined),
+                                icon: const Icon(
+                                  Icons.sports_baseball_outlined,
+                                ),
                                 label: Text(
                                   state.playUsageCount > 0
                                       ? 'Поиграть ✓'
@@ -336,7 +408,10 @@ class _HomeContent extends StatelessWidget {
                   ],
                   const SizedBox(height: AppSpacing.small),
                   if (state.allDaysCompleted)
-                    const _Notice('Все дни завершены')
+                    _Notice(
+                      'Все 5 дней завершены • Финни — этап '
+                      '${state.pet.developmentStage}',
+                    )
                   else if (period == null)
                     FilledButton(
                       key: const Key('home-start-day'),
@@ -366,7 +441,9 @@ class _HomeContent extends StatelessWidget {
                       key: const Key('home-finish-day'),
                       onPressed: state.finishingDay ? null : onFinishDay,
                       child: Text(
-                        state.finishingDay ? 'Завершаем…' : 'Завершить день',
+                        state.finishingDay
+                            ? 'Укладываем…'
+                            : 'Уложить Финни спать',
                       ),
                     ),
                   // Compact "Today" block
@@ -394,15 +471,18 @@ class _HomeContent extends StatelessWidget {
                                 children: [
                                   Text(
                                     goal.name,
-                                    style: Theme.of(context).textTheme.titleMedium,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium,
                                   ),
                                   const SizedBox(height: 4),
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(4),
                                     child: LinearProgressIndicator(
-                                      value: (state.gameState.savedAmount /
-                                              goal.price)
-                                          .clamp(0.0, 1.0),
+                                      value:
+                                          (state.gameState.savedAmount /
+                                                  goal.price)
+                                              .clamp(0.0, 1.0),
                                     ),
                                   ),
                                 ],
@@ -450,9 +530,8 @@ class _TodayCard extends StatelessWidget {
           children: [
             Text(
               'Сегодня',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppSpacing.small),
             Wrap(

@@ -85,14 +85,15 @@ void main() {
       taskId: 'task_period_1',
       answerId: 'apple',
     );
-    for (final checkpointId in const ['mandatory_need', 'savings_decision']) {
+    for (final checkpointId in const ['savings_decision']) {
       await periods.resolveCheckpoint(
         profileId: player.profileId,
         periodId: player.periodId,
         checkpointId: checkpointId,
       );
     }
-    await periods.completePeriod(
+    await completePeriodForTest(
+      database,
       profileId: player.profileId,
       periodId: player.periodId,
     );

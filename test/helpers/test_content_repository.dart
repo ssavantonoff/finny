@@ -72,10 +72,6 @@ List<PeriodDefinition> testPeriodDefinitions({int count = 2}) => [
       number: number,
       title: 'Период $number',
       baseIncome: 500,
-      requiredCheckpoints: const [
-        'financial_task',
-        'mandatory_need',
-        'savings_decision',
-      ],
+      requiredCheckpoints: const ['financial_task', 'savings_decision'],
     ),
 ];

@@ -291,11 +291,6 @@ void main() {
         taskId: 'task_period_1',
         answerId: 'apple',
       );
-      period = await periods.resolveCheckpoint(
-        profileId: profileId,
-        periodId: period.id!,
-        checkpointId: 'mandatory_need',
-      );
       period = await savings.skipToday(
         profileId: profileId,
         periodId: period.id!,

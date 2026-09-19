@@ -238,7 +238,8 @@ void main() {
       expect(readyReplay.wasAlreadyCompleted, isTrue);
       expect(readyReplay.rewardAppliedNow, isFalse);
       expect(readyReplay.gameState.walletBalance, 550);
-      await games.completePeriod(
+      await completePeriodForTest(
+        database,
         profileId: player.profileId,
         periodId: player.period.id!,
       );

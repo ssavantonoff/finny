@@ -65,7 +65,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/period-summary',
         builder: (_, _) => const PeriodSummaryScreen(),
       ),
-      GoRoute(path: '/progress', builder: (_, _) => const ProgressScreen()),
+      GoRoute(
+        path: '/progress',
+        builder: (_, state) => ProgressScreen(
+          completedDay: int.tryParse(state.uri.queryParameters['day'] ?? ''),
+        ),
+      ),
       GoRoute(path: '/adult', builder: (_, _) => const AdultScreen()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
     ],

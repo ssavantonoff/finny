@@ -287,7 +287,8 @@ void main() {
         periodId: period.id!,
         checkpointId: 'decision',
       );
-      await customPeriods.completePeriod(
+      await completePeriodForTest(
+        database,
         profileId: profile.id!,
         periodId: period.id!,
       );
@@ -715,7 +716,11 @@ void main() {
       var period = await startActivePeriod(profile.id!);
 
       await expectLater(
-        periods.completePeriod(profileId: profile.id!, periodId: period.id!),
+        completePeriodForTest(
+          database,
+          profileId: profile.id!,
+          periodId: period.id!,
+        ),
         throwsStateError,
       );
 
@@ -726,11 +731,6 @@ void main() {
         answerId: 'apple',
       ) as TaskAnswerCompleted).period;
       expect(period.status, GamePeriodStatus.active);
-      period = await periods.resolveCheckpoint(
-        profileId: profile.id!,
-        periodId: period.id!,
-        checkpointId: 'mandatory_need',
-      );
       period = await periods.resolveCheckpoint(
         profileId: profile.id!,
         periodId: period.id!,
@@ -790,7 +790,8 @@ void main() {
       expect(beforeCompletion.additionalIncome, 65);
       expect(beforeCompletion.factRemainder, 405);
 
-      final completed = await periods.completePeriod(
+      final completed = await completePeriodForTest(
+        database,
         profileId: profile.id!,
         periodId: period.id!,
       );
@@ -849,7 +850,11 @@ void main() {
         throwsStateError,
       );
       await expectLater(
-        periods.completePeriod(profileId: profile.id!, periodId: period.id!),
+        completePeriodForTest(
+          database,
+          profileId: profile.id!,
+          periodId: period.id!,
+        ),
         throwsStateError,
       );
 
@@ -920,7 +925,8 @@ void main() {
         operationId: 'carry-savings',
       );
       period = await resolveAll(period);
-      await periods.completePeriod(
+      await completePeriodForTest(
+        database,
         profileId: profile.id!,
         periodId: period.id!,
       );
@@ -947,7 +953,8 @@ void main() {
           periodId: next!.id!,
         );
         next = await resolveAll(next);
-        await periods.completePeriod(
+        await completePeriodForTest(
+          database,
           profileId: profile.id!,
           periodId: next.id!,
         );
@@ -1123,7 +1130,7 @@ void main() {
       addTearDown(reopenedDatabase.close);
 
       final restored = await reopenedGames.getCurrentPeriod(profile.id!);
-      expect(restored?.status, GamePeriodStatus.active);
+      expect(restored?.status, GamePeriodStatus.readyToFinish);
       expect(restored?.plannedNeed, 200);
       expect(restored?.plannedWant, 100);
       expect(restored?.plannedSavings, 50);

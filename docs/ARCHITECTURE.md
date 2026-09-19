@@ -85,6 +85,16 @@ restart и автоматически отделены новым period ID. `pe
 хранит durable proof для безопасного replay по `operationId`. Расчёт значений
 следующего утра детерминирован и не привязан к реальному календарному времени.
 
+Единый foreground tracker охватывает все пять игровых вкладок и периодически
+передаёт Core только время в состоянии `resumed`; background, planning, summary
+и completed не учитываются. Завершение дня проходит через
+`DayLifecycleService` и приватный `DayLifecyclePort`: Core проверяет checkpoints,
+зелёную зону или точную достижимость ухода из canonical inventory/shop и затем
+одной transaction фиксирует ending wallet, период и стадию питомца. Следующее
+утро применяется атомарно со стартом Day 2–5 через `PetStateRules.nextMorningPet`.
+Стадии не зависят от XP: новый Финни начинает с Stage 1, Day 2 переводит его в
+Stage 2, Day 5 — в Stage 3.
+
 ## Shop и специальные покупки
 
 `PurchaseService` принимает только `itemId` и разрешает его через canonical
@@ -129,8 +139,10 @@ Day 3 story purchase и Day 4 promotion загружаются из отдель
 
 `lib/app/router.dart` содержит GoRouter-маршруты для всех согласованных модулей.
 Стартовый `/startup` ожидает bootstrap и направляет на onboarding, Pet Creation
-или Home. Home открывает Savings, завершает готовый период и ведёт на минимальный
-Period Summary; следующий период запускается только отдельным действием на Home.
+или Home. Постоянная нижняя навигация: `Финни | Вещи | Магазин | Задания |
+Накопления`. Home укладывает готового Финни спать и ведёт на нейтральный Period
+Summary; после Day 2 и Day 5 используется `/progress`, а следующий период
+запускается только отдельным действием на Home.
 Светлая Material 3 тема, базовые отступы и радиусы определены в
 `lib/core/theme/app_theme.dart`.
 
@@ -146,7 +158,7 @@ Period Summary; следующий период запускается толь�
 
 ## Миграции
 
-Текущая schema version — 7. Миграция v1 → v2 добавляет period definition identity,
+Текущая schema version — 8. Миграция v1 → v2 добавляет period definition identity,
 required/resolved checkpoint snapshots и индекс period transactions, не удаляя
 существующие профили, balances, планы или историю. Для прежних периодов 1–5
 identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
@@ -159,6 +171,9 @@ persisted active-time/decay и `pet_daily_usage`, сохраняя прежни�
 proof операций использования предметов/взаимодействий и не изменяет inventory,
 usage или Pet. Миграция v6 → v7 добавляет только `period_special_actions` с
 уникальными action/operation identities на профиль и период; существующие
-runtime-данные не переписываются. Следующие
+runtime-данные не переписываются. Миграция v7 → v8 удаляет legacy
+`mandatory_need` из period snapshots с сохранением порядка остальных
+checkpoints, корректирует полностью решённый active period в `readyToFinish` и
+нормализует Stage 0 в Stage 1 без сброса runtime-данных. Следующие
 изменения схемы должны добавлять последовательные миграции; нельзя пересоздавать
 базу с потерей NORMAL-профиля.

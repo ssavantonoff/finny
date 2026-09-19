@@ -236,7 +236,7 @@ Future<Profile> _createPlayer(
       name: petName,
       colorId: 'purple',
       patternId: 'spots',
-      developmentStage: 0,
+      developmentStage: 1,
       growthPoints: 0,
       satiety: 100,
       care: 100,
@@ -252,11 +252,7 @@ List<PeriodDefinition> _definitions({int income = 500}) => [
     number: 1,
     title: 'Нужно или хочется?',
     baseIncome: income,
-    requiredCheckpoints: const [
-      'financial_task',
-      'mandatory_need',
-      'savings_decision',
-    ],
+    requiredCheckpoints: const ['financial_task', 'savings_decision'],
   ),
 ];
 
@@ -372,14 +368,17 @@ void main() {
     expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
 
     await tester.runAsync(
-      () =>
-          periods.completePeriod(profileId: profile.id!, periodId: period.id!),
+      () => completePeriodForTest(
+        database,
+        profileId: profile.id!,
+        periodId: period.id!,
+      ),
     );
     await tester.runAsync(
       harness.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Все дни завершены'), findsOneWidget);
+    expect(find.text('Все 5 дней завершены • Финни — этап 1'), findsOneWidget);
   });
 
   testWidgets(

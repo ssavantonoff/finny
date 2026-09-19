@@ -80,9 +80,9 @@ void main() {
     expect(find.text('План'), findsOneWidget);
     expect(find.text('Факт'), findsOneWidget);
     expect(find.text('Нужное'), findsOneWidget);
-    expect(find.text('Хочу'), findsOneWidget);
+    expect(find.text('Желания'), findsOneWidget);
     expect(find.text('Накопления'), findsOneWidget);
-    expect(find.text('Остаток'), findsOneWidget);
+    expect(find.text('На потом'), findsOneWidget);
     expect(find.byKey(const Key('summary-home')), findsOneWidget);
   });
 }
