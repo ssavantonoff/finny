@@ -494,7 +494,10 @@ class _HomeContent extends StatelessWidget {
                     _Notice(notice),
                   ],
                   const SizedBox(height: AppSpacing.small),
-                  _DayStatusCard(period: period),
+                  _DayStatusCard(
+                    period: period,
+                    completedDays: state.completedDays,
+                  ),
                   if (state.startFailed) ...[
                     const SizedBox(height: AppSpacing.small),
                     const _Notice(
@@ -698,14 +701,22 @@ class _CheckpointChip extends StatelessWidget {
 }
 
 class _DayStatusCard extends StatelessWidget {
-  const _DayStatusCard({required this.period});
+  const _DayStatusCard({required this.period, required this.completedDays});
 
   final GamePeriod? period;
+  final int completedDays;
 
   @override
   Widget build(BuildContext context) {
     final (title, description) = switch (period?.status) {
-      null => ('Первый день с Финни', 'Получи монеты и составь план на день.'),
+      null when completedDays == 0 => (
+        'Первый день с Финни',
+        'Получи монеты и составь план на день.',
+      ),
+      null => (
+        'День $completedDays завершён',
+        'Можно начать день ${completedDays + 1}.',
+      ),
       GamePeriodStatus.planning => ('План ещё не готов', ''),
       GamePeriodStatus.active => (
         'План готов',

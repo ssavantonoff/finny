@@ -9,11 +9,13 @@ import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/pet_state_rules.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
+import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/task_service.dart';
 import 'package:finny/models/task_submission_result.dart';
@@ -212,6 +214,9 @@ Future<Profile> _createPlayer(
   int wallet = 0,
   int savings = 0,
   String petName = 'Финни',
+  int satiety = 100,
+  int care = 100,
+  int mood = 100,
 }) async {
   final profile = await profiles.create(
     Profile(
@@ -238,9 +243,9 @@ Future<Profile> _createPlayer(
       patternId: 'spots',
       developmentStage: 1,
       growthPoints: 0,
-      satiety: 100,
-      care: 100,
-      mood: 100,
+      satiety: satiety,
+      care: care,
+      mood: mood,
     ),
   );
   return profile;
@@ -439,6 +444,185 @@ void main() {
       expect(
         await tester.runAsync(() => games.getTransactions(profile.id!)),
         hasLength(1),
+      );
+    },
+  );
+
+  testWidgets(
+    'completed Day 1 enters Day 2 without first-day state or repeated morning',
+    (tester) async {
+      content = TestContentRepository(testPeriodDefinitions(count: 3));
+      final profile = (await tester.runAsync(
+        () => _createPlayer(
+          profiles,
+          games,
+          satiety: PetStateRules.dayOneInitialSatiety,
+          care: PetStateRules.dayOneInitialCare,
+          mood: PetStateRules.dayOneInitialMood,
+        ),
+      ))!;
+      final periods = PeriodService(games, content);
+      final budgets = BudgetService(games);
+      final lifecycle = DayLifecycleService(
+        SqliteDayLifecyclePort(database),
+        content,
+      );
+
+      var day1 = (await tester.runAsync(
+        () => periods.startNextPeriod(profileId: profile.id!),
+      ))!;
+      day1 = (await tester.runAsync(
+        () => budgets.confirmPlan(profileId: profile.id!, periodId: day1.id!),
+      ))!;
+      await tester.runAsync(() async {
+        for (final checkpoint in day1.requiredCheckpoints) {
+          day1 = await resolveCheckpointForTest(
+            database,
+            profileId: profile.id!,
+            periodId: day1.id!,
+            checkpointId: checkpoint,
+          );
+        }
+        await (await database.database).update(
+          'game_periods',
+          {'day_progress': 76},
+          where: 'id = ?',
+          whereArgs: [day1.id],
+        );
+      });
+      final day1Evening = (await tester.runAsync(
+        () async =>
+            (await games.getPet(profile.id!))!
+                .copyWith(satiety: 80, care: 78, mood: 60),
+      ))!;
+      await tester.runAsync(() => games.savePet(day1Evening));
+      final completedDay1 = (await tester.runAsync(
+        () => lifecycle.sleep(
+          profileId: profile.id!,
+          periodId: day1.id!,
+          allowFallback: true,
+        ),
+      ))!;
+      final summary = (await tester.runAsync(
+        () => periods.getSummary(profileId: profile.id!, periodId: day1.id!),
+      ))!;
+      expect(completedDay1.period.status, GamePeriodStatus.completed);
+      expect(summary.factRemainder, completedDay1.period.endWalletBalance);
+
+      final harness = await _pumpFeature(
+        tester,
+        profileId: profile.id,
+        profiles: profiles,
+        games: games,
+        content: content,
+      );
+      expect(find.text('Первый день с Финни'), findsNothing);
+      expect(find.text('День 1 завершён'), findsOneWidget);
+      expect(find.text('Можно начать день 2.'), findsOneWidget);
+      expect(find.text('Начать следующий день'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('home-start-day')));
+      await _settleFeature(tester, harness.container);
+      final day2State = harness.container.read(homeControllerProvider);
+      expect(day2State, isA<HomeReady>());
+      expect((day2State as HomeReady).period?.periodNumber, 2);
+      expect(day2State.completedDays, 1);
+      final afterDay2Start = (await tester.runAsync(
+        () async => (
+          await games.getPeriods(profile.id!),
+          await games.getGameState(profile.id!),
+          await games.getPet(profile.id!),
+        ),
+      ))!;
+      expect(afterDay2Start.$1.first.status, GamePeriodStatus.completed);
+      expect(afterDay2Start.$1.last.periodNumber, 2);
+      expect(afterDay2Start.$2?.currentPeriod, 2);
+      expect(
+        [
+          afterDay2Start.$3?.satiety,
+          afterDay2Start.$3?.care,
+          afterDay2Start.$3?.mood,
+        ],
+        [40, 39, 35],
+      );
+
+      Navigator.of(tester.element(find.text('Новый день начался!'))).pop();
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        final controller = harness.container.read(
+          homeControllerProvider.notifier,
+        );
+        await controller.load();
+        await controller.load();
+        await expectLater(
+          periods.startNextPeriod(profileId: profile.id!),
+          throwsStateError,
+        );
+      });
+      final afterReload = (await tester.runAsync(
+        () => games.getPet(profile.id!),
+      ))!;
+      expect(
+        [afterReload.satiety, afterReload.care, afterReload.mood],
+        [40, 39, 35],
+      );
+
+      var day2 = (await tester.runAsync(
+        () => games.getCurrentPeriod(profile.id!),
+      ))!;
+      day2 = (await tester.runAsync(
+        () => budgets.confirmPlan(profileId: profile.id!, periodId: day2.id!),
+      ))!;
+      await tester.runAsync(() async {
+        for (final checkpoint in day2.requiredCheckpoints) {
+          day2 = await resolveCheckpointForTest(
+            database,
+            profileId: profile.id!,
+            periodId: day2.id!,
+            checkpointId: checkpoint,
+          );
+        }
+        await (await database.database).update(
+          'game_periods',
+          {'day_progress': 76},
+          where: 'id = ?',
+          whereArgs: [day2.id],
+        );
+        await games.savePet(
+          (await games.getPet(profile.id!))!
+              .copyWith(satiety: 90, care: 70, mood: 100),
+        );
+        await lifecycle.sleep(
+          profileId: profile.id!,
+          periodId: day2.id!,
+          allowFallback: false,
+        );
+        await harness.container.read(homeControllerProvider.notifier).load();
+      });
+      await tester.pumpAndSettle();
+      expect(find.text('День 2 завершён'), findsOneWidget);
+      expect(find.text('Можно начать день 3.'), findsOneWidget);
+
+      final day3 = (await tester.runAsync(
+        harness.container.read(homeControllerProvider.notifier).startDay,
+      ))!;
+      expect(day3.periodNumber, 3);
+      final day3Morning = (await tester.runAsync(
+        () => games.getPet(profile.id!),
+      ))!;
+      expect(
+        [day3Morning.satiety, day3Morning.care, day3Morning.mood],
+        [40, 35, 40],
+      );
+      await tester.runAsync(
+        harness.container.read(homeControllerProvider.notifier).load,
+      );
+      final afterDay3Reload = (await tester.runAsync(
+        () => games.getPet(profile.id!),
+      ))!;
+      expect(
+        [afterDay3Reload.satiety, afterDay3Reload.care, afterDay3Reload.mood],
+        [40, 35, 40],
       );
     },
   );
