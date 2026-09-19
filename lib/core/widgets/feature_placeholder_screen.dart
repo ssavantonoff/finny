@@ -13,6 +13,7 @@ const finnyRouteLinks = <FinnyRouteLink>[
   FinnyRouteLink('/onboarding', 'Старт'),
   FinnyRouteLink('/pet-creation', 'Создание Финни'),
   FinnyRouteLink('/home', 'Дом'),
+  FinnyRouteLink('/things', 'Вещи'),
   FinnyRouteLink('/budget', 'Бюджет'),
   FinnyRouteLink('/shop', 'Магазин'),
   FinnyRouteLink('/savings', 'Накопления'),

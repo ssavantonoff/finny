@@ -153,16 +153,19 @@ Future<_Harness> _pumpFeature(
     ),
   );
   await tester.pump();
-  await tester.runAsync(() async {
-    for (var attempt = 0; attempt < 500; attempt++) {
-      final loading = initialLocation == '/budget'
-          ? container.read(budgetControllerProvider) is BudgetLoading
-          : container.read(homeControllerProvider) is HomeLoading;
-      if (!loading) break;
-      await Future<void>.delayed(const Duration(milliseconds: 2));
-    }
-  });
-  await tester.pumpAndSettle();
+  for (var attempt = 0; attempt < 5000; attempt++) {
+    final loading = initialLocation == '/budget'
+        ? container.read(budgetControllerProvider) is BudgetLoading
+        : container.read(homeControllerProvider) is HomeLoading;
+    if (!loading) break;
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 2)),
+    );
+    await tester.pump();
+  }
+  for (var attempt = 0; attempt < 20; attempt++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
   return _Harness(container, router);
 }
 
