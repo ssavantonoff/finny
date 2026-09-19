@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as path_util;
 import 'package:sqflite/sqflite.dart' as sqflite;
 
@@ -5,7 +7,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 7;
+  static const schemaVersion = 8;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -54,7 +56,7 @@ class AppDatabase {
         name TEXT NOT NULL,
         color_id TEXT NOT NULL,
         pattern_id TEXT NOT NULL,
-        development_stage INTEGER NOT NULL DEFAULT 0 CHECK (development_stage >= 0),
+        development_stage INTEGER NOT NULL DEFAULT 1 CHECK (development_stage >= 0),
         growth_points INTEGER NOT NULL DEFAULT 0 CHECK (growth_points >= 0),
         satiety INTEGER NOT NULL DEFAULT 40 CHECK (satiety BETWEEN 0 AND 100),
         care INTEGER NOT NULL DEFAULT 40 CHECK (care BETWEEN 0 AND 100),
@@ -253,6 +255,71 @@ class AppDatabase {
     if (oldVersion < 7) {
       await _createPeriodSpecialActionsTable(db);
     }
+    if (oldVersion < 8) {
+      await _migrateDayLifecycleV8(db);
+    }
+  }
+
+  static Future<void> _migrateDayLifecycleV8(
+    sqflite.DatabaseExecutor db,
+  ) async {
+    final periodColumns = await db.rawQuery('PRAGMA table_info(game_periods)');
+    final periodColumnNames = periodColumns
+        .map((column) => column['name'])
+        .whereType<String>()
+        .toSet();
+    if (!periodColumnNames.containsAll({
+      'id',
+      'required_checkpoints',
+      'resolved_checkpoints',
+      'status',
+    })) {
+      return;
+    }
+    final periods = await db.query(
+      'game_periods',
+      columns: ['id', 'required_checkpoints', 'resolved_checkpoints', 'status'],
+    );
+    for (final row in periods) {
+      final required = _decodeCheckpointList(row['required_checkpoints'])
+          .where((value) => value != 'mandatory_need')
+          .toList(growable: false);
+      final resolved = _decodeCheckpointList(row['resolved_checkpoints'])
+          .where((value) => value != 'mandatory_need')
+          .toList(growable: false);
+      final oldStatus = row['status'] as String;
+      final newStatus =
+          oldStatus == 'active' && required.every(resolved.contains)
+          ? 'readyToFinish'
+          : oldStatus;
+      await db.update(
+        'game_periods',
+        {
+          'required_checkpoints': jsonEncode(required),
+          'resolved_checkpoints': jsonEncode(resolved),
+          'status': newStatus,
+        },
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+    final petColumns = await db.rawQuery('PRAGMA table_info(pets)');
+    if (petColumns.any((column) => column['name'] == 'development_stage')) {
+      await db.update('pets', {
+        'development_stage': 1,
+      }, where: 'development_stage = 0');
+    }
+  }
+
+  static List<String> _decodeCheckpointList(Object? source) {
+    if (source is! String) {
+      throw const FormatException('Checkpoint snapshot must be JSON text.');
+    }
+    final decoded = jsonDecode(source);
+    if (decoded is! List || decoded.any((value) => value is! String)) {
+      throw const FormatException('Checkpoint snapshot must be a string list.');
+    }
+    return decoded.cast<String>();
   }
 
   static Future<void> _createPeriodSpecialActionsTable(

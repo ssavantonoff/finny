@@ -6,7 +6,6 @@
     "baseIncome": 500,
     "requiredCheckpoints": [
       "financial_task",
-      "mandatory_need",
       "savings_decision"
     ]
   },
@@ -17,7 +16,6 @@
     "baseIncome": 500,
     "requiredCheckpoints": [
       "financial_task",
-      "mandatory_need",
       "savings_decision"
     ]
   },
@@ -28,7 +26,6 @@
     "baseIncome": 500,
     "requiredCheckpoints": [
       "financial_task",
-      "mandatory_need",
       "savings_decision",
       "changed_circumstance"
     ]
@@ -40,7 +37,6 @@
     "baseIncome": 500,
     "requiredCheckpoints": [
       "financial_task",
-      "mandatory_need",
       "savings_decision",
       "discount_decision"
     ]
@@ -52,7 +48,6 @@
     "baseIncome": 500,
     "requiredCheckpoints": [
       "financial_task",
-      "mandatory_need",
       "savings_decision"
     ]
   }

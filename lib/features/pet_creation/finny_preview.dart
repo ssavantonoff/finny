@@ -4,11 +4,13 @@ class FinnyPreview extends StatelessWidget {
   const FinnyPreview({
     required this.colorId,
     required this.patternId,
+    this.developmentStage = 1,
     super.key,
   });
 
   final String colorId;
   final String patternId;
+  final int developmentStage;
 
   @override
   Widget build(BuildContext context) {
@@ -28,9 +30,15 @@ class FinnyPreview extends StatelessWidget {
       'stripes' => 'полоски',
       _ => 'без узора',
     };
+    final stage = developmentStage.clamp(1, 3);
+    final scale = switch (stage) {
+      1 => 0.82,
+      2 => 0.92,
+      _ => 1.0,
+    };
 
     return Semantics(
-      label: 'Финни: $colorName, $patternName',
+      label: 'Финни: $colorName, $patternName, этап $stage',
       image: true,
       child: ExcludeSemantics(
         child: Container(
@@ -40,62 +48,76 @@ class FinnyPreview extends StatelessWidget {
             color: Theme.of(context).colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(24),
           ),
-          child: SizedBox(
-            width: 190,
-            height: 185,
-            child: Stack(
-              alignment: Alignment.bottomCenter,
-              children: [
-                Positioned(top: 4, left: 20, child: _ear(bodyColor, -0.2)),
-                Positioned(top: 4, right: 20, child: _ear(bodyColor, 0.2)),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(72),
-                  child: Container(
-                    width: 170,
-                    height: 155,
-                    color: bodyColor,
-                    child: Stack(
-                      children: [
-                        if (patternId == 'spots') ...[
-                          _spot(18, 28, 20, accentColor),
-                          _spot(112, 18, 26, accentColor),
-                          _spot(10, 102, 24, accentColor),
-                          _spot(126, 94, 20, accentColor),
-                        ],
-                        if (patternId == 'stripes') ...[
-                          for (final left in [15.0, 52.0, 89.0, 126.0])
-                            Positioned(
-                              left: left,
-                              top: 0,
-                              child: Transform.rotate(
-                                angle: 0.18,
-                                child: Container(
-                                  width: 14,
-                                  height: 160,
-                                  color: accentColor,
+          child: Transform.scale(
+            scale: scale,
+            alignment: Alignment.bottomCenter,
+            child: SizedBox(
+              width: 190,
+              height: 185,
+              child: Stack(
+                alignment: Alignment.bottomCenter,
+                children: [
+                  Positioned(top: 4, left: 20, child: _ear(bodyColor, -0.2)),
+                  Positioned(top: 4, right: 20, child: _ear(bodyColor, 0.2)),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(72),
+                    child: Container(
+                      width: 170,
+                      height: 155,
+                      color: bodyColor,
+                      child: Stack(
+                        children: [
+                          if (patternId == 'spots') ...[
+                            _spot(18, 28, 20, accentColor),
+                            _spot(112, 18, 26, accentColor),
+                            _spot(10, 102, 24, accentColor),
+                            _spot(126, 94, 20, accentColor),
+                          ],
+                          if (patternId == 'stripes') ...[
+                            for (final left in [15.0, 52.0, 89.0, 126.0])
+                              Positioned(
+                                left: left,
+                                top: 0,
+                                child: Transform.rotate(
+                                  angle: 0.18,
+                                  child: Container(
+                                    width: 14,
+                                    height: 160,
+                                    color: accentColor,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
-                        Positioned(top: 62, left: 48, child: _eye()),
-                        Positioned(top: 62, right: 48, child: _eye()),
-                        Positioned(
-                          top: 101,
-                          left: 75,
-                          child: Container(
-                            width: 20,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF354254),
-                              borderRadius: BorderRadius.circular(10),
+                          ],
+                          Positioned(top: 62, left: 48, child: _eye()),
+                          Positioned(top: 62, right: 48, child: _eye()),
+                          Positioned(
+                            top: 101,
+                            left: 75,
+                            child: Container(
+                              width: 20,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF354254),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  if (stage >= 2)
+                    Positioned(
+                      right: 22,
+                      bottom: 18,
+                      child: Icon(
+                        stage == 3 ? Icons.auto_awesome : Icons.star,
+                        size: stage == 3 ? 28 : 22,
+                        color: const Color(0xFFFFD166),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),

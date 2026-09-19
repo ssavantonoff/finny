@@ -5,9 +5,10 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
+import 'package:finny/services/active_gameplay_tracker.dart';
+import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/item_use_service.dart';
 import 'package:finny/services/period_service.dart';
-import 'package:finny/services/pet_progress_service.dart';
 import 'package:finny/services/pet_state_service.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:finny/services/savings_service.dart';
@@ -48,12 +49,23 @@ final gameRepositoryProvider = Provider<GameRepository>(
   (ref) => SqliteGameRepository(ref.watch(appDatabaseProvider)),
 );
 
+final activeGameplayTrackerProvider = Provider<ActiveGameplayTracker>(
+  (ref) => ActiveGameplayTracker(
+    ref.watch(gameRepositoryProvider),
+    () => ref.read(activeProfileIdProvider),
+  ),
+);
+
 final _taskCompletionPortProvider = Provider<TaskCompletionPort>(
   (ref) => SqliteTaskCompletionPort(ref.watch(appDatabaseProvider)),
 );
 
 final _petActionPortProvider = Provider<PetActionPort>(
   (ref) => SqlitePetActionPort(ref.watch(appDatabaseProvider)),
+);
+
+final _dayLifecyclePortProvider = Provider<DayLifecyclePort>(
+  (ref) => SqliteDayLifecyclePort(ref.watch(appDatabaseProvider)),
 );
 
 final _purchasePortProvider = Provider<PurchasePort>(
@@ -70,6 +82,13 @@ final contentRepositoryProvider = Provider<ContentRepository>(
 
 final budgetServiceProvider = Provider<BudgetService>(
   (ref) => BudgetService(ref.watch(gameRepositoryProvider)),
+);
+
+final dayLifecycleServiceProvider = Provider<DayLifecycleService>(
+  (ref) => DayLifecycleService(
+    ref.watch(_dayLifecyclePortProvider),
+    ref.watch(contentRepositoryProvider),
+  ),
 );
 
 final purchaseServiceProvider = Provider<PurchaseService>(
@@ -106,10 +125,6 @@ final taskServiceProvider = Provider<TaskService>(
     ref.watch(_taskCompletionPortProvider),
     ref.watch(contentRepositoryProvider),
   ),
-);
-
-final petProgressServiceProvider = Provider<PetProgressService>(
-  (ref) => PetProgressService(ref.watch(gameRepositoryProvider)),
 );
 
 final petStateServiceProvider = Provider<PetStateService>(

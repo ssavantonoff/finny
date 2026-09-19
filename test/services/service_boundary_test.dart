@@ -6,6 +6,7 @@ import 'package:finny/models/profile.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/item_use_service.dart';
 import 'package:finny/services/pet_state_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -36,6 +37,13 @@ void main() {
       expect(() => (games as dynamic).purchaseStory, throwsNoSuchMethodError);
       expect(() => (games as dynamic).decidePromotion, throwsNoSuchMethodError);
       expect(games, isNot(isA<PetActionPort>()));
+      expect(games, isNot(isA<DayLifecyclePort>()));
+      expect(() => (games as dynamic).evaluateBedtime, throwsNoSuchMethodError);
+      expect(() => (games as dynamic).sleep, throwsNoSuchMethodError);
+      expect(
+        container.read(dayLifecycleServiceProvider),
+        isA<DayLifecycleService>(),
+      );
       const forgedItem = ShopItem(
         id: 'forged',
         name: 'Forged item',

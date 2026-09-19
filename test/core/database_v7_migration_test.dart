@@ -18,12 +18,12 @@ void main() {
   sqfliteFfiInit();
 
   test(
-    'fresh v7 has canonical special-action proof table and constraints',
+    'fresh schema has canonical special-action proof table and constraints',
     () async {
       final database = createTestDatabase();
       addTearDown(database.close);
       final db = await database.database;
-      expect(await db.getVersion(), 7);
+      expect(await db.getVersion(), AppDatabase.schemaVersion);
       final schema = await db.rawQuery(
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'period_special_actions'",
       );
@@ -40,7 +40,7 @@ void main() {
   );
 
   test(
-    'v6 to v7 adds proof table without changing existing runtime data',
+    'legacy schema adds proof table without changing existing runtime data',
     () async {
       final directory = await Directory.systemTemp.createTemp('finny_v7_');
       final path = '${directory.path}/finny.sqlite';
@@ -165,7 +165,7 @@ void main() {
       );
       addTearDown(migrated.close);
       final upgraded = await migrated.database;
-      expect(await upgraded.getVersion(), 7);
+      expect(await upgraded.getVersion(), AppDatabase.schemaVersion);
       expect(
         await upgraded.rawQuery(
           "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'period_special_actions'",

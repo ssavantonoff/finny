@@ -729,11 +729,6 @@ void main() {
       period = await periods.resolveCheckpoint(
         profileId: profile.id!,
         periodId: period.id!,
-        checkpointId: 'mandatory_need',
-      );
-      period = await periods.resolveCheckpoint(
-        profileId: profile.id!,
-        periodId: period.id!,
         checkpointId: 'savings_decision',
       );
       expect(period.status, GamePeriodStatus.readyToFinish);
@@ -1123,7 +1118,7 @@ void main() {
       addTearDown(reopenedDatabase.close);
 
       final restored = await reopenedGames.getCurrentPeriod(profile.id!);
-      expect(restored?.status, GamePeriodStatus.active);
+      expect(restored?.status, GamePeriodStatus.readyToFinish);
       expect(restored?.plannedNeed, 200);
       expect(restored?.plannedWant, 100);
       expect(restored?.plannedSavings, 50);

@@ -215,10 +215,7 @@ class _ItemCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
                   if (effectText.isNotEmpty) ...[
                     const SizedBox(height: 2),
                     Text(
@@ -254,8 +251,7 @@ class _ItemCard extends StatelessWidget {
                 onPressed: canUse && !state.mutating
                     ? () => controller.use(item)
                     : null,
-                child: state.mutating &&
-                        state.pending?.item.id == item.id
+                child: state.mutating && state.pending?.item.id == item.id
                     ? const SizedBox(
                         width: 18,
                         height: 18,

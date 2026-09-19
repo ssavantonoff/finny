@@ -134,7 +134,7 @@ class _PetCreationScreenState extends ConsumerState<PetCreationScreen> {
               name: _draft.trimmedName,
               colorId: _draft.colorId,
               patternId: _draft.patternId,
-              developmentStage: 0,
+              developmentStage: 1,
               growthPoints: 0,
               satiety: PetStateRules.initialValue,
               care: PetStateRules.initialValue,
@@ -183,6 +183,7 @@ class _PetCreationScreenState extends ConsumerState<PetCreationScreen> {
                   FinnyPreview(
                     colorId: _draft.colorId,
                     patternId: _draft.patternId,
+                    developmentStage: _existingPet?.developmentStage ?? 1,
                   ),
                   const SizedBox(height: AppSpacing.large),
                   if (profileId == null)

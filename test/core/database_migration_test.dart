@@ -165,11 +165,7 @@ void main() {
     expect(period?.plannedWant, 100);
     expect(period?.plannedSavings, 50);
     expect(period?.plannedFree, 150);
-    expect(period?.requiredCheckpoints, [
-      'financial_task',
-      'mandatory_need',
-      'savings_decision',
-    ]);
+    expect(period?.requiredCheckpoints, ['financial_task', 'savings_decision']);
     expect(period?.resolvedCheckpoints, isEmpty);
     await expectTaskProgressV4Schema(migratedDatabase, profileId: 1);
 

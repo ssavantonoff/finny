@@ -7,13 +7,7 @@ import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum ThingsLoad {
-  loading,
-  ready,
-  noProfile,
-  contentError,
-  runtimeError,
-}
+enum ThingsLoad { loading, ready, noProfile, contentError, runtimeError }
 
 enum ItemUseResultKind {
   success,
@@ -75,7 +69,10 @@ class ThingsState {
       usageCounts['$itemId:${slot.storageValue}'] ?? 0;
 
   bool canUse(ShopItem item) {
-    if (profileId == null || load != ThingsLoad.ready || mutating || pending != null) {
+    if (profileId == null ||
+        load != ThingsLoad.ready ||
+        mutating ||
+        pending != null) {
       return false;
     }
     if (quantityOf(item.id) <= 0) return false;
@@ -152,7 +149,10 @@ class ThingsState {
   );
 }
 
-typedef ThingsOperationIdFactory = String Function(int profileId, String itemId);
+typedef ThingsOperationIdFactory = String Function(
+  int profileId,
+  String itemId,
+);
 
 final thingsControllerProvider =
     NotifierProvider<ThingsController, ThingsState>(ThingsController.new);
@@ -206,10 +206,7 @@ class ThingsController extends Notifier<ThingsState> {
     try {
       allItems = await content.loadShopItems();
     } catch (_) {
-      return ThingsState(
-        load: ThingsLoad.contentError,
-        profileId: profileId,
-      );
+      return ThingsState(load: ThingsLoad.contentError, profileId: profileId);
     }
 
     try {
@@ -264,10 +261,7 @@ class ThingsController extends Notifier<ThingsState> {
         usageCounts: Map.unmodifiable(usageCounts),
       );
     } catch (_) {
-      return ThingsState(
-        load: ThingsLoad.runtimeError,
-        profileId: profileId,
-      );
+      return ThingsState(load: ThingsLoad.runtimeError, profileId: profileId);
     }
   }
 

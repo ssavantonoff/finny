@@ -1,5 +1,6 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/models/content_entry.dart';
+import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -58,7 +59,7 @@ class HomeReady extends HomeViewState {
   final bool interacting;
   final String? interactionNotice;
   final ({FreePetInteraction interaction, String operationId})?
-      pendingInteraction;
+  pendingInteraction;
   final bool startingDay;
   final bool startFailed;
   final bool finishingDay;
@@ -102,8 +103,10 @@ class HomeReady extends HomeViewState {
   );
 }
 
-typedef FreeInteractionOperationIdFactory =
-    String Function(int profileId, String actionId);
+typedef FreeInteractionOperationIdFactory = String Function(
+  int profileId,
+  String actionId,
+);
 
 final homeControllerProvider = NotifierProvider<HomeController, HomeViewState>(
   HomeController.new,
@@ -163,7 +166,28 @@ class HomeController extends Notifier<HomeViewState> {
     return null;
   }
 
-  Future<bool> finishDay() async {
+  Future<BedtimeDecision?> evaluateBedtime() async {
+    final current = state;
+    final period = current is HomeReady ? current.period : null;
+    if (current is! HomeReady ||
+        period?.id == null ||
+        period!.status != GamePeriodStatus.readyToFinish) {
+      return null;
+    }
+    try {
+      return await ref
+          .read(dayLifecycleServiceProvider)
+          .evaluateBedtime(
+            profileId: current.profile.id!,
+            periodId: period.id!,
+          );
+    } catch (_) {
+      state = current.copyWith(finishFailed: true);
+      return null;
+    }
+  }
+
+  Future<bool> sleep({required bool allowFallback}) async {
     final current = state;
     final period = current is HomeReady ? current.period : null;
     if (_finishingDay ||
@@ -175,9 +199,14 @@ class HomeController extends Notifier<HomeViewState> {
     _finishingDay = true;
     state = current.copyWith(finishingDay: true, finishFailed: false);
     try {
+      await ref.read(activeGameplayTrackerProvider).flush();
       await ref
-          .read(periodServiceProvider)
-          .completePeriod(profileId: current.profile.id!, periodId: period.id!);
+          .read(dayLifecycleServiceProvider)
+          .sleep(
+            profileId: current.profile.id!,
+            periodId: period.id!,
+            allowFallback: allowFallback,
+          );
     } catch (_) {
       _finishingDay = false;
       final refreshed = await _readSnapshot();
@@ -229,12 +258,14 @@ class HomeController extends Notifier<HomeViewState> {
     );
 
     try {
-      await ref.read(itemUseServiceProvider).performFreeInteraction(
-        profileId: profileId,
-        periodId: periodId,
-        interaction: interaction,
-        operationId: operationId,
-      );
+      await ref
+          .read(itemUseServiceProvider)
+          .performFreeInteraction(
+            profileId: profileId,
+            periodId: periodId,
+            interaction: interaction,
+            operationId: operationId,
+          );
       _pendingInteraction = null;
       _interacting = false;
       final refreshed = await _readSnapshot();

@@ -45,16 +45,26 @@ Savings deposit требует canonical active goal, не может превы
 `completed_goals`, выдаёт persistent reward в inventory и сохраняет возможный
 остаток. Claim не является расходом периода и не меняет его `actualSavings`.
 
-## Checkpoints и завершение
+## Checkpoints, bedtime и завершение
 
 Checkpoint принадлежит конкретному period instance. Разрешается закрывать только
 ID из required snapshot. Когда закрыты все required checkpoints, период становится
 `readyToFinish`, но не завершается автоматически. В этом состоянии optional
 финансовые действия остаются разрешены.
 
-Только явное завершение переводит период в `completed` и фиксирует ending wallet.
-Completed period недоступен для новых игровых транзакций, изменения plan или
-checkpoints. Следующий content period стартует только отдельной командой.
+Явный bedtime сначала даёт одно из четырёх решений: unresolved checkpoints
+блокируют сон; зелёные характеристики разрешают обычный сон; достижимая зелёная
+зона требует продолжить уход; fallback разрешён только когда точный расчёт
+canonical вещей, usage, бесплатных действий, магазина и wallet доказал
+невозможность достичь `70/70/70`. При sleep расчёт повторяется внутри SQLite
+transaction, после чего вместе сохраняются ending wallet, `completedAt`, period,
+Pet и переход Stage 2 после Day 2 либо Stage 3 после Day 5. Вечерние значения не
+сбрасываются. Completed period недоступен для новых игровых транзакций, изменения
+plan или checkpoints.
+
+При старте Day 2–5 `PetStateRules.nextMorningPet` применяется ровно один раз в
+той же transaction, что создание следующего периода и начисление base income.
+Wallet и savings переносятся; Day 1 утренний reset не получает.
 
 ## Active-time Финни
 

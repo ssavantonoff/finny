@@ -279,7 +279,7 @@ void main() {
       itemId: comb.id,
       operationId: 'comb-next-day',
     );
-    expect(nextUse.care, 90);
+    expect(nextUse.care, 60);
     expect(await games.getInventoryQuantity(player.profileId, comb.id), 1);
   });
 
@@ -415,7 +415,7 @@ void main() {
         interaction: FreePetInteraction.pet,
         operationId: 'free-pet-next',
       );
-      expect(nextPet.mood, 100);
+      expect(nextPet.mood, 60);
     },
   );
 

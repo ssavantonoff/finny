@@ -1,12 +1,16 @@
+import 'dart:async';
+
+import 'package:finny/app/providers.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/savings/savings_controller.dart';
 import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/features/things/things_controller.dart';
+import 'package:finny/services/active_gameplay_tracker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class ScaffoldWithNestedNavigation extends ConsumerWidget {
+class ScaffoldWithNestedNavigation extends ConsumerStatefulWidget {
   const ScaffoldWithNestedNavigation({
     required this.navigationShell,
     super.key,
@@ -14,10 +18,51 @@ class ScaffoldWithNestedNavigation extends ConsumerWidget {
 
   final StatefulNavigationShell navigationShell;
 
+  @override
+  ConsumerState<ScaffoldWithNestedNavigation> createState() =>
+      _ScaffoldWithNestedNavigationState();
+}
+
+class _ScaffoldWithNestedNavigationState
+    extends ConsumerState<ScaffoldWithNestedNavigation>
+    with WidgetsBindingObserver {
+  Timer? _flushTimer;
+  late final ActiveGameplayTracker _tracker;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _tracker = ref.read(activeGameplayTrackerProvider);
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      _tracker.resume();
+    }
+    _flushTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      unawaited(_tracker.flush());
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _tracker.resume();
+    } else {
+      unawaited(_tracker.pause());
+    }
+  }
+
+  @override
+  void dispose() {
+    _flushTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_tracker.pause());
+    super.dispose();
+  }
+
   void _onTap(BuildContext context, WidgetRef ref, int index) {
-    navigationShell.goBranch(
+    widget.navigationShell.goBranch(
       index,
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: index == widget.navigationShell.currentIndex,
     );
     if (index == 0) {
       ref.read(homeControllerProvider.notifier).load();
@@ -31,11 +76,11 @@ class ScaffoldWithNestedNavigation extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return Scaffold(
-      body: navigationShell,
+      body: widget.navigationShell,
       bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
+        selectedIndex: widget.navigationShell.currentIndex,
         onDestinationSelected: (index) => _onTap(context, ref, index),
         destinations: const [
           NavigationDestination(
