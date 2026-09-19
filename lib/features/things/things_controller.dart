@@ -5,6 +5,7 @@ import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum ThingsLoad { loading, ready, noProfile, contentError, runtimeError }
@@ -83,10 +84,10 @@ class ThingsState {
       return false;
     }
     if (item.usagePolicy == ItemUsagePolicy.toothbrush) {
-      if (period!.status == GamePeriodStatus.active) {
+      if (VirtualDayRules.morningToothbrushAvailable(period!.dayProgress)) {
         return usageOf(item.id, PetActionSlot.morning) == 0;
       }
-      if (period!.status == GamePeriodStatus.readyToFinish) {
+      if (VirtualDayRules.eveningToothbrushAvailable(period!.dayProgress)) {
         return usageOf(item.id, PetActionSlot.evening) == 0;
       }
       return false;
@@ -102,11 +103,13 @@ class ThingsState {
       return 'Аксессуар';
     }
     if (item.usagePolicy == ItemUsagePolicy.toothbrush) {
-      if (period?.status == GamePeriodStatus.active) {
+      if (period != null &&
+          VirtualDayRules.morningToothbrushAvailable(period!.dayProgress)) {
         if (usageOf(item.id, PetActionSlot.morning) > 0) {
           return 'Утром использовано';
         }
-      } else if (period?.status == GamePeriodStatus.readyToFinish) {
+      } else if (period != null &&
+          VirtualDayRules.eveningToothbrushAvailable(period!.dayProgress)) {
         if (usageOf(item.id, PetActionSlot.evening) > 0) {
           return 'Вечером использовано';
         }
@@ -123,7 +126,8 @@ class ThingsState {
 
   String actionButtonLabel(ShopItem item) {
     if (item.usagePolicy == ItemUsagePolicy.toothbrush &&
-        period?.status == GamePeriodStatus.readyToFinish) {
+        period != null &&
+        VirtualDayRules.eveningToothbrushAvailable(period!.dayProgress)) {
       return 'Почистить зубы вечером';
     }
     if (item.usagePolicy == ItemUsagePolicy.toothbrush) {
@@ -274,9 +278,13 @@ class ThingsController extends Notifier<ThingsState> {
 
     final PetActionSlot slot;
     if (item.usagePolicy == ItemUsagePolicy.toothbrush) {
-      if (current.period?.status == GamePeriodStatus.active) {
+      if (VirtualDayRules.morningToothbrushAvailable(
+        current.period!.dayProgress,
+      )) {
         slot = PetActionSlot.morning;
-      } else if (current.period?.status == GamePeriodStatus.readyToFinish) {
+      } else if (VirtualDayRules.eveningToothbrushAvailable(
+        current.period!.dayProgress,
+      )) {
         slot = PetActionSlot.evening;
       } else {
         return;

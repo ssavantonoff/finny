@@ -52,11 +52,13 @@ ID из required snapshot. Когда закрыты все required checkpoints
 `readyToFinish`, но не завершается автоматически. В этом состоянии optional
 финансовые действия остаются разрешены.
 
-Явный bedtime сначала даёт одно из четырёх решений: unresolved checkpoints
-блокируют сон; зелёные характеристики разрешают обычный сон; достижимая зелёная
-зона требует продолжить уход; fallback разрешён только когда точный расчёт
-canonical вещей, usage, бесплатных действий, магазина и wallet доказал
-невозможность достичь `70/70/70`. При sleep расчёт повторяется внутри SQLite
+Явный bedtime сначала проверяет persisted virtual progress: до `76` Core
+возвращает `tooEarly` независимо от статуса периода. После `76` unresolved
+checkpoints блокируют сон; зелёные характеристики разрешают обычный сон;
+достижимая зелёная зона требует продолжить уход; fallback разрешён только когда
+точный расчёт canonical вещей, usage, бесплатных действий, магазина, wallet и
+дополнительного natural decay доказал невозможность достичь `70/70/70`. При
+sleep расчёт повторяется внутри SQLite
 transaction, после чего вместе сохраняются ending wallet, `completedAt`, period,
 Pet и переход Stage 2 после Day 2 либо Stage 3 после Day 5. Вечерние значения не
 сбрасываются. Completed period недоступен для новых игровых транзакций, изменения
@@ -66,27 +68,41 @@ plan или checkpoints.
 той же transaction, что создание следующего периода и начисление base income.
 Wallet и savings переносятся; Day 1 утренний reset не получает.
 
-## Active-time Финни
+## Виртуальное время и потребности Финни
 
-Характеристики Финни изменяются Core-операциями, а не виджетами. В активном или
-готовом к завершению периоде `applyActiveElapsedTime` атомарно обновляет Pet и
-period-bound счётчики: за шесть минут foreground active-time дневной decay
-достигает максимумов `15` сытости, `10` ухода и `12` настроения. Persisted
-счётчики исключают повторное применение после restart. Реальное wall-clock время
-между вызовами, planning и completed не учитываются.
+Каждый период хранит `dayProgress` в диапазоне `0..100`. Фаза вычисляется, а не
+сохраняется отдельно: `0..34` — утро, `35..69` — день, `70..100` — вечер.
+Реальное ожидание, foreground/background и переходы по вкладкам progress и Pet
+не меняют.
+
+Время продвигают только canonical gameplay mutations: первое подтверждение
+плана `+10`, первые четыре кормления по `+8`, morning/evening toothbrush по
+`+6`, первые два обычных ухода по `+5`, первое required task completion `+30`,
+первое savings decision `+8` и первое поглаживание `+4`. Purchase, draft,
+выбор/claim цели и retries дают `+0`. Progress ограничен `100`.
+
+Natural decay вычисляется cumulative target от progress: к `100` он составляет
+`60` сытости, `20` ухода и `12` настроения. Каждая атомарная операция применяет
+только разницу target между старым и новым progress, затем canonical effect и
+clamp `0..100`. Поэтому дробление действий и restart не меняют результат.
+Новый Финни начинает Day 1 с `55/80/80`; формула следующего утра Day 2–5
+сохраняет прежнюю базовую семантику `40`.
 
 ## Использование вещей и взаимодействия
 
 `ItemUseService.useItem` принимает item ID, перечитывает canonical content и не
 доверяет caller-значениям эффектов или usage policy. В `active` и
-`readyToFinish` repository атомарно применяет stat effect, уменьшает quantity
-расходника и фиксирует period-bound usage. Постоянные предметы не расходуются:
-расчёска и каждая игрушка доступны один раз за период, а зубная щётка имеет
-раздельные morning/evening slots. Morning доступен только в `active`, evening —
-после перехода в `readyToFinish`.
+`readyToFinish` repository атомарно применяет natural decay, stat effect,
+virtual progress, уменьшает quantity расходника и фиксирует period-bound usage.
+Постоянные предметы не расходуются: расчёска и каждая игрушка доступны один раз
+за период, а зубная щётка имеет раздельные morning/evening slots. Slot
+определяется по progress до действия: morning `<35`, evening `>=70`, в `35..69`
+щётка недоступна. Каждый initialized profile получает `care_toothbrush` один раз
+без wallet transaction.
 
-Бесплатные действия `погладить` (+20 mood) и `поиграть` (+25 mood) имеют
-отдельные once-per-period usage records. Успешные item/free операции сохраняют
+Бесплатное действие `погладить` даёт `+5 mood` и `+4 progress` один раз за
+период. Старое one-tap `поиграть` больше не является production gameplay path.
+Успешные item/free операции сохраняют
 `operationId`: тот же payload является безопасным replay даже после завершения
 периода, а повтор ID с другим action/slot отклоняется. Новый period получает
 новый namespace usage автоматически; restart текущего периода ничего не

@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../helpers/test_content_repository.dart';
+import '../helpers/test_database.dart';
 import '../helpers/task_progress_schema.dart';
 
 void main() {
@@ -185,7 +186,8 @@ void main() {
             );
         resumed = (result as TaskAnswerCompleted).period;
       } else {
-        resumed = await games.resolveCheckpoint(
+        resumed = await resolveCheckpointForTest(
+          migratedDatabase,
           profileId: 1,
           periodId: resumed.id!,
           checkpointId: checkpoint,

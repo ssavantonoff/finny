@@ -6,6 +6,7 @@ import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
+import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -101,7 +102,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted || decision == null) return;
     var allowFallback = false;
     switch (decision.type) {
+      case BedtimeDecisionType.tooEarly:
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Ещё рано спать'),
+            content: const Text(
+              'У Финни ещё есть время для дел и заботы. Вернись к нему позже.',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Хорошо'),
+              ),
+            ],
+          ),
+        );
+        return;
       case BedtimeDecisionType.blockedByCheckpoints:
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Перед сном осталось важное дело'),
+            content: Text(
+              decision.unresolvedCheckpoints
+                  .map(_checkpointBlockerText)
+                  .join('\n\n'),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Вернуться'),
+              ),
+            ],
+          ),
+        );
         return;
       case BedtimeDecisionType.ready:
         final confirmed = await showDialog<bool>(
@@ -206,6 +241,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (stats.contains(PetStat.mood)) 'Настроение',
   ].join(', ');
 
+  String _checkpointBlockerText(String checkpoint) => switch (checkpoint) {
+    'financial_task' => 'Осталось выполнить сегодняшнее финансовое задание.',
+    'savings_decision' =>
+      'Осталось решить, будешь ли ты сегодня откладывать монеты.',
+    'changed_circumstance' =>
+      'Осталось разобраться с сегодняшней неожиданной ситуацией.',
+    'discount_decision' =>
+      'Осталось принять решение о сегодняшнем предложении.',
+    _ => 'Осталось завершить одно важное дело этого дня.',
+  };
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(homeControllerProvider);
@@ -290,10 +336,18 @@ class _HomeContent extends StatelessWidget {
     final canPet =
         periodAllowsPetAction && state.petUsageCount == 0 && !state.interacting;
 
-    final canPlay =
-        periodAllowsPetAction &&
-        state.playUsageCount == 0 &&
-        !state.interacting;
+    final dayProgress = period?.dayProgress ?? 0;
+    final progressFraction = dayProgress / VirtualDayRules.maxProgress;
+    final skyTop = Color.lerp(
+      const Color(0xFFFFE0B2),
+      const Color(0xFF81D4FA),
+      (progressFraction * 2).clamp(0.0, 1.0),
+    )!;
+    final skyBottom = Color.lerp(
+      const Color(0xFFB3E5FC),
+      const Color(0xFF9575CD),
+      ((progressFraction - 0.5) * 2).clamp(0.0, 1.0),
+    )!;
 
     return Scaffold(
       appBar: AppBar(
@@ -322,11 +376,13 @@ class _HomeContent extends StatelessWidget {
                 children: [
                   // Pet Room Atmosphere
                   Container(
+                    key: const Key('home-day-sky'),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.4),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [skyTop, skyBottom],
+                      ),
                       borderRadius: BorderRadius.circular(24),
                     ),
                     padding: const EdgeInsets.symmetric(
@@ -335,6 +391,35 @@ class _HomeContent extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
+                        SizedBox(
+                          height: 42,
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              const diameter = 28.0;
+                              final travel = (constraints.maxWidth - diameter)
+                                  .clamp(0.0, double.infinity);
+                              final distanceFromNoon =
+                                  (progressFraction * 2 - 1).abs();
+                              return Stack(
+                                children: [
+                                  Positioned(
+                                    left: travel * progressFraction,
+                                    top: 2 + 12 * distanceFromNoon,
+                                    child: Container(
+                                      key: const Key('home-sun'),
+                                      width: diameter,
+                                      height: diameter,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Color(0xFFFFD54F),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
                         // 3 Stat Indicators
                         Row(
                           children: [
@@ -387,44 +472,19 @@ class _HomeContent extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.small),
                         // Free Interactions
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                key: const Key('home-free-pet'),
-                                onPressed: canPet
-                                    ? () => controller.performFreeInteraction(
-                                        FreePetInteraction.pet,
-                                      )
-                                    : null,
-                                icon: const Icon(Icons.favorite_outline),
-                                label: Text(
-                                  state.petUsageCount > 0
-                                      ? 'Погладить ✓'
-                                      : 'Погладить',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.small),
-                            Expanded(
-                              child: FilledButton.tonalIcon(
-                                key: const Key('home-free-play'),
-                                onPressed: canPlay
-                                    ? () => controller.performFreeInteraction(
-                                        FreePetInteraction.play,
-                                      )
-                                    : null,
-                                icon: const Icon(
-                                  Icons.sports_baseball_outlined,
-                                ),
-                                label: Text(
-                                  state.playUsageCount > 0
-                                      ? 'Поиграть ✓'
-                                      : 'Поиграть',
-                                ),
-                              ),
-                            ),
-                          ],
+                        FilledButton.tonalIcon(
+                          key: const Key('home-free-pet'),
+                          onPressed: canPet
+                              ? () => controller.performFreeInteraction(
+                                  FreePetInteraction.pet,
+                                )
+                              : null,
+                          icon: const Icon(Icons.favorite_outline),
+                          label: Text(
+                            state.petUsageCount > 0
+                                ? 'Погладить ✓'
+                                : 'Погладить',
+                          ),
                         ),
                       ],
                     ),
@@ -471,13 +531,9 @@ class _HomeContent extends StatelessWidget {
                       onPressed: () => context.go('/budget'),
                       child: const Text('Продолжить план'),
                     )
-                  else if (period.status == GamePeriodStatus.active)
-                    FilledButton(
-                      key: const Key('home-view-plan'),
-                      onPressed: () => context.go('/budget'),
-                      child: const Text('Посмотреть план'),
-                    )
-                  else if (period.status == GamePeriodStatus.readyToFinish)
+                  else if ((period.status == GamePeriodStatus.active ||
+                          period.status == GamePeriodStatus.readyToFinish) &&
+                      VirtualDayRules.bedtimeReached(period.dayProgress))
                     FilledButton(
                       key: const Key('home-finish-day'),
                       onPressed: state.finishingDay ? null : onFinishDay,
@@ -486,6 +542,13 @@ class _HomeContent extends StatelessWidget {
                             ? 'Укладываем…'
                             : 'Уложить Финни спать',
                       ),
+                    )
+                  else if (period.status == GamePeriodStatus.active ||
+                      period.status == GamePeriodStatus.readyToFinish)
+                    FilledButton(
+                      key: const Key('home-view-plan'),
+                      onPressed: () => context.go('/budget'),
+                      child: const Text('Посмотреть план'),
                     ),
                   // Compact "Today" block
                   if (period != null) ...[
@@ -557,7 +620,7 @@ class _TodayCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final checkpoints = period.requiredCheckpoints
-        .where((id) => id != 'mandatory_need')
+        .where((id) => id == 'financial_task' || id == 'savings_decision')
         .toList(growable: false);
 
     if (checkpoints.isEmpty) return const SizedBox.shrink();

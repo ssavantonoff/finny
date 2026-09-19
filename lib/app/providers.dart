@@ -5,11 +5,9 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
-import 'package:finny/services/active_gameplay_tracker.dart';
 import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/item_use_service.dart';
 import 'package:finny/services/period_service.dart';
-import 'package:finny/services/pet_state_service.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:finny/services/savings_service.dart';
 import 'package:finny/services/special_purchase_service.dart';
@@ -47,13 +45,6 @@ final profileRepositoryProvider = Provider<ProfileRepository>(
 
 final gameRepositoryProvider = Provider<GameRepository>(
   (ref) => SqliteGameRepository(ref.watch(appDatabaseProvider)),
-);
-
-final activeGameplayTrackerProvider = Provider<ActiveGameplayTracker>(
-  (ref) => ActiveGameplayTracker(
-    ref.watch(gameRepositoryProvider),
-    () => ref.read(activeProfileIdProvider),
-  ),
 );
 
 final _taskCompletionPortProvider = Provider<TaskCompletionPort>(
@@ -125,10 +116,6 @@ final taskServiceProvider = Provider<TaskService>(
     ref.watch(_taskCompletionPortProvider),
     ref.watch(contentRepositoryProvider),
   ),
-);
-
-final petStateServiceProvider = Provider<PetStateService>(
-  (ref) => PetStateService(ref.watch(gameRepositoryProvider)),
 );
 
 final itemUseServiceProvider = Provider<ItemUseService>(

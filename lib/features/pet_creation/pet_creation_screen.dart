@@ -136,9 +136,9 @@ class _PetCreationScreenState extends ConsumerState<PetCreationScreen> {
               patternId: _draft.patternId,
               developmentStage: 1,
               growthPoints: 0,
-              satiety: PetStateRules.initialValue,
-              care: PetStateRules.initialValue,
-              mood: PetStateRules.initialValue,
+              satiety: PetStateRules.dayOneInitialSatiety,
+              care: PetStateRules.dayOneInitialCare,
+              mood: PetStateRules.dayOneInitialMood,
             )
           : currentPet.copyWith(
               name: _draft.trimmedName,

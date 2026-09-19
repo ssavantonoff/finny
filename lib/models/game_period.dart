@@ -32,6 +32,7 @@ class GamePeriod {
     required this.resolvedCheckpoints,
     this.endWalletBalance,
     required this.growthPointsEarned,
+    this.dayProgress = 0,
     this.activeElapsedMilliseconds = 0,
     this.satietyDecayApplied = 0,
     this.careDecayApplied = 0,
@@ -59,6 +60,7 @@ class GamePeriod {
   final List<String> resolvedCheckpoints;
   final int? endWalletBalance;
   final int growthPointsEarned;
+  final int dayProgress;
   final int activeElapsedMilliseconds;
   final int satietyDecayApplied;
   final int careDecayApplied;
@@ -85,6 +87,7 @@ class GamePeriod {
     List<String>? resolvedCheckpoints,
     int? endWalletBalance,
     int? growthPointsEarned,
+    int? dayProgress,
     int? activeElapsedMilliseconds,
     int? satietyDecayApplied,
     int? careDecayApplied,
@@ -111,6 +114,7 @@ class GamePeriod {
       resolvedCheckpoints: resolvedCheckpoints ?? this.resolvedCheckpoints,
       endWalletBalance: endWalletBalance ?? this.endWalletBalance,
       growthPointsEarned: growthPointsEarned ?? this.growthPointsEarned,
+      dayProgress: dayProgress ?? this.dayProgress,
       activeElapsedMilliseconds:
           activeElapsedMilliseconds ?? this.activeElapsedMilliseconds,
       satietyDecayApplied: satietyDecayApplied ?? this.satietyDecayApplied,
@@ -141,6 +145,7 @@ class GamePeriod {
     'resolved_checkpoints': jsonEncode(resolvedCheckpoints),
     'end_wallet_balance': endWalletBalance,
     'growth_points_earned': growthPointsEarned,
+    'day_progress': dayProgress,
     'active_elapsed_milliseconds': activeElapsedMilliseconds,
     'satiety_decay_applied': satietyDecayApplied,
     'care_decay_applied': careDecayApplied,
@@ -175,6 +180,7 @@ class GamePeriod {
     ),
     endWalletBalance: map['end_wallet_balance'] as int?,
     growthPointsEarned: map['growth_points_earned'] as int,
+    dayProgress: map['day_progress'] as int? ?? 0,
     activeElapsedMilliseconds: map['active_elapsed_milliseconds'] as int? ?? 0,
     satietyDecayApplied: map['satiety_decay_applied'] as int? ?? 0,
     careDecayApplied: map['care_decay_applied'] as int? ?? 0,

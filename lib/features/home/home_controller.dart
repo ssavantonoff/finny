@@ -36,7 +36,6 @@ class HomeReady extends HomeViewState {
     required this.allDaysCompleted,
     this.activeGoal,
     this.petUsageCount = 0,
-    this.playUsageCount = 0,
     this.interacting = false,
     this.interactionNotice,
     this.pendingInteraction,
@@ -55,7 +54,6 @@ class HomeReady extends HomeViewState {
   final bool allDaysCompleted;
   final SavingsGoal? activeGoal;
   final int petUsageCount;
-  final int playUsageCount;
   final bool interacting;
   final String? interactionNotice;
   final ({FreePetInteraction interaction, String operationId})?
@@ -68,7 +66,6 @@ class HomeReady extends HomeViewState {
   HomeReady copyWith({
     SavingsGoal? activeGoal,
     int? petUsageCount,
-    int? playUsageCount,
     bool? interacting,
     String? interactionNotice,
     bool clearInteractionNotice = false,
@@ -88,7 +85,6 @@ class HomeReady extends HomeViewState {
     allDaysCompleted: allDaysCompleted,
     activeGoal: activeGoal ?? this.activeGoal,
     petUsageCount: petUsageCount ?? this.petUsageCount,
-    playUsageCount: playUsageCount ?? this.playUsageCount,
     interacting: interacting ?? this.interacting,
     interactionNotice: clearInteractionNotice
         ? null
@@ -171,7 +167,8 @@ class HomeController extends Notifier<HomeViewState> {
     final period = current is HomeReady ? current.period : null;
     if (current is! HomeReady ||
         period?.id == null ||
-        period!.status != GamePeriodStatus.readyToFinish) {
+        (period!.status != GamePeriodStatus.active &&
+            period.status != GamePeriodStatus.readyToFinish)) {
       return null;
     }
     try {
@@ -193,13 +190,13 @@ class HomeController extends Notifier<HomeViewState> {
     if (_finishingDay ||
         current is! HomeReady ||
         period?.id == null ||
-        period!.status != GamePeriodStatus.readyToFinish) {
+        (period!.status != GamePeriodStatus.active &&
+            period.status != GamePeriodStatus.readyToFinish)) {
       return false;
     }
     _finishingDay = true;
     state = current.copyWith(finishingDay: true, finishFailed: false);
     try {
-      await ref.read(activeGameplayTrackerProvider).flush();
       await ref
           .read(dayLifecycleServiceProvider)
           .sleep(
@@ -351,7 +348,6 @@ class HomeController extends Notifier<HomeViewState> {
       }
 
       int petUsageCount = 0;
-      int playUsageCount = 0;
       if (period != null &&
           period.id != null &&
           (period.status == GamePeriodStatus.active ||
@@ -362,14 +358,6 @@ class HomeController extends Notifier<HomeViewState> {
               profileId: profileId,
               periodId: period.id!,
               actionId: FreePetInteraction.pet.actionId,
-              slot: PetActionSlot.defaultSlot,
-            );
-        playUsageCount = await ref
-            .read(gameRepositoryProvider)
-            .getPetDailyUsageCount(
-              profileId: profileId,
-              periodId: period.id!,
-              actionId: FreePetInteraction.play.actionId,
               slot: PetActionSlot.defaultSlot,
             );
       }
@@ -389,7 +377,6 @@ class HomeController extends Notifier<HomeViewState> {
             periods.every((item) => item.status == GamePeriodStatus.completed),
         activeGoal: activeGoal,
         petUsageCount: petUsageCount,
-        playUsageCount: playUsageCount,
         pendingInteraction: _pendingInteraction,
       );
     } catch (_) {

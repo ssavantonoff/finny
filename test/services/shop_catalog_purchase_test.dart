@@ -84,7 +84,7 @@ void main() {
       );
       expect(transactions.last.type, GameTransactionType.needExpense);
       final pet = (await games.getPet(profileId))!;
-      expect((pet.satiety, pet.care, pet.mood), (40, 40, 40));
+      expect((pet.satiety, pet.care, pet.mood), (34, 38, 39));
       expect(await (await database.database).query('pet_daily_usage'), isEmpty);
       expect(
         await (await database.database).query('pet_action_operations'),
@@ -125,7 +125,7 @@ void main() {
       hasLength(1),
     );
     final pet = (await games.getPet(profileId))!;
-    expect((pet.satiety, pet.care, pet.mood), (40, 40, 40));
+    expect((pet.satiety, pet.care, pet.mood), (34, 38, 39));
     expect(await (await database.database).query('pet_daily_usage'), isEmpty);
   });
 
@@ -141,7 +141,7 @@ void main() {
       expect((await games.getGameState(profileId))!.walletBalance, 940);
       expect(await games.getInventoryQuantity(profileId, 'food_treat'), 1);
       final pet = (await games.getPet(profileId))!;
-      expect((pet.satiety, pet.care, pet.mood), (40, 40, 40));
+      expect((pet.satiety, pet.care, pet.mood), (34, 38, 39));
       final afterUse =
           await ItemUseService(
             SqlitePetActionPort(database),
@@ -152,7 +152,7 @@ void main() {
             itemId: 'food_treat',
             operationId: 'use-treat',
           );
-      expect((afterUse.satiety, afterUse.care, afterUse.mood), (50, 40, 50));
+      expect((afterUse.satiety, afterUse.care, afterUse.mood), (40, 37, 48));
       expect(await games.getInventoryQuantity(profileId, 'food_treat'), 0);
     },
   );
