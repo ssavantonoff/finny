@@ -193,6 +193,7 @@ void main() {
       final completed = await submit(player) as TaskAnswerCompleted;
       expect(completed.rewardAppliedNow, isTrue);
       expect(completed.gameState.walletBalance, 550);
+      expect(completed.period.dayProgress, 40);
     },
   );
 
@@ -206,6 +207,7 @@ void main() {
       expect(completed.wasAlreadyCompleted, isFalse);
       expect(completed.gameState.walletBalance, 550);
       expect(completed.period.status, GamePeriodStatus.active);
+      expect(completed.period.dayProgress, 40);
       expect(completed.period.resolvedCheckpoints, ['financial_task']);
       final rewards = (await games.getTransactions(player.profileId))
           .where((entry) => entry.type == GameTransactionType.taskReward)
@@ -238,6 +240,7 @@ void main() {
       expect(readyReplay.wasAlreadyCompleted, isTrue);
       expect(readyReplay.rewardAppliedNow, isFalse);
       expect(readyReplay.gameState.walletBalance, 550);
+      expect(readyReplay.period.dayProgress, 40);
       await completePeriodForTest(
         database,
         profileId: player.profileId,
@@ -266,6 +269,13 @@ void main() {
       hasLength(1),
     );
     expect((await games.getGameState(player.profileId))?.walletBalance, 550);
+    expect(
+      (await games.getPeriodById(
+        player.profileId,
+        player.period.id!,
+      ))?.dayProgress,
+      40,
+    );
     expect(
       (await games.getTransactions(player.profileId))
           .where((entry) => entry.type == GameTransactionType.taskReward),

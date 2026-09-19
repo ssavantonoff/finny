@@ -7,7 +7,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 8;
+  static const schemaVersion = 9;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -98,6 +98,8 @@ class AppDatabase {
         resolved_checkpoints TEXT NOT NULL DEFAULT '[]',
         end_wallet_balance INTEGER CHECK (end_wallet_balance >= 0),
         growth_points_earned INTEGER NOT NULL DEFAULT 0 CHECK (growth_points_earned >= 0),
+        day_progress INTEGER NOT NULL DEFAULT 0
+          CHECK (day_progress BETWEEN 0 AND 100),
         active_elapsed_milliseconds INTEGER NOT NULL DEFAULT 0
           CHECK (active_elapsed_milliseconds BETWEEN 0 AND 360000),
         satiety_decay_applied INTEGER NOT NULL DEFAULT 0
@@ -257,6 +259,53 @@ class AppDatabase {
     }
     if (oldVersion < 8) {
       await _migrateDayLifecycleV8(db);
+    }
+    if (oldVersion < 9) {
+      await _migrateVirtualDayV9(db);
+    }
+  }
+
+  static Future<void> _migrateVirtualDayV9(sqflite.DatabaseExecutor db) async {
+    final periodColumns = await db.rawQuery('PRAGMA table_info(game_periods)');
+    final hadDayProgress = periodColumns.any(
+      (column) => column['name'] == 'day_progress',
+    );
+    await _addColumnIfMissing(
+      db,
+      table: 'game_periods',
+      column: 'day_progress',
+      definition:
+          'INTEGER NOT NULL DEFAULT 0 CHECK (day_progress BETWEEN 0 AND 100)',
+    );
+    if (!hadDayProgress) {
+      final hasElapsed = periodColumns.any(
+        (column) => column['name'] == 'active_elapsed_milliseconds',
+      );
+      final activeProgress = hasElapsed
+          ? 'MIN(69, CAST(active_elapsed_milliseconds * 69 / 360000 AS INTEGER))'
+          : '0';
+      await db.execute('''
+        UPDATE game_periods
+        SET day_progress = CASE status
+          WHEN 'planning' THEN 0
+          WHEN 'readyToFinish' THEN 76
+          WHEN 'completed' THEN 100
+          WHEN 'active' THEN $activeProgress
+          ELSE 0
+        END
+      ''');
+    }
+    final inventoryTable = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'inventory'",
+    );
+    if (inventoryTable.isNotEmpty) {
+      await db.execute('''
+        INSERT OR IGNORE INTO inventory (
+          profile_id, item_id, quantity, acquired_at
+        )
+        SELECT id, 'care_toothbrush', 1, created_at
+        FROM profiles
+      ''');
     }
   }
 

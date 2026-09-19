@@ -1,4 +1,5 @@
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/task_submission_result.dart';
@@ -152,17 +153,80 @@ void main() {
             operationId: 'campaign-day$day-use-$itemId',
           );
         }
+        await purchases.purchase(
+          profileId: profileId,
+          periodId: period.id!,
+          itemId: 'food_feed',
+          operationId: 'campaign-day$day-buy-food-feed-second',
+        );
+        await itemUse.useItem(
+          profileId: profileId,
+          periodId: period.id!,
+          itemId: 'food_feed',
+          operationId: 'campaign-day$day-use-food-feed-second',
+        );
+        if (day == 1) {
+          await purchases.purchase(
+            profileId: profileId,
+            periodId: period.id!,
+            itemId: 'toy_ball',
+            operationId: 'campaign-buy-toy-ball',
+          );
+        }
+        await itemUse.useItem(
+          profileId: profileId,
+          periodId: period.id!,
+          itemId: 'toy_ball',
+          operationId: 'campaign-day$day-use-toy-ball',
+        );
         await itemUse.performFreeInteraction(
           profileId: profileId,
           periodId: period.id!,
           interaction: FreePetInteraction.pet,
           operationId: 'campaign-day$day-pet',
         );
-        await itemUse.performFreeInteraction(
+        if (day >= 3) {
+          await purchases.purchase(
+            profileId: profileId,
+            periodId: period.id!,
+            itemId: 'food_treat',
+            operationId: 'campaign-day$day-buy-food-treat',
+          );
+          await itemUse.useItem(
+            profileId: profileId,
+            periodId: period.id!,
+            itemId: 'food_treat',
+            operationId: 'campaign-day$day-use-food-treat',
+          );
+        }
+        await itemUse.useItem(
           profileId: profileId,
           periodId: period.id!,
-          interaction: FreePetInteraction.play,
-          operationId: 'campaign-day$day-play',
+          itemId: 'care_toothbrush',
+          operationId: 'campaign-day$day-brush-evening',
+          slot: PetActionSlot.evening,
+        );
+        await purchases.purchase(
+          profileId: profileId,
+          periodId: period.id!,
+          itemId: 'care_shampoo',
+          operationId: 'campaign-day$day-buy-care-shampoo-second',
+        );
+        await itemUse.useItem(
+          profileId: profileId,
+          periodId: period.id!,
+          itemId: 'care_shampoo',
+          operationId: 'campaign-day$day-use-care-shampoo-second',
+        );
+
+        final bedtime = await lifecycle.evaluateBedtime(
+          profileId: profileId,
+          periodId: period.id!,
+        );
+        expect(
+          bedtime.type,
+          BedtimeDecisionType.ready,
+          reason: 'Day $day must remain completable',
         );
 
         final result = await lifecycle.sleep(

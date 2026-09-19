@@ -338,6 +338,7 @@ void main() {
       periodId: period.id!,
     );
     expect(confirmed.status, GamePeriodStatus.active);
+    expect(confirmed.dayProgress, 10);
     expect((await games.getGameState(profile.id!))?.walletBalance, 500);
     await expectLater(
       budgets.saveDraft(
@@ -347,10 +348,12 @@ void main() {
       ),
       throwsStateError,
     );
-    await expectLater(
-      budgets.confirmPlan(profileId: profile.id!, periodId: period.id!),
-      throwsStateError,
+    final replay = await budgets.confirmPlan(
+      profileId: profile.id!,
+      periodId: period.id!,
     );
+    expect(replay.dayProgress, confirmed.dayProgress);
+    expect(replay.dayProgress, 10);
   });
 
   test('zero budget plan is valid and keeps all money as remainder', () async {

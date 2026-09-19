@@ -173,6 +173,7 @@ void main() {
       period = (await games.getPeriodById(profileId, period.id!))!;
       expect(period.actualSavings, 150);
       expect(period.resolvedCheckpoints, contains('savings_decision'));
+      expect(period.dayProgress, 18);
 
       final replay = await savings.deposit(
         profileId: profileId,
@@ -184,6 +185,10 @@ void main() {
       expect(
         (await games.getPeriodById(profileId, period.id!))!.actualSavings,
         150,
+      );
+      expect(
+        (await games.getPeriodById(profileId, period.id!))!.dayProgress,
+        18,
       );
       expect(
         await games.getTransactions(profileId, periodId: period.id),
@@ -297,6 +302,7 @@ void main() {
       );
       expect(period.status, GamePeriodStatus.readyToFinish);
       expect(period.actualSavings, 0);
+      expect(period.dayProgress, 48);
       expect(
         await games.getTransactions(profileId, periodId: period.id),
         hasLength(2),
@@ -311,6 +317,7 @@ void main() {
       final updated = (await games.getPeriodById(profileId, period.id!))!;
       expect(updated.status, GamePeriodStatus.readyToFinish);
       expect(updated.actualSavings, 50);
+      expect(updated.dayProgress, 48);
       expect(
         updated.resolvedCheckpoints.where((id) => id == 'savings_decision'),
         hasLength(1),

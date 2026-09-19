@@ -35,7 +35,9 @@ SQLite хранит только состояние конкретного ло�
 транзакции выполняются в одной SQLite transaction.
 `GameRepository.ensureInitialState(profileId)` атомарно создаёт нулевое
 состояние только при его отсутствии; повторные вызовы возвращают
-существующие balances и progress без изменений.
+существующие balances и progress без изменений. В той же bootstrap boundary
+profile-isolated и идемпотентно выдаётся starter `care_toothbrush`, без списания
+wallet и fake transaction.
 
 JSON в `assets/content/` описывает доступный контент: задания, товары, цели,
 периоды и словарь. `ContentRepository` скрывает загрузку через `AssetBundle` и
@@ -69,28 +71,31 @@ Period Summary. Required/resolved checkpoints сохраняются snapshot-с
 ## Pet state core
 
 `pets` хранит три характеристики Финни в диапазоне `0..100`: сытость, уход и
-настроение. Для нового Финни canonical начальное значение каждой характеристики
-равно 40. UI не вычисляет ухудшение самостоятельно: `PetStateService` передаёт
-фактически накопленное foreground active-time в атомарный repository-контракт.
+настроение. Новый Финни начинает Day 1 с `55/80/80`; отдельная прежняя база `40`
+сохраняется для формулы утра Day 2–5.
 
-Active-time и уже применённый decay сохраняются в конкретном `game_periods`.
-За первые шесть минут активного игрового времени линейно набираются дневные
-максимумы `15/10/12`; после этого дальнейшее время состояние не снижает.
-`planning` и `completed` не принимают decay. Таблица `pet_daily_usage` является
-period-bound источником лимитов item/free actions. `ItemUseService` перечитывает
-canonical item по ID, а repository одной SQLite transaction обновляет Pet,
-quantity расходника и usage. Постоянные предметы не расходуются; их лимиты,
-morning/evening slots зубной щётки и бесплатные взаимодействия переживают
-restart и автоматически отделены новым period ID. `pet_action_operations`
-хранит durable proof для безопасного replay по `operationId`. Расчёт значений
-следующего утра детерминирован и не привязан к реальному календарному времени.
+`game_periods.day_progress` хранит виртуальный progress `0..100`; фазы
+`morning/daytime/evening` выводятся по порогам `35/70`, а bedtime открывается с
+`76`. UI не может передать произвольный progress или effect. Узкие internal
+ports связывают canonical plan/task/savings/item/petting mutation с изменением
+progress, cumulative natural decay (`60/20/12` к концу дня), effect, usage и
+idempotency proof в одной SQLite transaction. Реальное foreground/background
+время Pet не меняет; прежний tracker и публичный elapsed-time mutation удалены.
 
-Единый foreground tracker охватывает все пять игровых вкладок и периодически
-передаёт Core только время в состоянии `resumed`; background, planning, summary
-и completed не учитываются. Завершение дня проходит через
+Таблица `pet_daily_usage` является period-bound источником лимитов item/free
+actions и time-bearing кормлений/ухода. `ItemUseService` перечитывает canonical
+item по ID, а repository одной SQLite transaction обновляет Pet, progress,
+quantity расходника и usage. Постоянные предметы не расходуются; их лимиты и
+morning/evening slots зубной щётки переживают restart и автоматически отделены
+новым period ID. `pet_action_operations` хранит durable proof для безопасного
+replay по `operationId`. Расчёт значений следующего утра детерминирован и не
+привязан к реальному календарному времени.
+
+Завершение дня проходит через
 `DayLifecycleService` и приватный `DayLifecyclePort`: Core проверяет checkpoints,
-зелёную зону или точную достижимость ухода из canonical inventory/shop и затем
-одной transaction фиксирует ending wallet, период и стадию питомца. Следующее
+порог progress `76`, зелёную зону или точную достижимость ухода из canonical
+inventory/shop с учётом virtual decay и затем одной transaction фиксирует ending
+wallet, период и стадию питомца. Следующее
 утро применяется атомарно со стартом Day 2–5 через `PetStateRules.nextMorningPet`.
 Стадии не зависят от XP: новый Финни начинает с Stage 1, Day 2 переводит его в
 Stage 2, Day 5 — в Stage 3.
@@ -158,7 +163,7 @@ Summary; после Day 2 и Day 5 используется `/progress`, а сл
 
 ## Миграции
 
-Текущая schema version — 8. Миграция v1 → v2 добавляет period definition identity,
+Текущая schema version — 9. Миграция v1 → v2 добавляет period definition identity,
 required/resolved checkpoint snapshots и индекс period transactions, не удаляя
 существующие профили, balances, планы или историю. Для прежних периодов 1–5
 identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
@@ -174,6 +179,9 @@ usage или Pet. Миграция v6 → v7 добавляет только `pe
 runtime-данные не переписываются. Миграция v7 → v8 удаляет legacy
 `mandatory_need` из period snapshots с сохранением порядка остальных
 checkpoints, корректирует полностью решённый active period в `readyToFinish` и
-нормализует Stage 0 в Stage 1 без сброса runtime-данных. Следующие
+нормализует Stage 0 в Stage 1 без сброса runtime-данных. Миграция v8 → v9
+добавляет `day_progress`, безопасно отображает planning/ready/completed и legacy
+active elapsed-time в `0/76/100/0..69`, не пересчитывает существующие Pet stats и
+идемпотентно выдаёт каждому профилю starter toothbrush. Следующие
 изменения схемы должны добавлять последовательные миграции; нельзя пересоздавать
 базу с потерей NORMAL-профиля.

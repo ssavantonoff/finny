@@ -49,7 +49,21 @@ const comb = ShopItem(
   effectType: 'care',
   effectValue: 25,
   unlockType: 'available',
+  displaySection: ShopDisplaySection.care,
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+
+const shampoo = ShopItem(
+  id: 'care_shampoo',
+  name: 'Шампунь',
+  category: ShopItemCategory.need,
+  price: 60,
+  persistent: false,
+  effectType: 'care',
+  effectValue: 40,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.care,
+  usagePolicy: ItemUsagePolicy.unlimited,
 );
 
 const toothbrush = ShopItem(
@@ -61,6 +75,7 @@ const toothbrush = ShopItem(
   effectType: 'care',
   effectValue: 8,
   unlockType: 'available',
+  displaySection: ShopDisplaySection.care,
   usagePolicy: ItemUsagePolicy.toothbrush,
 );
 
@@ -73,6 +88,7 @@ const ball = ShopItem(
   effectType: 'mood',
   effectValue: 35,
   unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
 );
 
@@ -85,10 +101,11 @@ const frisbee = ShopItem(
   effectType: 'mood',
   effectValue: 40,
   unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
 );
 
-const items = [apple, treat, comb, toothbrush, ball, frisbee];
+const items = [apple, treat, comb, shampoo, toothbrush, ball, frisbee];
 
 typedef ActivePlayer = ({int profileId, GamePeriod period});
 
@@ -158,12 +175,19 @@ void main() {
   }
 
   Future<void> grant(int profileId, ShopItem item, {int quantity = 1}) async {
-    await (await database.database).insert('inventory', {
-      'profile_id': profileId,
-      'item_id': item.id,
-      'quantity': quantity,
-      'acquired_at': DateTime.utc(2026, 9, 18).toIso8601String(),
-    });
+    await (await database.database).rawInsert(
+      '''
+      INSERT INTO inventory (profile_id, item_id, quantity, acquired_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(profile_id, item_id) DO UPDATE SET quantity = excluded.quantity
+      ''',
+      [
+        profileId,
+        item.id,
+        quantity,
+        DateTime.utc(2026, 9, 18).toIso8601String(),
+      ],
+    );
   }
 
   Future<GamePeriod> startNextPeriod(ActivePlayer player) async {
@@ -227,6 +251,83 @@ void main() {
     },
   );
 
+  test('only first four feedings advance time and replay is inert', () async {
+    final player = await createPlayer(satiety: 50, care: 80, mood: 80);
+    await grant(player.profileId, apple, quantity: 5);
+
+    for (var use = 1; use <= 5; use++) {
+      await service.useItem(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+        itemId: apple.id,
+        operationId: 'feeding-$use',
+      );
+    }
+    final afterFive = await games.getPeriodById(
+      player.profileId,
+      player.period.id!,
+    );
+    expect(afterFive?.dayProgress, 42);
+    expect((await games.getPet(player.profileId))?.satiety, 100);
+    expect(await games.getInventoryQuantity(player.profileId, apple.id), 0);
+    expect(
+      await games.getPetDailyUsageCount(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+        actionId: 'time:feeding',
+        slot: PetActionSlot.defaultSlot,
+      ),
+      5,
+    );
+
+    await service.useItem(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      itemId: apple.id,
+      operationId: 'feeding-5',
+    );
+    expect(
+      (await games.getPeriodById(
+        player.profileId,
+        player.period.id!,
+      ))?.dayProgress,
+      42,
+    );
+    expect(await games.getInventoryQuantity(player.profileId, apple.id), 0);
+  });
+
+  test('only first two ordinary care uses advance time', () async {
+    final player = await createPlayer(care: 40);
+    await grant(player.profileId, shampoo, quantity: 3);
+
+    for (var use = 1; use <= 3; use++) {
+      await service.useItem(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+        itemId: shampoo.id,
+        operationId: 'care-$use',
+      );
+    }
+    expect(
+      (await games.getPeriodById(
+        player.profileId,
+        player.period.id!,
+      ))?.dayProgress,
+      20,
+    );
+    expect((await games.getPet(player.profileId))?.care, 100);
+    expect(await games.getInventoryQuantity(player.profileId, shampoo.id), 0);
+    expect(
+      await games.getPetDailyUsageCount(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+        actionId: 'time:care',
+        slot: PetActionSlot.defaultSlot,
+      ),
+      3,
+    );
+  });
+
   test('zero quantity rejects use without pet or usage changes', () async {
     final player = await createPlayer();
 
@@ -241,7 +342,7 @@ void main() {
     );
 
     final pet = await games.getPet(player.profileId);
-    expect((pet?.satiety, pet?.care, pet?.mood), (40, 40, 40));
+    expect((pet?.satiety, pet?.care, pet?.mood), (34, 38, 39));
     expect(await (await database.database).query('pet_daily_usage'), isEmpty);
     expect(
       await (await database.database).query('pet_action_operations'),
@@ -259,7 +360,7 @@ void main() {
       itemId: comb.id,
       operationId: 'comb-1',
     );
-    expect(first.care, 65);
+    expect(first.care, 62);
     expect(await games.getInventoryQuantity(player.profileId, comb.id), 1);
 
     await expectLater(
@@ -271,7 +372,7 @@ void main() {
       ),
       throwsA(isA<PetActionAlreadyUsedException>()),
     );
-    expect((await games.getPet(player.profileId))?.care, 65);
+    expect((await games.getPet(player.profileId))?.care, 62);
 
     final next = await startNextPeriod(player);
     final nextUse = await service.useItem(
@@ -280,7 +381,7 @@ void main() {
       itemId: comb.id,
       operationId: 'comb-next-day',
     );
-    expect(nextUse.care, 60);
+    expect(nextUse.care, 57);
     expect(await games.getInventoryQuantity(player.profileId, comb.id), 1);
   });
 
@@ -345,10 +446,12 @@ void main() {
       throwsA(isA<PetActionSlotUnavailableException>()),
     );
 
-    await games.resolveCheckpoint(
-      profileId: player.profileId,
-      periodId: player.period.id!,
-      checkpointId: 'done',
+    final db = await database.database;
+    await db.update(
+      'game_periods',
+      {'day_progress': 35},
+      where: 'id = ?',
+      whereArgs: [player.period.id],
     );
     await expectLater(
       service.useItem(
@@ -360,6 +463,12 @@ void main() {
       ),
       throwsA(isA<PetActionSlotUnavailableException>()),
     );
+    await db.update(
+      'game_periods',
+      {'day_progress': 70},
+      where: 'id = ?',
+      whereArgs: [player.period.id],
+    );
     final evening = await service.useItem(
       profileId: player.profileId,
       periodId: player.period.id!,
@@ -367,7 +476,7 @@ void main() {
       operationId: 'brush-evening',
       slot: PetActionSlot.evening,
     );
-    expect(evening.care, 56);
+    expect(evening.care, 52);
     await expectLater(
       service.useItem(
         profileId: player.profileId,
@@ -380,45 +489,88 @@ void main() {
     );
   });
 
-  test(
-    'free pet and play interactions are independent and once per period',
-    () async {
-      final player = await createPlayer();
+  test('toothbrush slot is determined from progress before its cost', () async {
+    final player = await createPlayer(care: 50);
+    final db = await database.database;
+    await db.update(
+      'game_periods',
+      {'day_progress': 34},
+      where: 'id = ?',
+      whereArgs: [player.period.id],
+    );
+    await games.savePet(
+      (await games.getPet(player.profileId))!.copyWith(care: 50),
+    );
 
-      await service.performFreeInteraction(
+    final result = await service.useItem(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      itemId: toothbrush.id,
+      operationId: 'brush-crosses-morning-boundary',
+      slot: PetActionSlot.morning,
+    );
+    expect(result.care, 56);
+    expect(
+      (await games.getPeriodById(
+        player.profileId,
+        player.period.id!,
+      ))?.dayProgress,
+      40,
+    );
+  });
+
+  test('free petting is once per period and resets next period', () async {
+    final player = await createPlayer();
+
+    await service.performFreeInteraction(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      interaction: FreePetInteraction.pet,
+      operationId: 'free-pet',
+    );
+    expect((await games.getPet(player.profileId))?.mood, 44);
+    expect(
+      (await games.getPeriodById(
+        player.profileId,
+        player.period.id!,
+      ))?.dayProgress,
+      14,
+    );
+
+    final replay = await service.performFreeInteraction(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      interaction: FreePetInteraction.pet,
+      operationId: 'free-pet',
+    );
+    expect(replay.mood, 44);
+    expect(
+      (await games.getPeriodById(
+        player.profileId,
+        player.period.id!,
+      ))?.dayProgress,
+      14,
+    );
+
+    await expectLater(
+      service.performFreeInteraction(
         profileId: player.profileId,
         periodId: player.period.id!,
         interaction: FreePetInteraction.pet,
-        operationId: 'free-pet',
-      );
-      final played = await service.performFreeInteraction(
-        profileId: player.profileId,
-        periodId: player.period.id!,
-        interaction: FreePetInteraction.play,
-        operationId: 'free-play',
-      );
-      expect(played.mood, 85);
+        operationId: 'free-pet-again',
+      ),
+      throwsA(isA<PetActionAlreadyUsedException>()),
+    );
 
-      await expectLater(
-        service.performFreeInteraction(
-          profileId: player.profileId,
-          periodId: player.period.id!,
-          interaction: FreePetInteraction.pet,
-          operationId: 'free-pet-again',
-        ),
-        throwsA(isA<PetActionAlreadyUsedException>()),
-      );
-
-      final next = await startNextPeriod(player);
-      final nextPet = await service.performFreeInteraction(
-        profileId: player.profileId,
-        periodId: next.id!,
-        interaction: FreePetInteraction.pet,
-        operationId: 'free-pet-next',
-      );
-      expect(nextPet.mood, 60);
-    },
-  );
+    final next = await startNextPeriod(player);
+    final nextPet = await service.performFreeInteraction(
+      profileId: player.profileId,
+      periodId: next.id!,
+      interaction: FreePetInteraction.pet,
+      operationId: 'free-pet-next',
+    );
+    expect(nextPet.mood, greaterThan(35));
+  });
 
   test('same operation replays safely and changed payload conflicts', () async {
     final player = await createPlayer();
@@ -436,7 +588,7 @@ void main() {
       itemId: apple.id,
       operationId: 'ambiguous-use',
     );
-    expect(replay.satiety, 60);
+    expect(replay.satiety, 50);
     expect(await games.getInventoryQuantity(player.profileId, apple.id), 1);
     expect(
       await games.getPetDailyUsageCount(
@@ -531,8 +683,8 @@ void main() {
       ),
       throwsStateError,
     );
-    expect((await games.getPet(normal.profileId))?.mood, 40);
-    expect((await games.getPet(demo.profileId))?.mood, 60);
+    expect((await games.getPet(normal.profileId))?.mood, 39);
+    expect((await games.getPet(demo.profileId))?.mood, 59);
     expect(await games.getInventoryQuantity(normal.profileId, ball.id), 1);
   });
 
@@ -557,7 +709,7 @@ void main() {
       ),
       throwsA(anything),
     );
-    expect((await games.getPet(player.profileId))?.satiety, 40);
+    expect((await games.getPet(player.profileId))?.satiety, 34);
     expect(await games.getInventoryQuantity(player.profileId, apple.id), 1);
     expect(await db.query('pet_daily_usage'), isEmpty);
     expect(await db.query('pet_action_operations'), isEmpty);
@@ -586,7 +738,7 @@ void main() {
     ]);
     expect(results.whereType<Pet>(), hasLength(1));
     expect(results.whereType<PetActionAlreadyUsedException>(), hasLength(1));
-    expect((await games.getPet(player.profileId))?.mood, 75);
+    expect((await games.getPet(player.profileId))?.mood, 74);
   });
 
   test('restart preserves quantity, usage and idempotent replay', () async {
@@ -687,8 +839,8 @@ void main() {
       operationId: 'restart-replay',
     );
     expect(await reopenedGames.getInventoryQuantity(profileId, apple.id), 2);
-    expect((await reopenedGames.getPet(profileId))?.satiety, 60);
-    expect((await reopenedGames.getPet(profileId))?.care, 65);
+    expect((await reopenedGames.getPet(profileId))?.satiety, 44);
+    expect((await reopenedGames.getPet(profileId))?.care, 60);
     expect(
       await reopenedGames.getPetDailyUsageCount(
         profileId: profileId,

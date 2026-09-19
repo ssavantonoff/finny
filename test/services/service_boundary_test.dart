@@ -2,13 +2,13 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/models/task_submission_result.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet_action.dart';
+import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/item_use_service.dart';
-import 'package:finny/services/pet_state_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -70,12 +70,30 @@ void main() {
         () => (games as dynamic).performFreePetInteraction(
           profileId: 1,
           periodId: 1,
-          interaction: FreePetInteraction.play,
+          interaction: FreePetInteraction.pet,
           operationId: 'forged-free-interaction',
         ),
         throwsNoSuchMethodError,
       );
-      expect(container.read(petStateServiceProvider), isA<PetStateService>());
+      expect(
+        () => (games as dynamic).applyActiveElapsedTime,
+        throwsNoSuchMethodError,
+      );
+      expect(
+        () => (games as dynamic).advanceDayProgress(
+          profileId: 1,
+          periodId: 1,
+          amount: 100,
+        ),
+        throwsNoSuchMethodError,
+      );
+      expect(
+        () => (games as dynamic).applyPetEffects(
+          profileId: 1,
+          effects: const PetStatEffects(mood: 100),
+        ),
+        throwsNoSuchMethodError,
+      );
       expect(container.read(itemUseServiceProvider), isA<ItemUseService>());
       final profile = await profiles.create(
         Profile(
@@ -92,6 +110,19 @@ void main() {
           currentPeriod: 1,
           savedAmount: 0,
           updatedAt: DateTime.utc(2026, 1, 1),
+        ),
+      );
+      await games.savePet(
+        Pet(
+          profileId: profile.id!,
+          name: 'Финни',
+          colorId: 'blue',
+          patternId: 'plain',
+          developmentStage: 1,
+          growthPoints: 0,
+          satiety: 55,
+          care: 80,
+          mood: 80,
         ),
       );
       final period = await container
@@ -147,6 +178,19 @@ void main() {
         currentPeriod: 1,
         savedAmount: 0,
         updatedAt: DateTime.utc(2026, 1, 1),
+      ),
+    );
+    await games.savePet(
+      Pet(
+        profileId: profile.id!,
+        name: 'Финни',
+        colorId: 'blue',
+        patternId: 'plain',
+        developmentStage: 1,
+        growthPoints: 0,
+        satiety: 55,
+        care: 80,
+        mood: 80,
       ),
     );
     final period = await container

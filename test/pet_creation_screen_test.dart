@@ -233,9 +233,9 @@ void main() {
       expect(pet?.patternId, 'spots');
       expect(pet?.developmentStage, 1);
       expect(pet?.growthPoints, 0);
-      expect(pet?.satiety, 40);
-      expect(pet?.care, 40);
-      expect(pet?.mood, 40);
+      expect(pet?.satiety, 55);
+      expect(pet?.care, 80);
+      expect(pet?.mood, 80);
     },
   );
 

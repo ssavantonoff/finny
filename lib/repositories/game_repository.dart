@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/day_lifecycle.dart';
@@ -15,6 +17,7 @@ import 'package:finny/models/special_purchase.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/models/task_progress.dart';
 import 'package:finny/models/task_submission_result.dart';
+import 'package:finny/models/virtual_day_rules.dart';
 import 'package:sqflite/sqflite.dart';
 
 abstract interface class GameRepository {
@@ -23,11 +26,6 @@ abstract interface class GameRepository {
   Future<GameState?> getGameState(int profileId);
   Future<void> savePet(Pet pet);
   Future<Pet?> getPet(int profileId);
-  Future<Pet> applyActiveElapsedTime({
-    required int profileId,
-    required int periodId,
-    required Duration elapsed,
-  });
   Future<int> getPetDailyUsageCount({
     required int profileId,
     required int periodId,
@@ -176,7 +174,10 @@ class SqliteGameRepository implements GameRepository {
   @override
   Future<void> createInitialState(GameState state) async {
     final db = await _appDatabase.database;
-    await db.insert('game_states', state.toMap());
+    await db.transaction((txn) async {
+      await txn.insert('game_states', state.toMap());
+      await _ensureStarterToothbrush(txn, state.profileId);
+    });
   }
 
   @override
@@ -199,6 +200,7 @@ class SqliteGameRepository implements GameRepository {
         initialState.toMap(),
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
+      await _ensureStarterToothbrush(txn, profileId);
       return _requireState(txn, profileId);
     });
   }
@@ -230,67 +232,6 @@ class SqliteGameRepository implements GameRepository {
       limit: 1,
     );
     return rows.isEmpty ? null : Pet.fromMap(rows.single);
-  }
-
-  @override
-  Future<Pet> applyActiveElapsedTime({
-    required int profileId,
-    required int periodId,
-    required Duration elapsed,
-  }) async {
-    if (elapsed.isNegative) {
-      throw ArgumentError.value(elapsed, 'elapsed', 'Must not be negative.');
-    }
-    final db = await _appDatabase.database;
-    return db.transaction((txn) async {
-      final period = await _requirePeriod(txn, profileId, periodId);
-      if (period.status != GamePeriodStatus.active &&
-          period.status != GamePeriodStatus.readyToFinish) {
-        throw StateError(
-          'Pet decay requires an active or ready-to-finish period.',
-        );
-      }
-      final pet = await _requirePet(txn, profileId);
-      final uncappedElapsed =
-          period.activeElapsedMilliseconds + elapsed.inMilliseconds;
-      final activeElapsedMilliseconds =
-          uncappedElapsed > PetStateRules.fullDailyDecay.inMilliseconds
-          ? PetStateRules.fullDailyDecay.inMilliseconds
-          : uncappedElapsed;
-      final activeElapsed = Duration(milliseconds: activeElapsedMilliseconds);
-      final targetSatietyDecay = PetStateRules.decayAt(
-        activeElapsed,
-        PetStateRules.maxSatietyDecay,
-      );
-      final targetCareDecay = PetStateRules.decayAt(
-        activeElapsed,
-        PetStateRules.maxCareDecay,
-      );
-      final targetMoodDecay = PetStateRules.decayAt(
-        activeElapsed,
-        PetStateRules.maxMoodDecay,
-      );
-      final updatedPet = pet.copyWith(
-        satiety: PetStateRules.clampStat(
-          pet.satiety - (targetSatietyDecay - period.satietyDecayApplied),
-        ),
-        care: PetStateRules.clampStat(
-          pet.care - (targetCareDecay - period.careDecayApplied),
-        ),
-        mood: PetStateRules.clampStat(
-          pet.mood - (targetMoodDecay - period.moodDecayApplied),
-        ),
-      );
-      final updatedPeriod = period.copyWith(
-        activeElapsedMilliseconds: activeElapsedMilliseconds,
-        satietyDecayApplied: targetSatietyDecay,
-        careDecayApplied: targetCareDecay,
-        moodDecayApplied: targetMoodDecay,
-      );
-      await _writePet(txn, updatedPet);
-      await _writePeriod(txn, updatedPeriod);
-      return updatedPet;
-    });
   }
 
   @override
@@ -375,11 +316,44 @@ class SqliteGameRepository implements GameRepository {
         if (ownedQuantity <= 0) throw PetItemNotOwnedException(item.id);
       }
 
-      final updatedPet = pet.copyWith(
-        satiety: PetStateRules.clampStat(pet.satiety + effects.satiety),
-        care: PetStateRules.clampStat(pet.care + effects.care),
-        mood: PetStateRules.clampStat(pet.mood + effects.mood),
+      var timeCost = item == null ? VirtualDayRules.pettingCost : 0;
+      String? timeUsageActionId;
+      if (item?.usagePolicy == ItemUsagePolicy.toothbrush) {
+        timeCost = VirtualDayRules.toothbrushCost;
+      } else if (item?.displaySection == ShopDisplaySection.food) {
+        timeUsageActionId = 'time:feeding';
+        final count = await _readPetDailyUsageCount(
+          txn,
+          profileId: profileId,
+          periodId: periodId,
+          actionId: timeUsageActionId,
+          slot: PetActionSlot.defaultSlot,
+        );
+        if (count < VirtualDayRules.feedingTimeLimit) {
+          timeCost = VirtualDayRules.feedingCost;
+        }
+      } else if (item?.displaySection == ShopDisplaySection.care) {
+        timeUsageActionId = 'time:care';
+        final count = await _readPetDailyUsageCount(
+          txn,
+          profileId: profileId,
+          periodId: periodId,
+          actionId: timeUsageActionId,
+          slot: PetActionSlot.defaultSlot,
+        );
+        if (count < VirtualDayRules.careTimeLimit) {
+          timeCost = VirtualDayRules.careCost;
+        }
+      }
+
+      final transition = await _applyVirtualDayAction(
+        txn,
+        period: period,
+        timeCost: timeCost,
+        effects: effects,
+        pet: pet,
       );
+      final updatedPet = transition.pet!;
 
       if (item != null && !item.persistent) {
         if (ownedQuantity == 1) {
@@ -399,18 +373,24 @@ class SqliteGameRepository implements GameRepository {
       }
 
       final now = DateTime.now().toUtc().toIso8601String();
-      await txn.rawInsert(
-        '''
-        INSERT INTO pet_daily_usage (
-          profile_id, period_id, action_id, usage_slot, usage_count, updated_at
-        ) VALUES (?, ?, ?, ?, 1, ?)
-        ON CONFLICT(profile_id, period_id, action_id, usage_slot) DO UPDATE SET
-          usage_count = usage_count + 1,
-          updated_at = excluded.updated_at
-        ''',
-        [profileId, periodId, actionId, slot.storageValue, now],
+      await _incrementPetDailyUsage(
+        txn,
+        profileId: profileId,
+        periodId: periodId,
+        actionId: actionId,
+        slot: slot,
+        updatedAt: now,
       );
-      await _writePet(txn, updatedPet);
+      if (timeUsageActionId != null) {
+        await _incrementPetDailyUsage(
+          txn,
+          profileId: profileId,
+          periodId: periodId,
+          actionId: timeUsageActionId,
+          slot: PetActionSlot.defaultSlot,
+          updatedAt: now,
+        );
+      }
       await txn.insert('pet_action_operations', {
         'profile_id': profileId,
         'operation_id': operationId,
@@ -622,10 +602,21 @@ class SqliteGameRepository implements GameRepository {
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
       final period = await _requirePeriod(txn, profileId, periodId);
+      if (period.status == GamePeriodStatus.active ||
+          period.status == GamePeriodStatus.readyToFinish) {
+        return period;
+      }
       if (period.status != GamePeriodStatus.planning) {
         throw StateError('Only a planning period budget can be confirmed.');
       }
-      final confirmed = period.copyWith(status: GamePeriodStatus.active);
+      final advanced = await _applyVirtualDayAction(
+        txn,
+        period: period,
+        timeCost: VirtualDayRules.planConfirmationCost,
+      );
+      final confirmed = advanced.period.copyWith(
+        status: GamePeriodStatus.active,
+      );
       await _writePeriod(txn, confirmed);
       return confirmed;
     });
@@ -916,7 +907,17 @@ class SqliteGameRepository implements GameRepository {
         );
       }
       await txn.insert('transactions', transaction.toMap());
-      final resolved = _withSavingsDecisionResolved(period);
+      final firstDecision = !period.resolvedCheckpoints.contains(
+        'savings_decision',
+      );
+      final advanced = firstDecision
+          ? (await _applyVirtualDayAction(
+              txn,
+              period: period,
+              timeCost: VirtualDayRules.savingsDecisionCost,
+            )).period
+          : period;
+      final resolved = _withSavingsDecisionResolved(advanced);
       final updatedPeriod = resolved.copyWith(
         actualSavings: resolved.actualSavings + amount,
       );
@@ -952,7 +953,12 @@ class SqliteGameRepository implements GameRepository {
       if (period.status != GamePeriodStatus.active) {
         throw const SavingsPeriodNotAvailableException();
       }
-      final updated = _withSavingsDecisionResolved(period);
+      final advanced = await _applyVirtualDayAction(
+        txn,
+        period: period,
+        timeCost: VirtualDayRules.savingsDecisionCost,
+      );
+      final updated = _withSavingsDecisionResolved(advanced.period);
       await _writePeriod(txn, updated);
       return updated;
     });
@@ -992,7 +998,12 @@ class SqliteGameRepository implements GameRepository {
       if (period.status != GamePeriodStatus.active) {
         throw const SavingsPeriodNotAvailableException();
       }
-      final updated = _withSavingsDecisionResolved(period);
+      final advanced = await _applyVirtualDayAction(
+        txn,
+        period: period,
+        timeCost: VirtualDayRules.savingsDecisionCost,
+      );
+      final updated = _withSavingsDecisionResolved(advanced.period);
       await _writePeriod(txn, updated);
       return updated;
     });
@@ -1247,16 +1258,67 @@ class SqliteGameRepository implements GameRepository {
   }
 
   Future<Pet> _requirePet(DatabaseExecutor db, int profileId) async {
+    final pet = await _readPet(db, profileId);
+    if (pet == null) {
+      throw StateError('Pet for profile $profileId is missing.');
+    }
+    return pet;
+  }
+
+  Future<Pet?> _readPet(DatabaseExecutor db, int profileId) async {
     final rows = await db.query(
       'pets',
       where: 'profile_id = ?',
       whereArgs: [profileId],
       limit: 1,
     );
-    if (rows.isEmpty) {
-      throw StateError('Pet for profile $profileId is missing.');
+    return rows.isEmpty ? null : Pet.fromMap(rows.single);
+  }
+
+  Future<({GamePeriod period, Pet? pet})> _applyVirtualDayAction(
+    DatabaseExecutor db, {
+    required GamePeriod period,
+    required int timeCost,
+    PetStatEffects effects = const PetStatEffects(),
+    Pet? pet,
+  }) async {
+    final currentPet = pet ?? await _readPet(db, period.profileId);
+    if (currentPet == null) {
+      if (!effects.isEmpty) {
+        throw StateError('Pet for profile ${period.profileId} is missing.');
+      }
+      final updatedPeriod = period.copyWith(
+        dayProgress: VirtualDayRules.clampProgress(
+          period.dayProgress + timeCost,
+        ),
+      );
+      await _writePeriod(db, updatedPeriod);
+      return (period: updatedPeriod, pet: null);
     }
-    return Pet.fromMap(rows.single);
+    final transition = VirtualDayRules.applyAction(
+      pet: currentPet,
+      oldProgress: period.dayProgress,
+      timeCost: timeCost,
+      satietyEffect: effects.satiety,
+      careEffect: effects.care,
+      moodEffect: effects.mood,
+    );
+    final updatedPeriod = period.copyWith(dayProgress: transition.progress);
+    await _writePet(db, transition.pet);
+    await _writePeriod(db, updatedPeriod);
+    return (period: updatedPeriod, pet: transition.pet);
+  }
+
+  Future<void> _ensureStarterToothbrush(
+    DatabaseExecutor db,
+    int profileId,
+  ) async {
+    await db.insert('inventory', {
+      'profile_id': profileId,
+      'item_id': 'care_toothbrush',
+      'quantity': 1,
+      'acquired_at': DateTime.now().toUtc().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<void> _writePet(DatabaseExecutor db, Pet pet) async {
@@ -1316,6 +1378,27 @@ class SqliteGameRepository implements GameRepository {
       limit: 1,
     );
     return rows.isEmpty ? 0 : rows.single['usage_count'] as int;
+  }
+
+  Future<void> _incrementPetDailyUsage(
+    DatabaseExecutor db, {
+    required int profileId,
+    required int periodId,
+    required String actionId,
+    required PetActionSlot slot,
+    required String updatedAt,
+  }) async {
+    await db.rawInsert(
+      '''
+      INSERT INTO pet_daily_usage (
+        profile_id, period_id, action_id, usage_slot, usage_count, updated_at
+      ) VALUES (?, ?, ?, ?, 1, ?)
+      ON CONFLICT(profile_id, period_id, action_id, usage_slot) DO UPDATE SET
+        usage_count = usage_count + 1,
+        updated_at = excluded.updated_at
+      ''',
+      [profileId, periodId, actionId, slot.storageValue, updatedAt],
+    );
   }
 
   Future<GameState> _requireState(DatabaseExecutor db, int profileId) async {
@@ -1438,9 +1521,12 @@ class SqliteGameRepository implements GameRepository {
     }
     if (policy == ItemUsagePolicy.toothbrush) {
       final available = switch (slot) {
-        PetActionSlot.morning => period.status == GamePeriodStatus.active,
-        PetActionSlot.evening =>
-          period.status == GamePeriodStatus.readyToFinish,
+        PetActionSlot.morning => VirtualDayRules.morningToothbrushAvailable(
+          period.dayProgress,
+        ),
+        PetActionSlot.evening => VirtualDayRules.eveningToothbrushAvailable(
+          period.dayProgress,
+        ),
         PetActionSlot.defaultSlot => false,
       };
       if (!available) {
@@ -1606,12 +1692,16 @@ class SqliteDayLifecyclePort implements DayLifecyclePort {
         period.status == GamePeriodStatus.completed) {
       throw StateError('Bedtime requires an active period.');
     }
-    final unresolved = period.requiredCheckpoints.any(
-      (checkpoint) => !period.resolvedCheckpoints.contains(checkpoint),
-    );
-    if (unresolved) {
-      return const BedtimeDecision(
+    if (!VirtualDayRules.bedtimeReached(period.dayProgress)) {
+      return const BedtimeDecision(type: BedtimeDecisionType.tooEarly);
+    }
+    final unresolved = period.requiredCheckpoints
+        .where((checkpoint) => !period.resolvedCheckpoints.contains(checkpoint))
+        .toList(growable: false);
+    if (unresolved.isNotEmpty) {
+      return BedtimeDecision(
         type: BedtimeDecisionType.blockedByCheckpoints,
+        unresolvedCheckpoints: List.unmodifiable(unresolved),
       );
     }
 
@@ -1630,6 +1720,7 @@ class SqliteDayLifecyclePort implements DayLifecyclePort {
       profileId: profileId,
       periodId: periodId,
       pet: pet,
+      dayProgress: period.dayProgress,
       wallet: state.walletBalance,
       canonicalItems: canonicalItems,
     );
@@ -1646,140 +1737,236 @@ class SqliteDayLifecyclePort implements DayLifecyclePort {
     required int profileId,
     required int periodId,
     required Pet pet,
+    required int dayProgress,
     required int wallet,
     required List<ShopItem> canonicalItems,
   }) async {
-    var stats = (
-      satiety: pet.satiety.clamp(0, PetStateRules.greenThreshold),
-      care: pet.care.clamp(0, PetStateRules.greenThreshold),
-      mood: pet.mood.clamp(0, PetStateRules.greenThreshold),
-    );
-
-    for (final interaction in FreePetInteraction.values) {
-      final used = await _core._readPetDailyUsageCount(
-        db,
-        profileId: profileId,
-        periodId: periodId,
-        actionId: interaction.actionId,
-        slot: PetActionSlot.defaultSlot,
+    final fixedActions = <_CareAction>[];
+    final repeatableActions = <_CareAction>[];
+    void addFixed(
+      PetStatEffects effects,
+      _CareActionKind kind, {
+      required int price,
+    }) {
+      fixedActions.add(
+        _CareAction(
+          effects: effects,
+          kind: kind,
+          price: price,
+          fixedIndex: fixedActions.length,
+        ),
       );
-      if (used == 0) stats = _apply(stats, interaction.effects);
     }
 
-    final purchasablePersistent = <ShopItem>[];
-    final purchasableConsumables = <ShopItem>[];
+    final pettingUsed = await _core._readPetDailyUsageCount(
+      db,
+      profileId: profileId,
+      periodId: periodId,
+      actionId: FreePetInteraction.pet.actionId,
+      slot: PetActionSlot.defaultSlot,
+    );
+    if (pettingUsed == 0) {
+      addFixed(
+        FreePetInteraction.pet.effects,
+        _CareActionKind.petting,
+        price: 0,
+      );
+    }
+
     for (final item in canonicalItems) {
       if (item.usagePolicy == ItemUsagePolicy.none || item.petEffects.isEmpty) {
         continue;
       }
+      final kind = switch ((item.displaySection, item.usagePolicy)) {
+        (_, ItemUsagePolicy.toothbrush) => _CareActionKind.toothbrush,
+        (ShopDisplaySection.food, _) => _CareActionKind.food,
+        (ShopDisplaySection.care, _) => _CareActionKind.care,
+        _ => _CareActionKind.other,
+      };
       final quantity = await _core._readInventoryQuantity(
         db,
         profileId,
         item.id,
       );
       if (item.persistent) {
-        if (quantity > 0) {
-          final slot = item.usagePolicy == ItemUsagePolicy.toothbrush
-              ? PetActionSlot.evening
-              : PetActionSlot.defaultSlot;
-          final used = await _core._readPetDailyUsageCount(
-            db,
-            profileId: profileId,
-            periodId: periodId,
-            actionId: 'item:${item.id}',
-            slot: slot,
-          );
-          if (used == 0) stats = _apply(stats, item.petEffects);
-        } else {
-          purchasablePersistent.add(item);
+        final slot = item.usagePolicy == ItemUsagePolicy.toothbrush
+            ? PetActionSlot.evening
+            : PetActionSlot.defaultSlot;
+        final used = await _core._readPetDailyUsageCount(
+          db,
+          profileId: profileId,
+          periodId: periodId,
+          actionId: 'item:${item.id}',
+          slot: slot,
+        );
+        if (used == 0) {
+          addFixed(item.petEffects, kind, price: quantity > 0 ? 0 : item.price);
         }
       } else {
-        for (var count = 0; count < quantity; count++) {
-          stats = _apply(stats, item.petEffects);
+        final usefulQuantity = _usefulConsumableQuantity(item.petEffects);
+        for (
+          var count = 0;
+          count < quantity.clamp(0, usefulQuantity);
+          count++
+        ) {
+          addFixed(item.petEffects, kind, price: 0);
         }
-        purchasableConsumables.add(item);
+        repeatableActions.add(
+          _CareAction(effects: item.petEffects, kind: kind, price: item.price),
+        );
       }
     }
-    if (_isGreen(stats)) return true;
+    final foodUses = await _core._readPetDailyUsageCount(
+      db,
+      profileId: profileId,
+      periodId: periodId,
+      actionId: 'time:feeding',
+      slot: PetActionSlot.defaultSlot,
+    );
+    final careUses = await _core._readPetDailyUsageCount(
+      db,
+      profileId: profileId,
+      periodId: periodId,
+      actionId: 'time:care',
+      slot: PetActionSlot.defaultSlot,
+    );
+    final initial = _CareSearchState(
+      satiety: pet.satiety,
+      care: pet.care,
+      mood: pet.mood,
+      progress: dayProgress,
+      foodTimeUses: foodUses.clamp(0, VirtualDayRules.feedingTimeLimit),
+      careTimeUses: careUses.clamp(0, VirtualDayRules.careTimeLimit),
+      usedMask: 0,
+    );
+    if (initial.isGreen) return true;
 
-    var states = <int, int>{_encode(stats): 0};
-    for (final item in purchasablePersistent) {
-      final additions = <int, int>{};
-      for (final entry in states.entries) {
-        final nextCost = entry.value + item.price;
+    final queue = ListQueue<({_CareSearchState state, int cost})>()
+      ..add((state: initial, cost: 0));
+    final bestCost = <String, int>{initial.key: 0};
+    final actions = [...fixedActions, ...repeatableActions];
+    while (queue.isNotEmpty) {
+      final current = queue.removeFirst();
+      if (bestCost[current.state.key] != current.cost) continue;
+      for (final action in actions) {
+        if (action.fixedIndex case final index?
+            when current.state.usedMask & (1 << index) != 0) {
+          continue;
+        }
+        final nextCost = current.cost + action.price;
         if (nextCost > wallet) continue;
-        final next = _encode(_apply(_decode(entry.key), item.petEffects));
-        final existing = states[next] ?? additions[next];
-        if (existing == null || nextCost < existing) additions[next] = nextCost;
-      }
-      for (final entry in additions.entries) {
-        final existing = states[entry.key];
-        if (existing == null || entry.value < existing) {
-          states[entry.key] = entry.value;
-        }
+        final next = current.state.apply(action, pet);
+        if (next.key == current.state.key) continue;
+        if (next.isGreen) return true;
+        final known = bestCost[next.key];
+        if (known != null && known <= nextCost) continue;
+        bestCost[next.key] = nextCost;
+        queue.add((state: next, cost: nextCost));
       }
     }
-
-    const side = PetStateRules.greenThreshold + 1;
-    const stateCount = side * side * side;
-    const infinity = 1 << 30;
-    final minimumCost = List<int>.filled(stateCount, infinity);
-    for (final entry in states.entries) {
-      minimumCost[entry.key] = entry.value;
-    }
-    for (var satiety = 0; satiety <= PetStateRules.greenThreshold; satiety++) {
-      for (var care = 0; care <= PetStateRules.greenThreshold; care++) {
-        for (var mood = 0; mood <= PetStateRules.greenThreshold; mood++) {
-          final current = (satiety: satiety, care: care, mood: mood);
-          final encoded = _encode(current);
-          final cost = minimumCost[encoded];
-          if (cost > wallet) continue;
-          if (_isGreen(current)) return true;
-          for (final item in purchasableConsumables) {
-            final nextCost = cost + item.price;
-            if (nextCost > wallet) continue;
-            final next = _encode(_apply(current, item.petEffects));
-            if (nextCost < minimumCost[next]) minimumCost[next] = nextCost;
-          }
-        }
-      }
-    }
-    return minimumCost[_encode((
-          satiety: PetStateRules.greenThreshold,
-          care: PetStateRules.greenThreshold,
-          mood: PetStateRules.greenThreshold,
-        ))] <=
-        wallet;
+    return false;
   }
 
-  ({int satiety, int care, int mood}) _apply(
-    ({int satiety, int care, int mood}) current,
-    PetStatEffects effects,
-  ) => (
-    satiety: (current.satiety + effects.satiety).clamp(
-      0,
-      PetStateRules.greenThreshold,
-    ),
-    care: (current.care + effects.care).clamp(0, PetStateRules.greenThreshold),
-    mood: (current.mood + effects.mood).clamp(0, PetStateRules.greenThreshold),
-  );
-
-  bool _isGreen(({int satiety, int care, int mood}) stats) =>
-      stats.satiety >= PetStateRules.greenThreshold &&
-      stats.care >= PetStateRules.greenThreshold &&
-      stats.mood >= PetStateRules.greenThreshold;
-
-  int _encode(({int satiety, int care, int mood}) stats) {
-    const side = PetStateRules.greenThreshold + 1;
-    return (stats.satiety * side + stats.care) * side + stats.mood;
+  int _usefulConsumableQuantity(PetStatEffects effects) {
+    var maximum = 1;
+    for (final effect in [effects.satiety, effects.care, effects.mood]) {
+      if (effect > 0) {
+        final uses = (PetStateRules.maxValue + effect - 1) ~/ effect;
+        if (uses > maximum) maximum = uses;
+      }
+    }
+    return maximum + 1;
   }
+}
 
-  ({int satiety, int care, int mood}) _decode(int value) {
-    const side = PetStateRules.greenThreshold + 1;
-    final mood = value % side;
-    final care = value ~/ side % side;
-    final satiety = value ~/ (side * side);
-    return (satiety: satiety, care: care, mood: mood);
+enum _CareActionKind { food, toothbrush, care, petting, other }
+
+class _CareAction {
+  const _CareAction({
+    required this.effects,
+    required this.kind,
+    required this.price,
+    this.fixedIndex,
+  });
+
+  final PetStatEffects effects;
+  final _CareActionKind kind;
+  final int price;
+  final int? fixedIndex;
+}
+
+class _CareSearchState {
+  const _CareSearchState({
+    required this.satiety,
+    required this.care,
+    required this.mood,
+    required this.progress,
+    required this.foodTimeUses,
+    required this.careTimeUses,
+    required this.usedMask,
+  });
+
+  final int satiety;
+  final int care;
+  final int mood;
+  final int progress;
+  final int foodTimeUses;
+  final int careTimeUses;
+  final int usedMask;
+
+  bool get isGreen =>
+      satiety >= PetStateRules.greenThreshold &&
+      care >= PetStateRules.greenThreshold &&
+      mood >= PetStateRules.greenThreshold;
+
+  String get key =>
+      '$satiety:$care:$mood:$progress:$foodTimeUses:$careTimeUses:$usedMask';
+
+  _CareSearchState apply(_CareAction action, Pet template) {
+    var timeCost = 0;
+    var nextFoodUses = foodTimeUses;
+    var nextCareUses = careTimeUses;
+    switch (action.kind) {
+      case _CareActionKind.food:
+        if (foodTimeUses < VirtualDayRules.feedingTimeLimit) {
+          timeCost = VirtualDayRules.feedingCost;
+          nextFoodUses++;
+        }
+        break;
+      case _CareActionKind.toothbrush:
+        timeCost = VirtualDayRules.toothbrushCost;
+        break;
+      case _CareActionKind.care:
+        if (careTimeUses < VirtualDayRules.careTimeLimit) {
+          timeCost = VirtualDayRules.careCost;
+          nextCareUses++;
+        }
+        break;
+      case _CareActionKind.petting:
+        timeCost = VirtualDayRules.pettingCost;
+        break;
+      case _CareActionKind.other:
+        break;
+    }
+    final transition = VirtualDayRules.applyAction(
+      pet: template.copyWith(satiety: satiety, care: care, mood: mood),
+      oldProgress: progress,
+      timeCost: timeCost,
+      satietyEffect: action.effects.satiety,
+      careEffect: action.effects.care,
+      moodEffect: action.effects.mood,
+    );
+    return _CareSearchState(
+      satiety: transition.pet.satiety,
+      care: transition.pet.care,
+      mood: transition.pet.mood,
+      progress: transition.progress,
+      foodTimeUses: nextFoodUses,
+      careTimeUses: nextCareUses,
+      usedMask: action.fixedIndex == null
+          ? usedMask
+          : usedMask | (1 << action.fixedIndex!),
+    );
   }
 }
 
@@ -1902,13 +2089,20 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
         ).toMap(),
       );
       final afterReward = await _core._requirePeriod(txn, profileId, periodId);
+      final afterTime = task.requiredForCheckpoint
+          ? (await _core._applyVirtualDayAction(
+              txn,
+              period: afterReward,
+              timeCost: VirtualDayRules.requiredTaskCost,
+            )).period
+          : afterReward;
       final resolved = task.requiredForCheckpoint
           ? await _core._resolveCheckpointInTransaction(
               txn,
-              afterReward,
+              afterTime,
               'financial_task',
             )
-          : afterReward;
+          : afterTime;
       return TaskAnswerCompleted(
         explanation: task.choiceScenario.explanation,
         canonicalReward: task.reward,

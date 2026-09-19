@@ -1,11 +1,7 @@
-import 'dart:async';
-
-import 'package:finny/app/providers.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/savings/savings_controller.dart';
 import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/features/things/things_controller.dart';
-import 'package:finny/services/active_gameplay_tracker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,41 +20,7 @@ class ScaffoldWithNestedNavigation extends ConsumerStatefulWidget {
 }
 
 class _ScaffoldWithNestedNavigationState
-    extends ConsumerState<ScaffoldWithNestedNavigation>
-    with WidgetsBindingObserver {
-  Timer? _flushTimer;
-  late final ActiveGameplayTracker _tracker;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _tracker = ref.read(activeGameplayTrackerProvider);
-    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
-      _tracker.resume();
-    }
-    _flushTimer = Timer.periodic(const Duration(seconds: 12), (_) {
-      unawaited(_tracker.flush());
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _tracker.resume();
-    } else {
-      unawaited(_tracker.pause());
-    }
-  }
-
-  @override
-  void dispose() {
-    _flushTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
-    unawaited(_tracker.pause());
-    super.dispose();
-  }
-
+    extends ConsumerState<ScaffoldWithNestedNavigation> {
   void _onTap(BuildContext context, WidgetRef ref, int index) {
     widget.navigationShell.goBranch(
       index,

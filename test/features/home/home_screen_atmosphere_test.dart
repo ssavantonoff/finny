@@ -39,7 +39,6 @@ class _AtmosphereGames extends SqliteGameRepository {
   GameState gameState;
   GamePeriod? period;
   int petUsage = 0;
-  int playUsage = 0;
   Duration usageReadDelay = Duration.zero;
   String? failingUsageActionId;
 
@@ -64,7 +63,6 @@ class _AtmosphereGames extends SqliteGameRepository {
       throw StateError('usage read failed');
     }
     if (actionId == FreePetInteraction.pet.actionId) return petUsage;
-    if (actionId == FreePetInteraction.play.actionId) return playUsage;
     return 0;
   }
 }
@@ -197,7 +195,7 @@ void main() {
             isA<HomeFailure>(),
           );
           expect(states.whereType<HomeReady>(), isEmpty);
-          expect((harness.games.petUsage, harness.games.playUsage), (0, 0));
+          expect(harness.games.petUsage, 0);
         },
       );
     }
@@ -206,31 +204,51 @@ void main() {
       final harness = await controllerHarness();
       harness.games
         ..usageReadDelay = const Duration(milliseconds: 200)
-        ..petUsage = 1
-        ..playUsage = 2;
+        ..petUsage = 1;
 
       await harness.container.read(homeControllerProvider.notifier).load();
 
       final ready = harness.container.read(homeControllerProvider) as HomeReady;
-      expect((ready.petUsageCount, ready.playUsageCount), (1, 2));
+      expect(ready.petUsageCount, 1);
     });
 
     test('confirmed usage remains used after Home reload', () async {
       final harness = await controllerHarness();
-      harness.games
-        ..petUsage = 1
-        ..playUsage = 1;
+      harness.games.petUsage = 1;
       final controller = harness.container.read(
         homeControllerProvider.notifier,
       );
 
       await controller.load();
       var ready = harness.container.read(homeControllerProvider) as HomeReady;
-      expect((ready.petUsageCount, ready.playUsageCount), (1, 1));
+      expect(ready.petUsageCount, 1);
 
       await controller.load();
       ready = harness.container.read(homeControllerProvider) as HomeReady;
-      expect((ready.petUsageCount, ready.playUsageCount), (1, 1));
+      expect(ready.petUsageCount, 1);
+    });
+
+    testWidgets('elapsed foreground time and pause resume do not mutate Pet', (
+      tester,
+    ) async {
+      final harness = await controllerHarness();
+      final beforePet = harness.games.pet.toMap();
+      final beforePeriod = harness.games.period!.toMap();
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: MaterialApp(theme: AppTheme.light, home: const HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(minutes: 10));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(harness.games.pet.toMap(), beforePet);
+      expect(harness.games.period?.toMap(), beforePeriod);
     });
 
     testWidgets(
@@ -341,11 +359,16 @@ void main() {
         expect(find.byKey(const Key('home-stat-care-bar')), findsOneWidget);
         expect(find.byKey(const Key('home-stat-mood-bar')), findsOneWidget);
 
-        // Free interactions visible
+        // The canonical free interaction remains; legacy one-tap play is gone.
         expect(find.byKey(const Key('home-free-pet')), findsOneWidget);
-        expect(find.byKey(const Key('home-free-play')), findsOneWidget);
+        expect(find.byKey(const Key('home-free-play')), findsNothing);
         expect(find.text('Погладить'), findsOneWidget);
-        expect(find.text('Поиграть'), findsOneWidget);
+        expect(find.text('Поиграть'), findsNothing);
+        expect(find.byKey(const Key('home-day-sky')), findsOneWidget);
+        expect(find.byKey(const Key('home-sun')), findsOneWidget);
+        expect(find.text('Утро'), findsNothing);
+        expect(find.text('День'), findsNothing);
+        expect(find.text('Вечер'), findsNothing);
 
         // Day status card & view plan button (active status)
         expect(find.byKey(const Key('home-day-status')), findsOneWidget);
@@ -357,11 +380,54 @@ void main() {
         expect(find.text('Сегодня'), findsOneWidget);
         expect(find.text('Задание'), findsOneWidget);
         expect(find.text('Накопления'), findsOneWidget);
+        expect(find.text('Событие'), findsNothing);
+        expect(find.text('Скидка'), findsNothing);
 
         // Active savings goal card
         expect(find.byKey(const Key('home-savings-goal')), findsOneWidget);
         expect(find.text('Велосипед'), findsOneWidget);
         expect(find.text('150/500 🪙'), findsOneWidget);
+
+        final morningSun = tester.widget<Positioned>(
+          find.ancestor(
+            of: find.byKey(const Key('home-sun')),
+            matching: find.byType(Positioned),
+          ),
+        );
+        final morningSky = tester.widget<Container>(
+          find.byKey(const Key('home-day-sky')),
+        );
+        final morningGradient =
+            (morningSky.decoration! as BoxDecoration).gradient!
+                as LinearGradient;
+
+        games.period = period.copyWith(dayProgress: 100);
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        final eveningSun = tester.widget<Positioned>(
+          find.ancestor(
+            of: find.byKey(const Key('home-sun')),
+            matching: find.byType(Positioned),
+          ),
+        );
+        final eveningSky = tester.widget<Container>(
+          find.byKey(const Key('home-day-sky')),
+        );
+        final eveningGradient =
+            (eveningSky.decoration! as BoxDecoration).gradient!
+                as LinearGradient;
+        expect(eveningSun.left, greaterThan(morningSun.left!));
+        expect(eveningGradient.colors, isNot(morningGradient.colors));
+        expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
+
+        games.period = period.copyWith(
+          status: GamePeriodStatus.readyToFinish,
+          dayProgress: 60,
+        );
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('home-finish-day')), findsNothing);
+        expect(find.byKey(const Key('home-view-plan')), findsOneWidget);
       },
     );
 
@@ -459,12 +525,7 @@ void main() {
         final buttonWidget = tester.widget<FilledButton>(petBtnFinder);
         expect(buttonWidget.onPressed, isNull);
 
-        // Play button is not used yet, so it is enabled
-        final playBtnFinder = find.byKey(const Key('home-free-play'));
-        expect(playBtnFinder, findsOneWidget);
-        expect(find.text('Поиграть'), findsOneWidget);
-        final playWidget = tester.widget<FilledButton>(playBtnFinder);
-        expect(playWidget.onPressed, isNotNull);
+        expect(find.byKey(const Key('home-free-play')), findsNothing);
       },
     );
   });

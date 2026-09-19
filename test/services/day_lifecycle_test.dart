@@ -10,7 +10,6 @@ import 'package:finny/models/profile.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
-import 'package:finny/services/active_gameplay_tracker.dart';
 import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -110,6 +109,7 @@ void main() {
     int mood = 70,
     int wallet = 0,
     int periodNumber = 1,
+    int dayProgress = 76,
     bool resolveCheckpoints = true,
   }) async {
     final profileDraft = Profile(
@@ -161,6 +161,18 @@ void main() {
       profileId: profile.id!,
       periodId: period.id!,
     );
+    final db = await database.database;
+    await db.update(
+      'game_periods',
+      {'day_progress': dayProgress},
+      where: 'id = ?',
+      whereArgs: [period.id],
+    );
+    await games.savePet(
+      (await games.getPet(profile.id!))!
+          .copyWith(satiety: satiety, care: care, mood: mood),
+    );
+    period = (await games.getPeriodById(profile.id!, period.id!))!;
     if (resolveCheckpoints) {
       period = await games.resolveCheckpoint(
         profileId: profile.id!,
@@ -173,12 +185,14 @@ void main() {
 
   Future<void> grant(int profileId, ShopItem item, {int quantity = 1}) async {
     final db = await database.database;
-    await db.insert('inventory', {
-      'profile_id': profileId,
-      'item_id': item.id,
-      'quantity': quantity,
-      'acquired_at': DateTime.utc(2026).toIso8601String(),
-    });
+    await db.rawInsert(
+      '''
+      INSERT INTO inventory (profile_id, item_id, quantity, acquired_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(profile_id, item_id) DO UPDATE SET quantity = excluded.quantity
+      ''',
+      [profileId, item.id, quantity, DateTime.utc(2026).toIso8601String()],
+    );
   }
 
   Future<void> markUsed(
@@ -248,11 +262,73 @@ void main() {
     );
   });
 
+  test('bedtime depends on virtual progress independently of status', () async {
+    final tooEarlyReady = await createPlayer(dayProgress: 75);
+    expect(tooEarlyReady.period.status, GamePeriodStatus.readyToFinish);
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: tooEarlyReady.profileId,
+        periodId: tooEarlyReady.period.id!,
+      )).type,
+      BedtimeDecisionType.tooEarly,
+    );
+    await expectLater(
+      lifecycle.sleep(
+        profileId: tooEarlyReady.profileId,
+        periodId: tooEarlyReady.period.id!,
+        allowFallback: false,
+      ),
+      throwsA(
+        isA<BedtimeNotAllowedException>().having(
+          (error) => error.decision.type,
+          'decision',
+          BedtimeDecisionType.tooEarly,
+        ),
+      ),
+    );
+
+    final reached = await createPlayer(dayProgress: 76);
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: reached.profileId,
+        periodId: reached.period.id!,
+      )).type,
+      BedtimeDecisionType.ready,
+    );
+
+    final activeEvening = await createPlayer(
+      dayProgress: 80,
+      resolveCheckpoints: false,
+    );
+    expect(activeEvening.period.status, GamePeriodStatus.active);
+    final blocked = await lifecycle.evaluateBedtime(
+      profileId: activeEvening.profileId,
+      periodId: activeEvening.period.id!,
+    );
+    expect(blocked.type, BedtimeDecisionType.blockedByCheckpoints);
+    expect(blocked.unresolvedCheckpoints, ['savings_decision']);
+
+    final db = await database.database;
+    await db.update(
+      'game_periods',
+      {'day_progress': 60},
+      where: 'id = ?',
+      whereArgs: [reached.period.id],
+    );
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: reached.profileId,
+        periodId: reached.period.id!,
+      )).type,
+      BedtimeDecisionType.tooEarly,
+    );
+  });
+
   test(
     'owned consumables and unused persistent items make care possible',
     () async {
-      final consumable = await createPlayer(satiety: 50);
-      await grant(consumable.profileId, _apple);
+      final consumable = await createPlayer(satiety: 50, care: 100, mood: 100);
+      await grant(consumable.profileId, _apple, quantity: 2);
       expect(
         (await lifecycle.evaluateBedtime(
           profileId: consumable.profileId,
@@ -261,7 +337,7 @@ void main() {
         BedtimeDecisionType.carePossible,
       );
 
-      final persistent = await createPlayer(care: 50);
+      final persistent = await createPlayer(satiety: 100, care: 50, mood: 100);
       await grant(persistent.profileId, _comb);
       expect(
         (await lifecycle.evaluateBedtime(
@@ -284,7 +360,7 @@ void main() {
   test(
     'toothbrush evening slot and unused free actions are considered',
     () async {
-      final brush = await createPlayer(care: 62);
+      final brush = await createPlayer(satiety: 100, care: 63, mood: 100);
       await grant(brush.profileId, _toothbrush);
       expect(
         (await lifecycle.evaluateBedtime(
@@ -306,13 +382,13 @@ void main() {
         BedtimeDecisionType.fallbackAllowed,
       );
 
-      final free = await createPlayer(mood: 25);
+      final free = await createPlayer(satiety: 100, care: 100, mood: 25);
       expect(
         (await lifecycle.evaluateBedtime(
           profileId: free.profileId,
           periodId: free.period.id!,
         )).type,
-        BedtimeDecisionType.carePossible,
+        BedtimeDecisionType.fallbackAllowed,
       );
     },
   );
@@ -320,7 +396,12 @@ void main() {
   test(
     'canonical shop prices respect wallet and accessories are ignored',
     () async {
-      final enough = await createPlayer(satiety: 50, wallet: 40);
+      final enough = await createPlayer(
+        satiety: 60,
+        care: 100,
+        mood: 100,
+        wallet: 40,
+      );
       expect(
         (await lifecycle.evaluateBedtime(
           profileId: enough.profileId,
@@ -328,7 +409,12 @@ void main() {
         )).type,
         BedtimeDecisionType.carePossible,
       );
-      final short = await createPlayer(satiety: 50, wallet: 39);
+      final short = await createPlayer(
+        satiety: 60,
+        care: 100,
+        mood: 100,
+        wallet: 39,
+      );
       expect(
         (await lifecycle.evaluateBedtime(
           profileId: short.profileId,
@@ -350,7 +436,7 @@ void main() {
   );
 
   test('fallback rechecks current resources inside the transaction', () async {
-    final player = await createPlayer(satiety: 50);
+    final player = await createPlayer(satiety: 60, care: 100, mood: 100);
     expect(
       (await lifecycle.evaluateBedtime(
         profileId: player.profileId,
@@ -461,6 +547,12 @@ void main() {
         periodId: day2.id!,
         checkpointId: 'savings_decision',
       );
+      await (await database.database).update(
+        'game_periods',
+        {'day_progress': 76},
+        where: 'id = ?',
+        whereArgs: [day2.id],
+      );
       await games.savePet(
         (await games.getPet(player.profileId))!
             .copyWith(satiety: 70, care: 70, mood: 70),
@@ -537,6 +629,12 @@ void main() {
         periodId: day1.id!,
         checkpointId: 'savings_decision',
       );
+      await (await firstDatabase.database).update(
+        'game_periods',
+        {'day_progress': 76},
+        where: 'id = ?',
+        whereArgs: [day1.id],
+      );
       final firstLifecycle = DayLifecycleService(
         SqliteDayLifecyclePort(firstDatabase),
         TestContentRepository(const [], shopItems: _items),
@@ -588,45 +686,4 @@ void main() {
     expect(completed.pet.developmentStage, 3);
     expect(completed.pet.growthPoints, 0);
   });
-
-  test(
-    'foreground tracker persists active time and excludes background',
-    () async {
-      final player = await createPlayer();
-      var now = DateTime.utc(2026);
-      final tracker = ActiveGameplayTracker(
-        games,
-        () => player.profileId,
-        now: () => now,
-      );
-      tracker.resume();
-      now = now.add(const Duration(minutes: 3));
-      await tracker.flush();
-      var pet = await games.getPet(player.profileId);
-      expect([pet?.satiety, pet?.care, pet?.mood], [63, 65, 64]);
-
-      await tracker.pause();
-      now = now.add(const Duration(hours: 2));
-      tracker.resume();
-      now = now.add(const Duration(minutes: 3));
-      await tracker.flush();
-      pet = await games.getPet(player.profileId);
-      expect([pet?.satiety, pet?.care, pet?.mood], [55, 60, 58]);
-
-      now = now.add(const Duration(minutes: 10));
-      await tracker.flush();
-      pet = await games.getPet(player.profileId);
-      expect([pet?.satiety, pet?.care, pet?.mood], [55, 60, 58]);
-
-      await lifecycle.sleep(
-        profileId: player.profileId,
-        periodId: player.period.id!,
-        allowFallback: true,
-      );
-      now = now.add(const Duration(minutes: 3));
-      await tracker.flush();
-      pet = await games.getPet(player.profileId);
-      expect([pet?.satiety, pet?.care, pet?.mood], [55, 60, 58]);
-    },
-  );
 }

@@ -11,8 +11,7 @@ enum PetActionSlot {
 }
 
 enum FreePetInteraction {
-  pet(actionId: 'free:pet', effects: PetStatEffects(mood: 20)),
-  play(actionId: 'free:play', effects: PetStatEffects(mood: 25));
+  pet(actionId: 'free:pet', effects: PetStatEffects(mood: 5));
 
   const FreePetInteraction({required this.actionId, required this.effects});
 

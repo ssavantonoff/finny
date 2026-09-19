@@ -169,7 +169,7 @@ void main() {
       );
       expect(pet?.developmentStage, 1);
       expect(pet?.growthPoints, 45);
-      expect(pet?.satiety, 61);
+      expect(pet?.satiety, 55);
       expect(
         await migratedGames.getInventoryQuantity(profile.id!, 'food_apple'),
         3,

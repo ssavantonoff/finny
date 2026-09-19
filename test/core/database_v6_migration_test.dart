@@ -122,7 +122,22 @@ void main() {
 
       expect(await db.getVersion(), AppDatabase.schemaVersion);
       expect((await db.query('pets')).single['care'], 64);
-      expect((await db.query('inventory')).single['quantity'], 3);
+      expect(
+        (await db.query(
+          'inventory',
+          where: 'item_id = ?',
+          whereArgs: ['food_apple'],
+        )).single['quantity'],
+        3,
+      );
+      expect(
+        (await db.query(
+          'inventory',
+          where: 'item_id = ?',
+          whereArgs: ['care_toothbrush'],
+        )).single['quantity'],
+        1,
+      );
       expect((await db.query('pet_daily_usage')).single['usage_count'], 1);
       expect(
         await db.rawQuery(

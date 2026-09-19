@@ -2,6 +2,7 @@ import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet.dart';
 
 enum BedtimeDecisionType {
+  tooEarly,
   blockedByCheckpoints,
   ready,
   carePossible,
@@ -11,10 +12,15 @@ enum BedtimeDecisionType {
 enum PetStat { satiety, care, mood }
 
 class BedtimeDecision {
-  const BedtimeDecision({required this.type, this.statsNeedingCare = const {}});
+  const BedtimeDecision({
+    required this.type,
+    this.statsNeedingCare = const {},
+    this.unresolvedCheckpoints = const [],
+  });
 
   final BedtimeDecisionType type;
   final Set<PetStat> statsNeedingCare;
+  final List<String> unresolvedCheckpoints;
 }
 
 class DayCompletionResult {

@@ -198,6 +198,15 @@ void main() {
         BootstrapPhase.resolvedWithoutPet,
       );
       expect(await games.getGameState(created.id!), isNotNull);
+      expect(
+        await games.getInventoryQuantity(created.id!, 'care_toothbrush'),
+        1,
+      );
+      await games.ensureInitialState(created.id!);
+      expect(
+        await games.getInventoryQuantity(created.id!, 'care_toothbrush'),
+        1,
+      );
       final oldState = (await games.getGameState(created.id!))!.toMap();
       await games.savePet(
         Pet(
@@ -224,6 +233,10 @@ void main() {
       expect((await profiles.findAll()).single.id, created.id);
       expect((await games.getGameState(created.id!))!.toMap(), oldState);
       expect((await games.getPet(created.id!))?.name, 'Финни');
+      expect(
+        await games.getInventoryQuantity(created.id!, 'care_toothbrush'),
+        1,
+      );
     },
   );
 

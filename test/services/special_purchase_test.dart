@@ -176,7 +176,7 @@ void main() {
       (GameTransactionType.needExpense, -120, 'story_${story.id}'),
     );
     expect(await games.getInventoryQuantity(player.profileId, story.id), 0);
-    expect((await games.getPet(player.profileId))!.satiety, 40);
+    expect((await games.getPet(player.profileId))!.satiety, 34);
     expect((await proofs()).single['outcome'], 'purchased');
     expect(
       (await games.getPeriodById(
@@ -263,8 +263,8 @@ void main() {
     await decide(player, 'promo-buy', purchase: true);
     expect((await games.getGameState(player.profileId))!.walletBalance, 465);
     expect(await games.getInventoryQuantity(player.profileId, treat.id), 1);
-    expect((await games.getPet(player.profileId))!.satiety, 40);
-    expect((await games.getPet(player.profileId))!.mood, 40);
+    expect((await games.getPet(player.profileId))!.satiety, 34);
+    expect((await games.getPet(player.profileId))!.mood, 39);
     final transactions = await games.getTransactions(player.profileId);
     expect(
       (transactions.last.type, transactions.last.amount),

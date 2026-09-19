@@ -359,6 +359,15 @@ void main() {
     period = (await tester.runAsync(
       () => _resolveAll(profile.id!, period, periods, games, database, content),
     ))!;
+    await tester.runAsync(() async {
+      final db = await database.database;
+      await db.update(
+        'game_periods',
+        {'day_progress': 76},
+        where: 'id = ?',
+        whereArgs: [period.id],
+      );
+    });
     await tester.runAsync(
       harness.container.read(homeControllerProvider.notifier).load,
     );
