@@ -51,10 +51,7 @@ Future<GoRouter> _pumpApp(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [contentRepositoryProvider.overrideWithValue(repository)],
-      child: MaterialApp.router(
-        theme: AppTheme.light,
-        routerConfig: router,
-      ),
+      child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
     ),
   );
   await tester.pumpAndSettle();

@@ -8,21 +8,21 @@ void main() {
     final glossary = await AssetContentRepository().loadGlossary();
 
     expect(glossary, hasLength(9));
+    expect(glossary.map((entry) => entry.term).toList(growable: false), const [
+      'Доход',
+      'Расход',
+      'Обязательная покупка',
+      'Необязательная покупка',
+      'Накопления',
+      'Финансовая цель',
+      'Бюджет',
+      'План',
+      'Факт',
+    ]);
     expect(
-      glossary.map((entry) => entry.term).toList(growable: false),
-      const [
-        'Доход',
-        'Расход',
-        'Обязательная покупка',
-        'Необязательная покупка',
-        'Накопления',
-        'Финансовая цель',
-        'Бюджет',
-        'План',
-        'Факт',
-      ],
+      glossary.map((entry) => entry.id).toSet(),
+      hasLength(glossary.length),
     );
-    expect(glossary.map((entry) => entry.id).toSet(), hasLength(glossary.length));
     expect(
       glossary.every((entry) => entry.definition.trim().isNotEmpty),
       isTrue,

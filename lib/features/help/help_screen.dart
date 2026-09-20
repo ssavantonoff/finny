@@ -100,10 +100,7 @@ class _EmptyGlossary extends StatelessWidget {
       key: Key('glossary-empty'),
       child: Padding(
         padding: EdgeInsets.all(AppSpacing.large),
-        child: Text(
-          'Пока здесь нет терминов.',
-          textAlign: TextAlign.center,
-        ),
+        child: Text('Пока здесь нет терминов.', textAlign: TextAlign.center),
       ),
     );
   }
