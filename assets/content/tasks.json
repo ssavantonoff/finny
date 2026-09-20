@@ -1,18 +1,66 @@
 [
   {
     "id": "task_need_or_want_01",
-    "title": "Нужно или хочется?",
+    "title": "Нужно или хочу?",
     "topic": "needs_and_wants",
-    "description": "Помоги Финни выбрать, что купить сначала.",
-    "type": "choice",
+    "description": "Разложи вещи Финни на нужное и желаемое.",
+    "type": "categorization",
     "reward": 50,
     "period": 1,
     "requiredForCheckpoint": true,
     "scenarioData": {
-      "prompt": "Финни проголодался. Что стоит купить в первую очередь?",
-      "options": [{"id":"apple","label":"Яблоко"},{"id":"ball","label":"Мяч"},{"id":"decoration","label":"Украшение"}],
-      "correctOptionId": "apple",
-      "explanation": "Когда Финни голоден, сначала стоит купить еду — яблоко. Мяч и украшение могут подождать."
+      "prompt": "Финни готовится к дню. Разложи вещи: что ему нужно, а что просто хочется?",
+      "categories": [
+        {
+          "id": "need",
+          "label": "Нужно",
+          "description": "То, что связано с важной заботой о Финни."
+        },
+        {
+          "id": "want",
+          "label": "Хочу",
+          "description": "Это приятно, но можно купить позже."
+        }
+      ],
+      "items": [
+        {
+          "id": "food",
+          "label": "Корм",
+          "correctCategoryId": "need",
+          "feedback": "Корм нужен, чтобы Финни был сыт."
+        },
+        {
+          "id": "shampoo",
+          "label": "Шампунь",
+          "correctCategoryId": "need",
+          "feedback": "Шампунь нужен для ухода за Финни."
+        },
+        {
+          "id": "comb",
+          "label": "Расчёска",
+          "correctCategoryId": "need",
+          "feedback": "Расчёска помогает ухаживать за Финни."
+        },
+        {
+          "id": "ball",
+          "label": "Мяч",
+          "correctCategoryId": "want",
+          "feedback": "С мячом весело, но его можно купить позже."
+        },
+        {
+          "id": "bow",
+          "label": "Бантик",
+          "correctCategoryId": "want",
+          "feedback": "Бантик украшает Финни, но без него можно обойтись."
+        },
+        {
+          "id": "room_decoration",
+          "label": "Украшение для комнаты",
+          "correctCategoryId": "want",
+          "feedback": "Украшение делает комнату уютнее, но это не обязательная покупка."
+        }
+      ],
+      "successExplanation": "Сначала важно позаботиться о нужном. А желания можно купить позже, если хватает монет."
     }
   },
   {

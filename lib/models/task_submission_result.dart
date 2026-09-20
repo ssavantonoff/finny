@@ -13,6 +13,17 @@ final class TaskAnswerIncorrect extends TaskSubmissionResult {
   bool get rewardAppliedNow => false;
 }
 
+final class TaskCategorizationIncorrect extends TaskSubmissionResult {
+  const TaskCategorizationIncorrect({
+    required super.explanation,
+    required this.incorrectItemIds,
+  });
+
+  final Set<String> incorrectItemIds;
+
+  bool get rewardAppliedNow => false;
+}
+
 final class TaskAnswerCompleted extends TaskSubmissionResult {
   const TaskAnswerCompleted({
     required super.explanation,

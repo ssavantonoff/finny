@@ -103,11 +103,18 @@ void main() {
     );
     expect((await games.getPeriodById(profileId, period.id!))?.dayProgress, 24);
 
-    final task = await tasks.submitAnswer(
+    final task = await tasks.submitCategorization(
       profileId: profileId,
       periodId: period.id!,
       taskId: 'task_need_or_want_01',
-      answerId: 'apple',
+      assignments: const {
+        'food': 'need',
+        'shampoo': 'need',
+        'comb': 'need',
+        'ball': 'want',
+        'bow': 'want',
+        'room_decoration': 'want',
+      },
     );
     expect(task, isA<TaskAnswerCompleted>());
     expect((task as TaskAnswerCompleted).period.dayProgress, 54);

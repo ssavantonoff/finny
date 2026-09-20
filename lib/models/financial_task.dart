@@ -68,6 +68,158 @@ class ChoiceTaskScenario {
   }
 }
 
+class CategorizationTaskCategory {
+  const CategorizationTaskCategory({
+    required this.id,
+    required this.label,
+    required this.description,
+  });
+
+  final String id;
+  final String label;
+  final String description;
+
+  factory CategorizationTaskCategory.fromJson(Map<String, Object?> json) =>
+      CategorizationTaskCategory(
+        id: _requiredString(json, 'id'),
+        label: _requiredString(json, 'label'),
+        description: _requiredString(json, 'description'),
+      );
+}
+
+class CategorizationTaskItem {
+  const CategorizationTaskItem({
+    required this.id,
+    required this.label,
+    required this.correctCategoryId,
+    required this.feedback,
+  });
+
+  final String id;
+  final String label;
+  final String correctCategoryId;
+  final String feedback;
+
+  factory CategorizationTaskItem.fromJson(Map<String, Object?> json) =>
+      CategorizationTaskItem(
+        id: _requiredString(json, 'id'),
+        label: _requiredString(json, 'label'),
+        correctCategoryId: _requiredString(json, 'correctCategoryId'),
+        feedback: _requiredString(json, 'feedback'),
+      );
+}
+
+class CategorizationTaskScenario {
+  const CategorizationTaskScenario({
+    required this.prompt,
+    required this.categories,
+    required this.items,
+    required this.successExplanation,
+  });
+
+  final String prompt;
+  final List<CategorizationTaskCategory> categories;
+  final List<CategorizationTaskItem> items;
+  final String successExplanation;
+
+  factory CategorizationTaskScenario.fromJson(Map<String, Object?> json) {
+    final categories = json['categories'];
+    final items = json['items'];
+    if (categories is! List) {
+      throw const FormatException(
+        'Categorization task categories must be a list.',
+      );
+    }
+    if (items is! List) {
+      throw const FormatException('Categorization task items must be a list.');
+    }
+    return CategorizationTaskScenario(
+      prompt: _requiredString(json, 'prompt'),
+      categories: categories
+          .map((value) {
+            if (value is! Map) {
+              throw const FormatException(
+                'Categorization task category must be an object.',
+              );
+            }
+            return CategorizationTaskCategory.fromJson(
+              Map<String, Object?>.from(value),
+            );
+          })
+          .toList(growable: false),
+      items: items
+          .map((value) {
+            if (value is! Map) {
+              throw const FormatException(
+                'Categorization task item must be an object.',
+              );
+            }
+            return CategorizationTaskItem.fromJson(
+              Map<String, Object?>.from(value),
+            );
+          })
+          .toList(growable: false),
+      successExplanation: _requiredString(json, 'successExplanation'),
+    );
+  }
+
+  Map<String, String> get correctAssignments => {
+    for (final item in items) item.id: item.correctCategoryId,
+  };
+
+  void validate() {
+    if (prompt.trim().isEmpty || successExplanation.trim().isEmpty) {
+      throw const FormatException(
+        'Categorization task text must not be empty.',
+      );
+    }
+    if (categories.length < 2) {
+      throw const FormatException(
+        'Categorization task needs at least two categories.',
+      );
+    }
+    final categoryIds = <String>{};
+    for (final category in categories) {
+      if (category.id.trim().isEmpty ||
+          category.label.trim().isEmpty ||
+          category.description.trim().isEmpty) {
+        throw const FormatException(
+          'Categorization category ID, label and description are required.',
+        );
+      }
+      if (!categoryIds.add(category.id)) {
+        throw FormatException(
+          'Duplicate categorization category ID: ${category.id}',
+        );
+      }
+    }
+    if (items.length < 2) {
+      throw const FormatException(
+        'Categorization task needs at least two items.',
+      );
+    }
+    final itemIds = <String>{};
+    for (final item in items) {
+      if (item.id.trim().isEmpty ||
+          item.label.trim().isEmpty ||
+          item.correctCategoryId.trim().isEmpty ||
+          item.feedback.trim().isEmpty) {
+        throw const FormatException(
+          'Categorization item ID, label, category and feedback are required.',
+        );
+      }
+      if (!itemIds.add(item.id)) {
+        throw FormatException('Duplicate categorization item ID: ${item.id}');
+      }
+      if (!categoryIds.contains(item.correctCategoryId)) {
+        throw FormatException(
+          'Unknown category ${item.correctCategoryId} for item ${item.id}.',
+        );
+      }
+    }
+  }
+}
+
 class FinancialTask {
   const FinancialTask({
     required this.id,
@@ -78,8 +230,13 @@ class FinancialTask {
     required this.reward,
     required this.period,
     this.requiredForCheckpoint = true,
-    required this.choiceScenario,
-  });
+    ChoiceTaskScenario? choiceScenario,
+    CategorizationTaskScenario? categorizationScenario,
+  }) : // The public parameter names preserve the existing choice constructor.
+       // ignore: prefer_initializing_formals
+       _choiceScenario = choiceScenario,
+       // ignore: prefer_initializing_formals
+       _categorizationScenario = categorizationScenario;
 
   // Stable identity: a new period, reward, correct answer, or task meaning
   // requires a new ID rather than reusing persisted task progress.
@@ -91,25 +248,39 @@ class FinancialTask {
   final int reward;
   final int period;
   final bool requiredForCheckpoint;
-  final ChoiceTaskScenario choiceScenario;
+  final ChoiceTaskScenario? _choiceScenario;
+  final CategorizationTaskScenario? _categorizationScenario;
+
+  ChoiceTaskScenario get choiceScenario =>
+      _choiceScenario ?? (throw StateError('Task $id is not a choice task.'));
+
+  CategorizationTaskScenario get categorizationScenario =>
+      _categorizationScenario ??
+      (throw StateError('Task $id is not a categorization task.'));
 
   factory FinancialTask.fromJson(Map<String, Object?> json) {
     final scenario = json['scenarioData'];
     if (scenario is! Map) {
       throw const FormatException('Choice task scenario must be an object.');
     }
+    final type = _requiredString(json, 'type');
     final task = FinancialTask(
       id: _requiredString(json, 'id'),
       title: _requiredString(json, 'title'),
       topic: _requiredString(json, 'topic'),
       description: _requiredString(json, 'description'),
-      type: _requiredString(json, 'type'),
+      type: type,
       reward: _requiredInt(json, 'reward'),
       period: _requiredInt(json, 'period'),
       requiredForCheckpoint: _requiredBool(json, 'requiredForCheckpoint'),
-      choiceScenario: ChoiceTaskScenario.fromJson(
-        Map<String, Object?>.from(scenario),
-      ),
+      choiceScenario: type == 'choice'
+          ? ChoiceTaskScenario.fromJson(Map<String, Object?>.from(scenario))
+          : null,
+      categorizationScenario: type == 'categorization'
+          ? CategorizationTaskScenario.fromJson(
+              Map<String, Object?>.from(scenario),
+            )
+          : null,
     );
     task.validate();
     return task;
@@ -122,10 +293,24 @@ class FinancialTask {
     if (period <= 0 || reward <= 0) {
       throw const FormatException('Task period and reward must be positive.');
     }
-    if (type != 'choice') {
-      throw FormatException('Unsupported task type: $type');
+    switch (type) {
+      case 'choice':
+        if (_choiceScenario == null || _categorizationScenario != null) {
+          throw const FormatException('Choice task scenario is invalid.');
+        }
+        _choiceScenario.validate();
+        break;
+      case 'categorization':
+        if (_categorizationScenario == null || _choiceScenario != null) {
+          throw const FormatException(
+            'Categorization task scenario is invalid.',
+          );
+        }
+        _categorizationScenario.validate();
+        break;
+      default:
+        throw FormatException('Unsupported task type: $type');
     }
-    choiceScenario.validate();
   }
 }
 
