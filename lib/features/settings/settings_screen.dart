@@ -29,6 +29,21 @@ class SettingsScreen extends StatelessWidget {
                 onTap: () => context.push('/help'),
               ),
             ),
+            const SizedBox(height: AppSpacing.small),
+            Card(
+              child: ListTile(
+                key: const Key('settings-adult'),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.medium,
+                  vertical: AppSpacing.small,
+                ),
+                leading: const Icon(Icons.supervisor_account_outlined),
+                title: const Text('Для взрослого'),
+                subtitle: const Text('Цели обучения и общий прогресс'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/adult'),
+              ),
+            ),
           ],
         ),
       ),

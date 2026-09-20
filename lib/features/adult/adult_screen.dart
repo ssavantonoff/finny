@@ -1,14 +1,286 @@
-import 'package:finny/core/widgets/feature_placeholder_screen.dart';
-import 'package:flutter/widgets.dart';
+import 'dart:async';
 
-class AdultScreen extends StatelessWidget {
+import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/features/adult/adult_controller.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+class AdultScreen extends ConsumerStatefulWidget {
   const AdultScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const FeaturePlaceholderScreen(
-    title: 'Для взрослых',
-    description:
-        'Раздел намеренно оставлен без полной реализации на foundation-этапе.',
-    currentPath: '/adult',
-  );
+  ConsumerState<AdultScreen> createState() => _AdultScreenState();
+}
+
+class _AdultScreenState extends ConsumerState<AdultScreen> {
+  bool _unlocked = false;
+
+  void _goBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/settings');
+    }
+  }
+
+  void _unlock() {
+    if (_unlocked) return;
+    setState(() => _unlocked = true);
+    unawaited(ref.read(adultControllerProvider.notifier).load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          key: const Key('adult-back'),
+          tooltip: 'Назад',
+          onPressed: _goBack,
+          icon: const Icon(Icons.arrow_back),
+        ),
+        title: const Text('Для взрослого'),
+      ),
+      body: _unlocked
+          ? _AdultBody(state: ref.watch(adultControllerProvider))
+          : _AdultBarrier(onUnlock: _unlock),
+    );
+  }
+}
+
+class _AdultBarrier extends StatelessWidget {
+  const _AdultBarrier({required this.onUnlock});
+
+  final VoidCallback onUnlock;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.large),
+          child: Card(
+            key: const Key('adult-barrier'),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.large),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Раздел для взрослого',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.small),
+                  const Text(
+                    'Нажмите и удерживайте кнопку, чтобы продолжить.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.large),
+                  Semantics(
+                    button: true,
+                    label: 'Удерживать',
+                    hint: 'Нажмите и удерживайте, чтобы открыть раздел',
+                    child: Material(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(AppRadii.button),
+                      child: InkWell(
+                        key: const Key('adult-unlock'),
+                        onTap: () {},
+                        onLongPress: onUnlock,
+                        borderRadius: BorderRadius.circular(AppRadii.button),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 160,
+                            minHeight: 48,
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Удерживать',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AdultBody extends ConsumerWidget {
+  const _AdultBody({required this.state});
+
+  final AdultViewState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SafeArea(
+      child: switch (state) {
+        AdultLoading() => const Center(child: CircularProgressIndicator()),
+        AdultNoProfile() => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.large),
+            child: Text('Профиль пока не выбран.'),
+          ),
+        ),
+        AdultFailure() => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.large),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Не получилось загрузить прогресс.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.medium),
+                FilledButton(
+                  key: const Key('adult-retry'),
+                  onPressed: () => unawaited(
+                    ref.read(adultControllerProvider.notifier).load(),
+                  ),
+                  child: const Text('Попробовать снова'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AdultReady(:final overview) => _AdultOverviewContent(
+          overview: overview,
+        ),
+      },
+    );
+  }
+}
+
+class _AdultOverviewContent extends StatelessWidget {
+  const _AdultOverviewContent({required this.overview});
+
+  static const learningTopics = [
+    'отличать нужное от желаемого',
+    'планировать ограниченный бюджет',
+    'выбирать приоритеты',
+    'откладывать на цель',
+    'менять план при неожиданной трате',
+    'оценивать скидку без импульсивной покупки',
+  ];
+
+  final AdultOverview overview;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (overview.completedDays / adultCampaignDays)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.medium),
+          children: [
+            const _SectionCard(
+              title: 'О проекте',
+              child: Text(
+                'Finny помогает ребёнку тренировать базовые финансовые '
+                'навыки через игровые решения: планирование, обязательные и '
+                'необязательные траты, накопления и последствия выбора.',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.medium),
+            _SectionCard(
+              title: 'Чему учится ребёнок',
+              child: Column(
+                children: [
+                  for (final topic in learningTopics)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.small),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.check_circle_outline, size: 20),
+                          const SizedBox(width: AppSpacing.small),
+                          Expanded(child: Text(topic)),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.medium),
+            _SectionCard(
+              title: 'Общий прогресс',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Пройдено дней: ${overview.completedDays} из '
+                    '$adultCampaignDays',
+                  ),
+                  const SizedBox(height: AppSpacing.small),
+                  LinearProgressIndicator(
+                    key: const Key('adult-campaign-progress'),
+                    value: progress,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.medium),
+            _SectionCard(
+              title: 'Финни',
+              child: Text(
+                key: const Key('adult-development'),
+                overview.developmentStage == null
+                    ? 'Финни ещё не создан.'
+                    : 'Этап развития Финни: '
+                          '${overview.developmentStage} из 3',
+              ),
+            ),
+            const SizedBox(height: AppSpacing.medium),
+            _SectionCard(
+              title: 'Накопления',
+              child: Text(
+                key: const Key('adult-savings'),
+                'В копилке: ${overview.savedAmount} монет',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.medium),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.small),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
 }

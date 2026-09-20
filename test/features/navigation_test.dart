@@ -1,6 +1,7 @@
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/app/router.dart';
+import 'package:finny/features/adult/adult_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/settings/settings_screen.dart';
 import 'package:finny/models/game_period.dart';
@@ -188,7 +189,14 @@ void main() {
 
       expect(find.byType(SettingsScreen), findsOneWidget);
       expect(find.byKey(const Key('settings-help')), findsOneWidget);
+      expect(find.byKey(const Key('settings-adult')), findsOneWidget);
       expect(find.text('Финансовые термины'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('settings-adult')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AdultScreen), findsOneWidget);
+      expect(find.byKey(const Key('adult-barrier')), findsOneWidget);
 
       // Navigate to outside-shell route: /budget
       container.read(routerProvider).go('/budget');
