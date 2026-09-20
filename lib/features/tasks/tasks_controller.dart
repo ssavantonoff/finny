@@ -214,4 +214,45 @@ class TasksController extends Notifier<TasksState> {
       }
     }
   }
+
+  Future<TaskSubmissionResult?> submitBudgetPriority(
+    FinancialTask task,
+    Map<String, String> assignments,
+  ) async {
+    final current = state;
+    final profileId = current.profileId;
+    final periodId = current.period?.id;
+    if (_submitting ||
+        current.load != TasksLoad.ready ||
+        profileId == null ||
+        periodId == null ||
+        current.isCompleted(task)) {
+      return null;
+    }
+    _submitting = true;
+    state = current.copyWith(submittingTaskId: task.id);
+    try {
+      final result = await ref
+          .read(taskServiceProvider)
+          .submitBudgetPriority(
+            profileId: profileId,
+            periodId: periodId,
+            taskId: task.id,
+            assignments: assignments,
+          );
+      if (ref.read(activeProfileIdProvider) != profileId) return null;
+      if (result is TaskAnswerCompleted) await load();
+      return result;
+    } catch (_) {
+      if (ref.read(activeProfileIdProvider) == profileId) {
+        state = current.copyWith(clearSubmitting: true);
+      }
+      rethrow;
+    } finally {
+      _submitting = false;
+      if (state.submittingTaskId != null) {
+        state = state.copyWith(clearSubmitting: true);
+      }
+    }
+  }
 }

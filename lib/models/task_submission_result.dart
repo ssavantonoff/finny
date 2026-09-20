@@ -24,6 +24,19 @@ final class TaskCategorizationIncorrect extends TaskSubmissionResult {
   bool get rewardAppliedNow => false;
 }
 
+final class TaskBudgetPriorityIncorrect extends TaskSubmissionResult {
+  const TaskBudgetPriorityIncorrect({
+    required super.explanation,
+    required this.incorrectItemIds,
+    this.overBudgetBy = 0,
+  });
+
+  final Set<String> incorrectItemIds;
+  final int overBudgetBy;
+
+  bool get rewardAppliedNow => false;
+}
+
 final class TaskAnswerCompleted extends TaskSubmissionResult {
   const TaskAnswerCompleted({
     required super.explanation,

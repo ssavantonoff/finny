@@ -163,6 +163,10 @@ void main() {
       () => (games as dynamic).submitFinancialTaskAnswer,
       throwsNoSuchMethodError,
     );
+    expect(
+      () => (games as dynamic).submitFinancialTaskBudgetPriority,
+      throwsNoSuchMethodError,
+    );
     final profile = await profiles.create(
       Profile(
         gameName: 'Игрок',

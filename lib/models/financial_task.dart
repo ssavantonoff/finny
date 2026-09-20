@@ -220,6 +220,169 @@ class CategorizationTaskScenario {
   }
 }
 
+enum BudgetPriorityDecision {
+  buyNow('buy_now'),
+  later('later');
+
+  const BudgetPriorityDecision(this.wireValue);
+
+  final String wireValue;
+
+  factory BudgetPriorityDecision.fromJson(String value) =>
+      BudgetPriorityDecision.values.firstWhere(
+        (decision) => decision.wireValue == value,
+        orElse: () => throw FormatException(
+          'Unsupported budget priority decision: $value',
+        ),
+      );
+}
+
+class BudgetPriorityTaskItem {
+  const BudgetPriorityTaskItem({
+    required this.id,
+    required this.label,
+    required this.price,
+    required this.correctDecision,
+    required this.feedback,
+  });
+
+  final String id;
+  final String label;
+  final int price;
+  final BudgetPriorityDecision correctDecision;
+  final String feedback;
+
+  factory BudgetPriorityTaskItem.fromJson(Map<String, Object?> json) =>
+      BudgetPriorityTaskItem(
+        id: _requiredString(json, 'id'),
+        label: _requiredString(json, 'label'),
+        price: _requiredInt(json, 'price'),
+        correctDecision: BudgetPriorityDecision.fromJson(
+          _requiredString(json, 'correctDecision'),
+        ),
+        feedback: _requiredString(json, 'feedback'),
+      );
+}
+
+class BudgetPriorityTaskScenario {
+  const BudgetPriorityTaskScenario({
+    required this.prompt,
+    required this.budget,
+    required this.buyNowLabel,
+    required this.buyNowDescription,
+    required this.laterLabel,
+    required this.laterDescription,
+    required this.items,
+    required this.incorrectExplanation,
+    required this.successExplanation,
+  });
+
+  final String prompt;
+  final int budget;
+  final String buyNowLabel;
+  final String buyNowDescription;
+  final String laterLabel;
+  final String laterDescription;
+  final List<BudgetPriorityTaskItem> items;
+  final String incorrectExplanation;
+  final String successExplanation;
+
+  factory BudgetPriorityTaskScenario.fromJson(Map<String, Object?> json) {
+    final items = json['items'];
+    if (items is! List) {
+      throw const FormatException('Budget priority items must be a list.');
+    }
+    return BudgetPriorityTaskScenario(
+      prompt: _requiredString(json, 'prompt'),
+      budget: _requiredInt(json, 'budget'),
+      buyNowLabel: _requiredString(json, 'buyNowLabel'),
+      buyNowDescription: _requiredString(json, 'buyNowDescription'),
+      laterLabel: _requiredString(json, 'laterLabel'),
+      laterDescription: _requiredString(json, 'laterDescription'),
+      items: items
+          .map((value) {
+            if (value is! Map) {
+              throw const FormatException(
+                'Budget priority item must be an object.',
+              );
+            }
+            return BudgetPriorityTaskItem.fromJson(
+              Map<String, Object?>.from(value),
+            );
+          })
+          .toList(growable: false),
+      incorrectExplanation: _requiredString(json, 'incorrectExplanation'),
+      successExplanation: _requiredString(json, 'successExplanation'),
+    );
+  }
+
+  Map<String, String> get correctAssignments => {
+    for (final item in items) item.id: item.correctDecision.wireValue,
+  };
+
+  void validate() {
+    if (prompt.trim().isEmpty ||
+        buyNowLabel.trim().isEmpty ||
+        buyNowDescription.trim().isEmpty ||
+        laterLabel.trim().isEmpty ||
+        laterDescription.trim().isEmpty ||
+        incorrectExplanation.trim().isEmpty ||
+        successExplanation.trim().isEmpty) {
+      throw const FormatException(
+        'Budget priority task text must not be empty.',
+      );
+    }
+    if (budget <= 0) {
+      throw const FormatException('Budget priority budget must be positive.');
+    }
+    if (items.length < 2) {
+      throw const FormatException(
+        'Budget priority task needs at least two items.',
+      );
+    }
+    final itemIds = <String>{};
+    var hasBuyNow = false;
+    var hasLater = false;
+    var correctBuyNowTotal = 0;
+    for (final item in items) {
+      if (item.id.trim().isEmpty ||
+          item.label.trim().isEmpty ||
+          item.feedback.trim().isEmpty) {
+        throw const FormatException(
+          'Budget priority item ID, label and feedback are required.',
+        );
+      }
+      if (item.price <= 0) {
+        throw const FormatException(
+          'Budget priority item price must be positive.',
+        );
+      }
+      if (!itemIds.add(item.id)) {
+        throw FormatException('Duplicate budget priority item ID: ${item.id}');
+      }
+      switch (item.correctDecision) {
+        case BudgetPriorityDecision.buyNow:
+          hasBuyNow = true;
+          correctBuyNowTotal += item.price;
+          break;
+        case BudgetPriorityDecision.later:
+          hasLater = true;
+          break;
+      }
+    }
+    if (!hasBuyNow || !hasLater) {
+      throw const FormatException(
+        'Budget priority solution needs buy-now and later items.',
+      );
+    }
+    if (correctBuyNowTotal > budget) {
+      throw const FormatException(
+        'Budget priority canonical solution exceeds its budget.',
+      );
+    }
+  }
+}
+
 class FinancialTask {
   const FinancialTask({
     required this.id,
@@ -232,11 +395,14 @@ class FinancialTask {
     this.requiredForCheckpoint = true,
     ChoiceTaskScenario? choiceScenario,
     CategorizationTaskScenario? categorizationScenario,
+    BudgetPriorityTaskScenario? budgetPriorityScenario,
   }) : // The public parameter names preserve the existing choice constructor.
        // ignore: prefer_initializing_formals
        _choiceScenario = choiceScenario,
        // ignore: prefer_initializing_formals
-       _categorizationScenario = categorizationScenario;
+       _categorizationScenario = categorizationScenario,
+       // ignore: prefer_initializing_formals
+       _budgetPriorityScenario = budgetPriorityScenario;
 
   // Stable identity: a new period, reward, correct answer, or task meaning
   // requires a new ID rather than reusing persisted task progress.
@@ -250,6 +416,7 @@ class FinancialTask {
   final bool requiredForCheckpoint;
   final ChoiceTaskScenario? _choiceScenario;
   final CategorizationTaskScenario? _categorizationScenario;
+  final BudgetPriorityTaskScenario? _budgetPriorityScenario;
 
   ChoiceTaskScenario get choiceScenario =>
       _choiceScenario ?? (throw StateError('Task $id is not a choice task.'));
@@ -257,6 +424,10 @@ class FinancialTask {
   CategorizationTaskScenario get categorizationScenario =>
       _categorizationScenario ??
       (throw StateError('Task $id is not a categorization task.'));
+
+  BudgetPriorityTaskScenario get budgetPriorityScenario =>
+      _budgetPriorityScenario ??
+      (throw StateError('Task $id is not a budget priority task.'));
 
   factory FinancialTask.fromJson(Map<String, Object?> json) {
     final scenario = json['scenarioData'];
@@ -281,6 +452,11 @@ class FinancialTask {
               Map<String, Object?>.from(scenario),
             )
           : null,
+      budgetPriorityScenario: type == 'budget_priority'
+          ? BudgetPriorityTaskScenario.fromJson(
+              Map<String, Object?>.from(scenario),
+            )
+          : null,
     );
     task.validate();
     return task;
@@ -295,18 +471,32 @@ class FinancialTask {
     }
     switch (type) {
       case 'choice':
-        if (_choiceScenario == null || _categorizationScenario != null) {
+        if (_choiceScenario == null ||
+            _categorizationScenario != null ||
+            _budgetPriorityScenario != null) {
           throw const FormatException('Choice task scenario is invalid.');
         }
         _choiceScenario.validate();
         break;
       case 'categorization':
-        if (_categorizationScenario == null || _choiceScenario != null) {
+        if (_categorizationScenario == null ||
+            _choiceScenario != null ||
+            _budgetPriorityScenario != null) {
           throw const FormatException(
             'Categorization task scenario is invalid.',
           );
         }
         _categorizationScenario.validate();
+        break;
+      case 'budget_priority':
+        if (_budgetPriorityScenario == null ||
+            _choiceScenario != null ||
+            _categorizationScenario != null) {
+          throw const FormatException(
+            'Budget priority task scenario is invalid.',
+          );
+        }
+        _budgetPriorityScenario.validate();
         break;
       default:
         throw FormatException('Unsupported task type: $type');

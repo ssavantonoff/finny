@@ -64,8 +64,47 @@
     }
   },
   {
-    "id":"task_priority_02","title":"Что важнее сейчас?","topic":"priorities","description":"Сначала выбери самое важное.","type":"choice","reward":50,"period":2,"requiredForCheckpoint":true,
-    "scenarioData":{"prompt":"У Финни осталось 100 монет. Корм закончился, а ещё ему понравился бантик. Что стоит купить сначала?","options":[{"id":"food","label":"Корм"},{"id":"bow","label":"Бантик"},{"id":"other","label":"Потратить деньги на что-нибудь другое"}],"correctOptionId":"food","explanation":"Сначала стоит закрыть необходимость — купить корм. Желание можно оставить на потом."}
+    "id": "task_priority_02",
+    "title": "Что важнее сейчас?",
+    "topic": "priorities",
+    "description": "Собери покупки и уложись в бюджет.",
+    "type": "budget_priority",
+    "reward": 50,
+    "period": 2,
+    "requiredForCheckpoint": true,
+    "scenarioData": {
+      "prompt": "У Финни 150 монет на покупки.\nКорм закончился, шампунь почти закончился,\nа бантик очень понравился Финни.",
+      "budget": 150,
+      "buyNowLabel": "Купить сейчас",
+      "buyNowDescription": "То, что берём в этот раз.",
+      "laterLabel": "Оставить на потом",
+      "laterDescription": "То, что можно отложить.",
+      "items": [
+        {
+          "id": "food",
+          "label": "Корм",
+          "price": 90,
+          "correctDecision": "buy_now",
+          "feedback": "Корм закончился — его важно купить сейчас."
+        },
+        {
+          "id": "shampoo",
+          "label": "Шампунь",
+          "price": 60,
+          "correctDecision": "buy_now",
+          "feedback": "После корма остаётся 60 монет — этого как раз хватает на шампунь."
+        },
+        {
+          "id": "bow",
+          "label": "Бантик",
+          "price": 80,
+          "correctDecision": "later",
+          "feedback": "Бантик хочется купить, но сейчас важнее корм и шампунь."
+        }
+      ],
+      "incorrectExplanation": "Проверь, что сначала выбраны важные покупки и бюджет не превышен.",
+      "successExplanation": "Ты сначала выбрал важные покупки и уложился в бюджет.\nЖелание можно оставить на потом."
+    }
   },
   {
     "id":"task_changed_plan_03","title":"Планы изменились","topic":"adapting_plan","description":"Реши, как поступить с неожиданной тратой.","type":"choice","reward":50,"period":3,"requiredForCheckpoint":true,

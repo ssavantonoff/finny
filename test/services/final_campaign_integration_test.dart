@@ -76,7 +76,6 @@ void main() {
       await savings.selectGoal(profileId: profileId, goalId: goal.id);
 
       const answers = {
-        2: ('task_priority_02', 'food'),
         3: ('task_changed_plan_03', 'adapt'),
         4: ('task_discount_04', 'consider'),
         5: ('task_final_choice_05', 'balanced'),
@@ -117,6 +116,17 @@ void main() {
               'ball': 'want',
               'bow': 'want',
               'room_decoration': 'want',
+            },
+          );
+        } else if (day == 2) {
+          taskResult = await tasks.submitBudgetPriority(
+            profileId: profileId,
+            periodId: period.id!,
+            taskId: 'task_priority_02',
+            assignments: const {
+              'food': 'buy_now',
+              'shampoo': 'buy_now',
+              'bow': 'later',
             },
           );
         } else {
