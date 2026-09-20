@@ -1,6 +1,8 @@
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/app/router.dart';
+import 'package:finny/features/home/home_screen.dart';
+import 'package:finny/features/settings/settings_screen.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -58,7 +60,7 @@ class _NavGames extends SqliteGameRepository {
 
 void main() {
   testWidgets(
-    '5 bottom navigation tabs in exact order, tap transitions and outside-shell route isolation',
+    'bottom navigation, Home settings entry point and outside-shell routes',
     (tester) async {
       final database = createTestDatabase();
       addTearDown(database.close);
@@ -177,6 +179,16 @@ void main() {
         tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
         0,
       );
+
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(find.byKey(const Key('home-settings')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('home-settings')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SettingsScreen), findsOneWidget);
+      expect(find.byKey(const Key('settings-help')), findsOneWidget);
+      expect(find.text('Финансовые термины'), findsOneWidget);
 
       // Navigate to outside-shell route: /budget
       container.read(routerProvider).go('/budget');

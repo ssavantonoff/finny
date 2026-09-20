@@ -1,13 +1,37 @@
-import 'package:finny/core/widgets/feature_placeholder_screen.dart';
-import 'package:flutter/widgets.dart';
+import 'package:finny/core/theme/app_theme.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const FeaturePlaceholderScreen(
-    title: 'Настройки',
-    description: 'Локальные настройки приложения будут добавлены здесь.',
-    currentPath: '/settings',
-  );
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Настройки')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.medium),
+          children: [
+            Text('Справка', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: AppSpacing.small),
+            Card(
+              child: ListTile(
+                key: const Key('settings-help'),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.medium,
+                  vertical: AppSpacing.small,
+                ),
+                leading: const Icon(Icons.menu_book_outlined),
+                title: const Text('Финансовые термины'),
+                subtitle: const Text('Короткие объяснения слов из игры'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/help'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
