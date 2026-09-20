@@ -353,6 +353,12 @@ class _HomeContent extends StatelessWidget {
       appBar: AppBar(
         title: Text(title),
         actions: [
+          IconButton(
+            key: const Key('home-settings'),
+            tooltip: 'Настройки',
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings_outlined),
+          ),
           Center(
             child: Padding(
               padding: const EdgeInsets.only(right: AppSpacing.medium),

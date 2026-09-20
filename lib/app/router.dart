@@ -2,6 +2,7 @@ import 'package:finny/app/bootstrap_screen.dart';
 import 'package:finny/app/scaffold_with_nested_navigation.dart';
 import 'package:finny/features/adult/adult_screen.dart';
 import 'package:finny/features/budget/budget_screen.dart';
+import 'package:finny/features/help/help_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/onboarding/onboarding_screen.dart';
 import 'package:finny/features/period_summary/period_summary_screen.dart';
@@ -71,6 +72,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           completedDay: int.tryParse(state.uri.queryParameters['day'] ?? ''),
         ),
       ),
+      GoRoute(path: '/help', builder: (_, _) => const HelpScreen()),
       GoRoute(path: '/adult', builder: (_, _) => const AdultScreen()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
     ],
