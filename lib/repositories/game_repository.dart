@@ -106,6 +106,13 @@ abstract interface class TaskCompletionPort {
     required FinancialTask task,
     required String answerId,
   });
+
+  Future<TaskSubmissionResult> submitFinancialTaskCategorization({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required Map<String, String> assignments,
+  });
 }
 
 abstract interface class PurchasePort {
@@ -1989,9 +1996,78 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
     task.validate();
     if (profileId <= 0 ||
         periodId <= 0 ||
+        task.type != 'choice' ||
         !task.choiceScenario.options.any((option) => option.id == answerId)) {
       throw ArgumentError('Invalid financial task submission.');
     }
+    return _submitFinancialTask(
+      profileId: profileId,
+      periodId: periodId,
+      task: task,
+      isCorrect: answerId == task.choiceScenario.correctOptionId,
+      incorrectResult: TaskAnswerIncorrect(
+        explanation: task.choiceScenario.explanation,
+      ),
+      completedScenarioState: {'answerId': task.choiceScenario.correctOptionId},
+      completionExplanation: task.choiceScenario.explanation,
+      isValidCompletedScenario: (state) =>
+          state['answerId'] == task.choiceScenario.correctOptionId,
+    );
+  }
+
+  @override
+  Future<TaskSubmissionResult> submitFinancialTaskCategorization({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required Map<String, String> assignments,
+  }) async {
+    task.validate();
+    if (profileId <= 0 ||
+        periodId <= 0 ||
+        task.type != 'categorization' ||
+        !_isValidCategorizationSubmission(
+          task.categorizationScenario,
+          assignments,
+        )) {
+      throw ArgumentError('Invalid financial task categorization.');
+    }
+    final scenario = task.categorizationScenario;
+    final incorrectItemIds = {
+      for (final item in scenario.items)
+        if (assignments[item.id] != item.correctCategoryId) item.id,
+    };
+    final canonicalAssignments = scenario.correctAssignments;
+    return _submitFinancialTask(
+      profileId: profileId,
+      periodId: periodId,
+      task: task,
+      isCorrect: incorrectItemIds.isEmpty,
+      incorrectResult: TaskCategorizationIncorrect(
+        explanation: 'Проверь выделенные карточки и попробуй ещё раз.',
+        incorrectItemIds: Set.unmodifiable(incorrectItemIds),
+      ),
+      completedScenarioState: {
+        'type': 'categorization',
+        'assignments': canonicalAssignments,
+      },
+      completionExplanation: scenario.successExplanation,
+      isValidCompletedScenario: (state) =>
+          _isCanonicalCategorizationState(state, canonicalAssignments) ||
+          _isLegacyDayOneChoiceState(task, state),
+    );
+  }
+
+  Future<TaskSubmissionResult> _submitFinancialTask({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required bool isCorrect,
+    required TaskSubmissionResult incorrectResult,
+    required Map<String, Object?> completedScenarioState,
+    required String completionExplanation,
+    required bool Function(Map<String, Object?> state) isValidCompletedScenario,
+  }) async {
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
       final period = await _core._requirePeriod(txn, profileId, periodId);
@@ -2025,8 +2101,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
         if (progress == null ||
             progress.status != TaskProgressStatus.completed ||
             !progress.rewardClaimed ||
-            progress.scenarioState['answerId'] !=
-                task.choiceScenario.correctOptionId ||
+            !isValidCompletedScenario(progress.scenarioState) ||
             (task.requiredForCheckpoint && !checkpointResolved) ||
             rewardRows.length != 1) {
           throw const TaskIntegrityException(
@@ -2043,7 +2118,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
           throw const TaskIntegrityException('Task reward is inconsistent.');
         }
         return TaskAnswerCompleted(
-          explanation: task.choiceScenario.explanation,
+          explanation: completionExplanation,
           canonicalReward: task.reward,
           rewardAppliedNow: false,
           wasAlreadyCompleted: true,
@@ -2058,11 +2133,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       if (!canComplete) {
         throw StateError('New task completion is unavailable for this period.');
       }
-      if (answerId != task.choiceScenario.correctOptionId) {
-        return TaskAnswerIncorrect(
-          explanation: task.choiceScenario.explanation,
-        );
-      }
+      if (!isCorrect) return incorrectResult;
 
       final now = DateTime.now().toUtc();
       final state = await _core._applyWalletTransaction(
@@ -2085,7 +2156,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
           taskId: task.id,
           status: TaskProgressStatus.completed,
           rewardClaimed: true,
-          scenarioState: {'answerId': task.choiceScenario.correctOptionId},
+          scenarioState: completedScenarioState,
           updatedAt: now,
         ).toMap(),
       );
@@ -2105,7 +2176,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
             )
           : afterTime;
       return TaskAnswerCompleted(
-        explanation: task.choiceScenario.explanation,
+        explanation: completionExplanation,
         canonicalReward: task.reward,
         rewardAppliedNow: true,
         wasAlreadyCompleted: false,
@@ -2114,6 +2185,47 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       );
     });
   }
+
+  bool _isValidCategorizationSubmission(
+    CategorizationTaskScenario scenario,
+    Map<String, String> assignments,
+  ) {
+    final itemIds = scenario.items.map((item) => item.id).toSet();
+    final categoryIds = scenario.categories
+        .map((category) => category.id)
+        .toSet();
+    return assignments.length == itemIds.length &&
+        assignments.keys.every(
+          (itemId) => itemId.trim().isNotEmpty && itemIds.contains(itemId),
+        ) &&
+        itemIds.every(assignments.containsKey) &&
+        assignments.values.every(
+          (categoryId) =>
+              categoryId.trim().isNotEmpty && categoryIds.contains(categoryId),
+        );
+  }
+
+  bool _isCanonicalCategorizationState(
+    Map<String, Object?> state,
+    Map<String, String> canonicalAssignments,
+  ) {
+    if (state['type'] != 'categorization' || state['assignments'] is! Map) {
+      return false;
+    }
+    final stored = Map<Object?, Object?>.from(state['assignments'] as Map);
+    return stored.length == canonicalAssignments.length &&
+        canonicalAssignments.entries.every(
+          (entry) => stored[entry.key] == entry.value,
+        );
+  }
+
+  bool _isLegacyDayOneChoiceState(
+    FinancialTask task,
+    Map<String, Object?> state,
+  ) =>
+      task.id == 'task_need_or_want_01' &&
+      state.length == 1 &&
+      state['answerId'] == 'apple';
 }
 
 class SqlitePurchasePort implements PurchasePort {

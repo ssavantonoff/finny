@@ -66,6 +66,50 @@ FinancialTask testFinancialTask(int periodNumber) => FinancialTask(
   ),
 );
 
+FinancialTask testCategorizationTask({
+  String id = 'task_need_or_want_01',
+  int period = 1,
+}) => FinancialTask(
+  id: id,
+  title: 'Нужно или хочу?',
+  topic: 'needs_and_wants',
+  description: 'Разложи вещи Финни на нужное и желаемое.',
+  type: 'categorization',
+  reward: 50,
+  period: period,
+  requiredForCheckpoint: true,
+  categorizationScenario: const CategorizationTaskScenario(
+    prompt: 'Разложи вещи.',
+    categories: [
+      CategorizationTaskCategory(
+        id: 'need',
+        label: 'Нужно',
+        description: 'Важная забота.',
+      ),
+      CategorizationTaskCategory(
+        id: 'want',
+        label: 'Хочу',
+        description: 'Можно купить позже.',
+      ),
+    ],
+    items: [
+      CategorizationTaskItem(
+        id: 'food',
+        label: 'Корм',
+        correctCategoryId: 'need',
+        feedback: 'Корм нужен.',
+      ),
+      CategorizationTaskItem(
+        id: 'ball',
+        label: 'Мяч',
+        correctCategoryId: 'want',
+        feedback: 'Мяч может подождать.',
+      ),
+    ],
+    successExplanation: 'Сначала важное.',
+  ),
+);
+
 List<PeriodDefinition> testPeriodDefinitions({int count = 2}) => [
   for (var number = 1; number <= count; number++)
     PeriodDefinition(

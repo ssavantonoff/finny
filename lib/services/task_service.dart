@@ -31,6 +31,9 @@ class TaskService {
     final matches = tasks.where((task) => task.id == taskId).toList();
     if (matches.isEmpty) throw StateError('Task $taskId does not exist.');
     final task = matches.single;
+    if (task.type != 'choice') {
+      throw StateError('Task ${task.id} is not a choice task.');
+    }
     if (!task.choiceScenario.options.any((option) => option.id == answerId)) {
       throw ArgumentError.value(answerId, 'answerId', 'Unknown answer ID.');
     }
@@ -53,5 +56,67 @@ class TaskService {
       task: task,
       answerId: answerId,
     );
+  }
+
+  Future<TaskSubmissionResult> submitCategorization({
+    required int profileId,
+    required int periodId,
+    required String taskId,
+    required Map<String, String> assignments,
+  }) async {
+    if (profileId <= 0 || periodId <= 0 || taskId.trim().isEmpty) {
+      throw ArgumentError('Profile, period and task IDs are required.');
+    }
+    final tasks = await _contentRepository.loadTasks();
+    validateTaskContent(tasks);
+    final matches = tasks.where((task) => task.id == taskId).toList();
+    if (matches.isEmpty) throw StateError('Task $taskId does not exist.');
+    final task = matches.single;
+    if (task.type != 'categorization') {
+      throw StateError('Task ${task.id} is not a categorization task.');
+    }
+    _validateCategorizationSubmission(task.categorizationScenario, assignments);
+    final period = await _gameRepository.getPeriodById(profileId, periodId);
+    if (period == null) {
+      throw StateError(
+        'Period $periodId does not exist for profile $profileId.',
+      );
+    }
+    if (task.period != period.periodNumber) {
+      throw StateError('Task ${task.id} does not belong to this period.');
+    }
+    if (task.requiredForCheckpoint &&
+        !period.requiredCheckpoints.contains('financial_task')) {
+      throw StateError('Period $periodId does not require a financial task.');
+    }
+    return _taskCompletionPort.submitFinancialTaskCategorization(
+      profileId: profileId,
+      periodId: periodId,
+      task: task,
+      assignments: Map.unmodifiable(assignments),
+    );
+  }
+}
+
+void _validateCategorizationSubmission(
+  CategorizationTaskScenario scenario,
+  Map<String, String> assignments,
+) {
+  final expectedItemIds = scenario.items.map((item) => item.id).toSet();
+  final submittedItemIds = assignments.keys.toSet();
+  if (assignments.keys.any((id) => id.trim().isEmpty) ||
+      assignments.values.any((id) => id.trim().isEmpty) ||
+      submittedItemIds.length != expectedItemIds.length ||
+      !submittedItemIds.containsAll(expectedItemIds) ||
+      !expectedItemIds.containsAll(submittedItemIds)) {
+    throw ArgumentError('Assignments must contain every canonical item once.');
+  }
+  final categoryIds = scenario.categories
+      .map((category) => category.id)
+      .toSet();
+  if (assignments.values.any(
+    (categoryId) => !categoryIds.contains(categoryId),
+  )) {
+    throw ArgumentError('Assignment contains an unknown category ID.');
   }
 }

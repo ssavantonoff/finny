@@ -219,17 +219,25 @@ void main() {
     );
     final service = container.read(taskServiceProvider);
 
-    final first = await service.submitAnswer(
+    const assignments = {
+      'food': 'need',
+      'shampoo': 'need',
+      'comb': 'need',
+      'ball': 'want',
+      'bow': 'want',
+      'room_decoration': 'want',
+    };
+    final first = await service.submitCategorization(
       profileId: profile.id!,
       periodId: period.id!,
       taskId: 'task_need_or_want_01',
-      answerId: 'apple',
+      assignments: assignments,
     );
-    final replay = await service.submitAnswer(
+    final replay = await service.submitCategorization(
       profileId: profile.id!,
       periodId: period.id!,
       taskId: 'task_need_or_want_01',
-      answerId: 'apple',
+      assignments: assignments,
     );
     expect((first as TaskAnswerCompleted).rewardAppliedNow, isTrue);
     expect((replay as TaskAnswerCompleted).wasAlreadyCompleted, isTrue);

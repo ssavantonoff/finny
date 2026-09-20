@@ -38,6 +38,47 @@ Map<String, Object?> _validTaskJson() => {
   },
 };
 
+Map<String, Object?> _validCategorizationTaskJson() => {
+  'id': 'task_need_or_want_01',
+  'title': 'Нужно или хочу?',
+  'topic': 'needs_and_wants',
+  'description': 'Разложи вещи Финни на нужное и желаемое.',
+  'type': 'categorization',
+  'reward': 50,
+  'period': 1,
+  'requiredForCheckpoint': true,
+  'scenarioData': <String, Object?>{
+    'prompt': 'Разложи вещи.',
+    'categories': [
+      <String, Object?>{
+        'id': 'need',
+        'label': 'Нужно',
+        'description': 'Важная забота.',
+      },
+      <String, Object?>{
+        'id': 'want',
+        'label': 'Хочу',
+        'description': 'Можно купить позже.',
+      },
+    ],
+    'items': [
+      <String, Object?>{
+        'id': 'food',
+        'label': 'Корм',
+        'correctCategoryId': 'need',
+        'feedback': 'Корм нужен.',
+      },
+      <String, Object?>{
+        'id': 'ball',
+        'label': 'Мяч',
+        'correctCategoryId': 'want',
+        'feedback': 'Мяч может подождать.',
+      },
+    ],
+    'successExplanation': 'Сначала важное.',
+  },
+};
+
 Map<String, Object?> _validShopJson() => {
   'id': 'food_apple',
   'name': 'Яблоко',
@@ -63,7 +104,10 @@ FinancialTask _copyTask(FinancialTask task, {bool? requiredForCheckpoint}) =>
       period: task.period,
       requiredForCheckpoint:
           requiredForCheckpoint ?? task.requiredForCheckpoint,
-      choiceScenario: task.choiceScenario,
+      choiceScenario: task.type == 'choice' ? task.choiceScenario : null,
+      categorizationScenario: task.type == 'categorization'
+          ? task.categorizationScenario
+          : null,
     );
 
 void main() {
@@ -87,13 +131,13 @@ void main() {
     expect(dayOne.period, 1);
     expect(dayOne.reward, 50);
     expect(dayOne.requiredForCheckpoint, isTrue);
-    expect(dayOne.choiceScenario.options.map((option) => option.id), [
-      'apple',
-      'ball',
-      'decoration',
+    expect(dayOne.type, 'categorization');
+    expect(dayOne.categorizationScenario.categories.map((item) => item.id), [
+      'need',
+      'want',
     ]);
-    expect(dayOne.choiceScenario.correctOptionId, 'apple');
-    expect(dayOne.choiceScenario.explanation, isNotEmpty);
+    expect(dayOne.categorizationScenario.items, hasLength(6));
+    expect(dayOne.categorizationScenario.successExplanation, isNotEmpty);
     expect(tasks.where((task) => task.requiredForCheckpoint), hasLength(5));
     expect(
       tasks
@@ -558,4 +602,77 @@ void main() {
       );
     }
   });
+
+  test('valid categorization parses into typed content', () {
+    final task = FinancialTask.fromJson(_validCategorizationTaskJson());
+    expect(task.type, 'categorization');
+    expect(task.categorizationScenario.categories, hasLength(2));
+    expect(task.categorizationScenario.items, hasLength(2));
+    expect(task.categorizationScenario.correctAssignments, {
+      'food': 'need',
+      'ball': 'want',
+    });
+  });
+
+  test('categorization rejects duplicate and malformed canonical fields', () {
+    final invalidCases = <String, void Function(Map<String, Object?>)>{
+      'duplicate category ID': (task) {
+        final scenario = task['scenarioData'] as Map<String, Object?>;
+        final categories = scenario['categories'] as List;
+        (categories[1] as Map<String, Object?>)['id'] = 'need';
+      },
+      'duplicate item ID': (task) {
+        final scenario = task['scenarioData'] as Map<String, Object?>;
+        final items = scenario['items'] as List;
+        (items[1] as Map<String, Object?>)['id'] = 'food';
+      },
+      'unknown item category': (task) {
+        final scenario = task['scenarioData'] as Map<String, Object?>;
+        final items = scenario['items'] as List;
+        (items[0] as Map<String, Object?>)['correctCategoryId'] = 'other';
+      },
+      'empty prompt': (task) {
+        final scenario = task['scenarioData'] as Map<String, Object?>;
+        scenario['prompt'] = ' ';
+      },
+      'empty category description': (task) {
+        final scenario = task['scenarioData'] as Map<String, Object?>;
+        final categories = scenario['categories'] as List;
+        (categories[0] as Map<String, Object?>)['description'] = '';
+      },
+      'empty item feedback': (task) {
+        final scenario = task['scenarioData'] as Map<String, Object?>;
+        final items = scenario['items'] as List;
+        (items[0] as Map<String, Object?>)['feedback'] = ' ';
+      },
+      'empty success explanation': (task) {
+        final scenario = task['scenarioData'] as Map<String, Object?>;
+        scenario['successExplanation'] = '';
+      },
+    };
+    for (final entry in invalidCases.entries) {
+      final json = _validCategorizationTaskJson();
+      entry.value(json);
+      expect(
+        () => FinancialTask.fromJson(json),
+        throwsFormatException,
+        reason: entry.key,
+      );
+    }
+  });
+
+  test(
+    'campaign keeps exactly one required categorization task on Day 1',
+    () async {
+      final tasks = await AssetContentRepository().loadTasks();
+      final dayOneRequired = tasks.where(
+        (task) => task.period == 1 && task.requiredForCheckpoint,
+      );
+      expect(dayOneRequired, hasLength(1));
+      expect(dayOneRequired.single.id, 'task_need_or_want_01');
+      expect(dayOneRequired.single.type, 'categorization');
+      expect(() => validateCampaignTaskContent(tasks), returnsNormally);
+      expect(tasks.where((task) => task.type == 'choice'), hasLength(5));
+    },
+  );
 }

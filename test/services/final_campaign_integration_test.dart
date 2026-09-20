@@ -76,7 +76,6 @@ void main() {
       await savings.selectGoal(profileId: profileId, goalId: goal.id);
 
       const answers = {
-        1: ('task_need_or_want_01', 'apple'),
         2: ('task_priority_02', 'food'),
         3: ('task_changed_plan_03', 'adapt'),
         4: ('task_discount_04', 'consider'),
@@ -105,13 +104,30 @@ void main() {
           );
         }
 
-        final answer = answers[day]!;
-        final taskResult = await tasks.submitAnswer(
-          profileId: profileId,
-          periodId: period.id!,
-          taskId: answer.$1,
-          answerId: answer.$2,
-        );
+        final TaskSubmissionResult taskResult;
+        if (day == 1) {
+          taskResult = await tasks.submitCategorization(
+            profileId: profileId,
+            periodId: period.id!,
+            taskId: 'task_need_or_want_01',
+            assignments: const {
+              'food': 'need',
+              'shampoo': 'need',
+              'comb': 'need',
+              'ball': 'want',
+              'bow': 'want',
+              'room_decoration': 'want',
+            },
+          );
+        } else {
+          final answer = answers[day]!;
+          taskResult = await tasks.submitAnswer(
+            profileId: profileId,
+            periodId: period.id!,
+            taskId: answer.$1,
+            answerId: answer.$2,
+          );
+        }
         expect(taskResult, isA<TaskAnswerCompleted>());
 
         if (day == 4) {
