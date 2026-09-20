@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
+import 'package:finny/features/tasks/budget_priority_task_screen.dart';
 import 'package:finny/features/tasks/tasks_controller.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/task_submission_result.dart';
@@ -126,6 +127,18 @@ class _TaskCard extends StatelessWidget {
               onPressed: completed || state.submittingTaskId != null
                   ? null
                   : () {
+                      if (task.type == 'budget_priority') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            fullscreenDialog: true,
+                            builder: (_) => BudgetPriorityTaskScreen(
+                              task: task,
+                              controller: controller,
+                            ),
+                          ),
+                        );
+                        return;
+                      }
                       if (task.type == 'categorization') {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(

@@ -113,6 +113,13 @@ abstract interface class TaskCompletionPort {
     required FinancialTask task,
     required Map<String, String> assignments,
   });
+
+  Future<TaskSubmissionResult> submitFinancialTaskBudgetPriority({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required Map<String, String> assignments,
+  });
 }
 
 abstract interface class PurchasePort {
@@ -2058,6 +2065,59 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
     );
   }
 
+  @override
+  Future<TaskSubmissionResult> submitFinancialTaskBudgetPriority({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required Map<String, String> assignments,
+  }) async {
+    task.validate();
+    if (profileId <= 0 ||
+        periodId <= 0 ||
+        task.type != 'budget_priority' ||
+        !_isValidBudgetPrioritySubmission(
+          task.budgetPriorityScenario,
+          assignments,
+        )) {
+      throw ArgumentError('Invalid financial task budget priority.');
+    }
+    final scenario = task.budgetPriorityScenario;
+    final incorrectItemIds = {
+      for (final item in scenario.items)
+        if (assignments[item.id] != item.correctDecision.wireValue) item.id,
+    };
+    final buyNowTotal = scenario.items
+        .where(
+          (item) =>
+              assignments[item.id] == BudgetPriorityDecision.buyNow.wireValue,
+        )
+        .fold<int>(0, (total, item) => total + item.price);
+    final overBudgetBy = buyNowTotal > scenario.budget
+        ? buyNowTotal - scenario.budget
+        : 0;
+    final canonicalAssignments = scenario.correctAssignments;
+    return _submitFinancialTask(
+      profileId: profileId,
+      periodId: periodId,
+      task: task,
+      isCorrect: incorrectItemIds.isEmpty && overBudgetBy == 0,
+      incorrectResult: TaskBudgetPriorityIncorrect(
+        explanation: scenario.incorrectExplanation,
+        incorrectItemIds: Set.unmodifiable(incorrectItemIds),
+        overBudgetBy: overBudgetBy,
+      ),
+      completedScenarioState: {
+        'type': 'budget_priority',
+        'assignments': canonicalAssignments,
+      },
+      completionExplanation: scenario.successExplanation,
+      isValidCompletedScenario: (state) =>
+          _isCanonicalBudgetPriorityState(state, canonicalAssignments) ||
+          _isLegacyDayTwoChoiceState(task, state),
+    );
+  }
+
   Future<TaskSubmissionResult> _submitFinancialTask({
     required int profileId,
     required int periodId,
@@ -2226,6 +2286,47 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       task.id == 'task_need_or_want_01' &&
       state.length == 1 &&
       state['answerId'] == 'apple';
+
+  bool _isValidBudgetPrioritySubmission(
+    BudgetPriorityTaskScenario scenario,
+    Map<String, String> assignments,
+  ) {
+    final itemIds = scenario.items.map((item) => item.id).toSet();
+    final decisions = BudgetPriorityDecision.values
+        .map((decision) => decision.wireValue)
+        .toSet();
+    return assignments.length == itemIds.length &&
+        assignments.keys.every(
+          (itemId) => itemId.trim().isNotEmpty && itemIds.contains(itemId),
+        ) &&
+        itemIds.every(assignments.containsKey) &&
+        assignments.values.every(
+          (decision) =>
+              decision.trim().isNotEmpty && decisions.contains(decision),
+        );
+  }
+
+  bool _isCanonicalBudgetPriorityState(
+    Map<String, Object?> state,
+    Map<String, String> canonicalAssignments,
+  ) {
+    if (state['type'] != 'budget_priority' || state['assignments'] is! Map) {
+      return false;
+    }
+    final stored = Map<Object?, Object?>.from(state['assignments'] as Map);
+    return stored.length == canonicalAssignments.length &&
+        canonicalAssignments.entries.every(
+          (entry) => stored[entry.key] == entry.value,
+        );
+  }
+
+  bool _isLegacyDayTwoChoiceState(
+    FinancialTask task,
+    Map<String, Object?> state,
+  ) =>
+      task.id == 'task_priority_02' &&
+      state.length == 1 &&
+      state['answerId'] == 'food';
 }
 
 class SqlitePurchasePort implements PurchasePort {

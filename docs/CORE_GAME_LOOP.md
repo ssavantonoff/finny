@@ -29,7 +29,7 @@ wallet. Повторный старт не может создать второ�
 
 Purchase, explicit income и wallet → savings разрешены только в
 `active`/`readyToFinish`. Новая task reward выдаётся только после canonical
-successful completion choice- или categorization-задания в `active`: reward,
+successful completion choice-, categorization- или budget-priority-задания в `active`: reward,
 `task_progress` и checkpoint `financial_task` записываются одной SQLite
 transaction. Consistent replay
 завершённого задания допустим и в `readyToFinish`/`completed`, но не выдаёт

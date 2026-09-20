@@ -79,6 +79,50 @@ Map<String, Object?> _validCategorizationTaskJson() => {
   },
 };
 
+Map<String, Object?> _validBudgetPriorityTaskJson() => {
+  'id': 'task_priority_02',
+  'title': 'Что купить сначала?',
+  'topic': 'priorities',
+  'description': 'Собери покупки и уложись в бюджет.',
+  'type': 'budget_priority',
+  'reward': 50,
+  'period': 2,
+  'requiredForCheckpoint': true,
+  'scenarioData': <String, Object?>{
+    'prompt': 'Раздели покупки.',
+    'budget': 150,
+    'buyNowLabel': 'Купить сейчас',
+    'buyNowDescription': 'Самое важное в пределах бюджета.',
+    'laterLabel': 'Оставить на потом',
+    'laterDescription': 'То, что может подождать.',
+    'items': [
+      <String, Object?>{
+        'id': 'food',
+        'label': 'Корм',
+        'price': 90,
+        'correctDecision': 'buy_now',
+        'feedback': 'Корм нужен каждый день.',
+      },
+      <String, Object?>{
+        'id': 'shampoo',
+        'label': 'Шампунь',
+        'price': 60,
+        'correctDecision': 'buy_now',
+        'feedback': 'Шампунь нужен для ухода.',
+      },
+      <String, Object?>{
+        'id': 'bow',
+        'label': 'Бантик',
+        'price': 80,
+        'correctDecision': 'later',
+        'feedback': 'Бантик может подождать.',
+      },
+    ],
+    'incorrectExplanation': 'Проверь важность и бюджет.',
+    'successExplanation': 'Важные покупки укладываются в бюджет.',
+  },
+};
+
 Map<String, Object?> _validShopJson() => {
   'id': 'food_apple',
   'name': 'Яблоко',
@@ -107,6 +151,9 @@ FinancialTask _copyTask(FinancialTask task, {bool? requiredForCheckpoint}) =>
       choiceScenario: task.type == 'choice' ? task.choiceScenario : null,
       categorizationScenario: task.type == 'categorization'
           ? task.categorizationScenario
+          : null,
+      budgetPriorityScenario: task.type == 'budget_priority'
+          ? task.budgetPriorityScenario
           : null,
     );
 
@@ -138,6 +185,23 @@ void main() {
     ]);
     expect(dayOne.categorizationScenario.items, hasLength(6));
     expect(dayOne.categorizationScenario.successExplanation, isNotEmpty);
+    final dayTwo = tasks.singleWhere((task) => task.id == 'task_priority_02');
+    expect(dayTwo.period, 2);
+    expect(dayTwo.reward, 50);
+    expect(dayTwo.requiredForCheckpoint, isTrue);
+    expect(dayTwo.type, 'budget_priority');
+    expect(dayTwo.budgetPriorityScenario.budget, 150);
+    expect(
+      [
+        for (final item in dayTwo.budgetPriorityScenario.items)
+          (item.id, item.price, item.correctDecision.wireValue),
+      ],
+      [
+        ('food', 90, 'buy_now'),
+        ('shampoo', 60, 'buy_now'),
+        ('bow', 80, 'later'),
+      ],
+    );
     expect(tasks.where((task) => task.requiredForCheckpoint), hasLength(5));
     expect(
       tasks
@@ -661,6 +725,75 @@ void main() {
     }
   });
 
+  test('valid budget priority parses into typed content', () {
+    final task = FinancialTask.fromJson(_validBudgetPriorityTaskJson());
+    expect(task.type, 'budget_priority');
+    expect(task.budgetPriorityScenario.budget, 150);
+    expect(task.budgetPriorityScenario.items, hasLength(3));
+    expect(task.budgetPriorityScenario.correctAssignments, {
+      'food': 'buy_now',
+      'shampoo': 'buy_now',
+      'bow': 'later',
+    });
+  });
+
+  test('budget priority rejects malformed canonical fields', () {
+    final invalidCases = <String, void Function(Map<String, Object?>)>{
+      'zero budget': (task) =>
+          (task['scenarioData'] as Map<String, Object?>)['budget'] = 0,
+      'negative budget': (task) =>
+          (task['scenarioData'] as Map<String, Object?>)['budget'] = -1,
+      'empty prompt': (task) =>
+          (task['scenarioData'] as Map<String, Object?>)['prompt'] = ' ',
+      'empty zone label': (task) =>
+          (task['scenarioData'] as Map<String, Object?>)['buyNowLabel'] = '',
+      'duplicate item ID': (task) {
+        final items =
+            (task['scenarioData'] as Map<String, Object?>)['items'] as List;
+        (items[1] as Map<String, Object?>)['id'] = 'food';
+      },
+      'zero price': (task) {
+        final items =
+            (task['scenarioData'] as Map<String, Object?>)['items'] as List;
+        (items[0] as Map<String, Object?>)['price'] = 0;
+      },
+      'negative price': (task) {
+        final items =
+            (task['scenarioData'] as Map<String, Object?>)['items'] as List;
+        (items[0] as Map<String, Object?>)['price'] = -1;
+      },
+      'unknown decision': (task) {
+        final items =
+            (task['scenarioData'] as Map<String, Object?>)['items'] as List;
+        (items[0] as Map<String, Object?>)['correctDecision'] = 'unknown';
+      },
+      'empty feedback': (task) {
+        final items =
+            (task['scenarioData'] as Map<String, Object?>)['items'] as List;
+        (items[0] as Map<String, Object?>)['feedback'] = ' ';
+      },
+      'no later item': (task) {
+        final items =
+            (task['scenarioData'] as Map<String, Object?>)['items'] as List;
+        (items[2] as Map<String, Object?>)['correctDecision'] = 'buy_now';
+      },
+      'canonical buy-now total exceeds budget': (task) =>
+          (task['scenarioData'] as Map<String, Object?>)['budget'] = 149,
+      'empty explanation': (task) =>
+          (task['scenarioData'] as Map<String, Object?>)['successExplanation'] =
+              '',
+    };
+    for (final entry in invalidCases.entries) {
+      final json = _validBudgetPriorityTaskJson();
+      entry.value(json);
+      expect(
+        () => FinancialTask.fromJson(json),
+        throwsFormatException,
+        reason: entry.key,
+      );
+    }
+  });
+
   test(
     'campaign keeps exactly one required categorization task on Day 1',
     () async {
@@ -671,8 +804,14 @@ void main() {
       expect(dayOneRequired, hasLength(1));
       expect(dayOneRequired.single.id, 'task_need_or_want_01');
       expect(dayOneRequired.single.type, 'categorization');
+      final dayTwoRequired = tasks.where(
+        (task) => task.period == 2 && task.requiredForCheckpoint,
+      );
+      expect(dayTwoRequired, hasLength(1));
+      expect(dayTwoRequired.single.id, 'task_priority_02');
+      expect(dayTwoRequired.single.type, 'budget_priority');
       expect(() => validateCampaignTaskContent(tasks), returnsNormally);
-      expect(tasks.where((task) => task.type == 'choice'), hasLength(5));
+      expect(tasks.where((task) => task.type == 'choice'), hasLength(4));
     },
   );
 }

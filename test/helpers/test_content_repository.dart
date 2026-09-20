@@ -110,6 +110,55 @@ FinancialTask testCategorizationTask({
   ),
 );
 
+FinancialTask testBudgetPriorityTask({
+  String id = 'task_priority_02',
+  int period = 2,
+}) => FinancialTask(
+  id: id,
+  title: 'Что важнее сейчас?',
+  topic: 'priorities',
+  description: 'Собери покупки и уложись в бюджет.',
+  type: 'budget_priority',
+  reward: 50,
+  period: period,
+  requiredForCheckpoint: true,
+  budgetPriorityScenario: const BudgetPriorityTaskScenario(
+    prompt: 'У Финни 150 монет на покупки.\nКорм закончился, шампунь почти закончился,\nа бантик очень понравился Финни.',
+    budget: 150,
+    buyNowLabel: 'Купить сейчас',
+    buyNowDescription: 'То, что берём в этот раз.',
+    laterLabel: 'Оставить на потом',
+    laterDescription: 'То, что можно отложить.',
+    items: [
+      BudgetPriorityTaskItem(
+        id: 'food',
+        label: 'Корм',
+        price: 90,
+        correctDecision: BudgetPriorityDecision.buyNow,
+        feedback: 'Корм закончился — его важно купить сейчас.',
+      ),
+      BudgetPriorityTaskItem(
+        id: 'shampoo',
+        label: 'Шампунь',
+        price: 60,
+        correctDecision: BudgetPriorityDecision.buyNow,
+        feedback:
+            'После корма остаётся 60 монет — этого как раз хватает на шампунь.',
+      ),
+      BudgetPriorityTaskItem(
+        id: 'bow',
+        label: 'Бантик',
+        price: 80,
+        correctDecision: BudgetPriorityDecision.later,
+        feedback: 'Бантик хочется купить, но сейчас важнее корм и шампунь.',
+      ),
+    ],
+    incorrectExplanation:
+        'Проверь, что сначала выбраны важные покупки и бюджет не превышен.',
+    successExplanation: 'Ты сначала выбрал важные покупки и уложился в бюджет.\nЖелание можно оставить на потом.',
+  ),
+);
+
 List<PeriodDefinition> testPeriodDefinitions({int count = 2}) => [
   for (var number = 1; number <= count; number++)
     PeriodDefinition(
