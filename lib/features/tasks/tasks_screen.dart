@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
@@ -12,7 +13,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 class TasksScreen extends ConsumerStatefulWidget {
-  const TasksScreen({super.key});
+  const TasksScreen({super.key, this.random});
+
+  final Random? random;
 
   @override
   ConsumerState<TasksScreen> createState() => _TasksScreenState();
@@ -57,7 +60,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             button: 'Попробовать ещё раз',
             onPressed: controller.load,
           ),
-          TasksLoad.ready => _TaskList(state: state, controller: controller),
+          TasksLoad.ready => _TaskList(
+            state: state,
+            controller: controller,
+            random: widget.random,
+          ),
         },
       ),
     );
@@ -65,10 +72,11 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
 }
 
 class _TaskList extends StatelessWidget {
-  const _TaskList({required this.state, required this.controller});
+  const _TaskList({required this.state, required this.controller, this.random});
 
   final TasksState state;
   final TasksController controller;
+  final Random? random;
 
   @override
   Widget build(BuildContext context) {
@@ -84,12 +92,22 @@ class _TaskList extends StatelessWidget {
         const SizedBox(height: AppSpacing.medium),
         const Text('Главное задание'),
         for (final task in required)
-          _TaskCard(task: task, state: state, controller: controller),
+          _TaskCard(
+            task: task,
+            state: state,
+            controller: controller,
+            random: random,
+          ),
         if (optional.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.medium),
           const Text('Дополнительное задание'),
           for (final task in optional)
-            _TaskCard(task: task, state: state, controller: controller),
+            _TaskCard(
+              task: task,
+              state: state,
+              controller: controller,
+              random: random,
+            ),
         ],
       ],
     );
@@ -101,11 +119,13 @@ class _TaskCard extends StatelessWidget {
     required this.task,
     required this.state,
     required this.controller,
+    this.random,
   });
 
   final FinancialTask task;
   final TasksState state;
   final TasksController controller;
+  final Random? random;
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +167,7 @@ class _TaskCard extends StatelessWidget {
                             builder: (_) => _CategorizationTaskScreen(
                               task: task,
                               controller: controller,
+                              random: random,
                             ),
                           ),
                         );
@@ -292,10 +313,12 @@ class _CategorizationTaskScreen extends StatefulWidget {
   const _CategorizationTaskScreen({
     required this.task,
     required this.controller,
+    this.random,
   });
 
   final FinancialTask task;
   final TasksController controller;
+  final Random? random;
 
   @override
   State<_CategorizationTaskScreen> createState() =>
@@ -308,8 +331,29 @@ class _CategorizationTaskScreenState extends State<_CategorizationTaskScreen> {
   TaskSubmissionResult? result;
   bool submitting = false;
   bool failed = false;
+  late final List<CategorizationTaskItem> shuffledItems;
 
   CategorizationTaskScenario get scenario => widget.task.categorizationScenario;
+
+  @override
+  void initState() {
+    super.initState();
+    shuffledItems = [...scenario.items]..shuffle(widget.random ?? Random());
+    if (_sameOrder(shuffledItems, scenario.items) && shuffledItems.length > 1) {
+      final first = shuffledItems.removeAt(0);
+      shuffledItems.add(first);
+    }
+  }
+
+  bool _sameOrder(
+    List<CategorizationTaskItem> left,
+    List<CategorizationTaskItem> right,
+  ) {
+    for (var index = 0; index < left.length; index++) {
+      if (left[index].id != right[index].id) return false;
+    }
+    return true;
+  }
 
   Set<String> get incorrectItemIds => switch (result) {
     TaskCategorizationIncorrect(:final incorrectItemIds) => incorrectItemIds,
@@ -390,7 +434,7 @@ class _CategorizationTaskScreenState extends State<_CategorizationTaskScreen> {
               spacing: AppSpacing.small,
               runSpacing: AppSpacing.small,
               children: [
-                for (final item in scenario.items)
+                for (final item in shuffledItems)
                   if (!assignments.containsKey(item.id))
                     _buildDraggableItem(context, item),
               ],
@@ -411,7 +455,7 @@ class _CategorizationTaskScreenState extends State<_CategorizationTaskScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.small),
-            for (final item in scenario.items)
+            for (final item in shuffledItems)
               if (incorrectItemIds.contains(item.id))
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.small),
@@ -515,7 +559,7 @@ class _CategorizationTaskScreenState extends State<_CategorizationTaskScreen> {
                 spacing: AppSpacing.small,
                 runSpacing: AppSpacing.small,
                 children: [
-                  for (final item in scenario.items)
+                  for (final item in shuffledItems)
                     if (assignments[item.id] == category.id)
                       _buildDraggableItem(context, item),
                 ],

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:finny/app/providers.dart';
 import 'package:finny/features/tasks/tasks_screen.dart';
 import 'package:finny/models/financial_task.dart';
@@ -77,6 +79,23 @@ const _dayOneTask = FinancialTask(
   ),
 );
 
+class _DeterministicShuffleRandom implements Random {
+  var _calls = 0;
+
+  @override
+  bool nextBool() => false;
+
+  @override
+  double nextDouble() => 0;
+
+  @override
+  int nextInt(int max) {
+    final call = _calls++;
+    if (call < 5) return max - 1;
+    return max > 1 ? 1 : 0;
+  }
+}
+
 Future<void> _pumpUntil(
   WidgetTester tester,
   Finder finder, {
@@ -120,6 +139,47 @@ Future<void> _dragToCategory(
   final end = tester.getCenter(zone);
   await tester.dragFrom(start, end - start);
   await tester.pump(const Duration(milliseconds: 300));
+}
+
+List<String> _visualOrder(WidgetTester tester, Iterable<String> itemIds) {
+  final ordered = itemIds.toList();
+  ordered.sort((left, right) {
+    final leftOffset = tester.getTopLeft(
+      find.byKey(Key('categorization-item-$left')),
+    );
+    final rightOffset = tester.getTopLeft(
+      find.byKey(Key('categorization-item-$right')),
+    );
+    final vertical = leftOffset.dy.compareTo(rightOffset.dy);
+    return vertical == 0 ? leftOffset.dx.compareTo(rightOffset.dx) : vertical;
+  });
+  return ordered;
+}
+
+List<String> _visualOrderInZone(
+  WidgetTester tester,
+  String categoryId,
+  Iterable<String> itemIds,
+) {
+  final zone = find.byKey(Key('categorization-zone-$categoryId'));
+  final ordered = itemIds.toList();
+  ordered.sort((left, right) {
+    final leftOffset = tester.getTopLeft(
+      find.descendant(
+        of: zone,
+        matching: find.byKey(Key('categorization-item-$left')),
+      ),
+    );
+    final rightOffset = tester.getTopLeft(
+      find.descendant(
+        of: zone,
+        matching: find.byKey(Key('categorization-item-$right')),
+      ),
+    );
+    final vertical = leftOffset.dy.compareTo(rightOffset.dy);
+    return vertical == 0 ? leftOffset.dx.compareTo(rightOffset.dx) : vertical;
+  });
+  return ordered;
 }
 
 void main() {
@@ -192,7 +252,9 @@ void main() {
       await tester.pumpWidget(
         UncontrolledProviderScope(
           container: container,
-          child: const MaterialApp(home: TasksScreen()),
+          child: MaterialApp(
+            home: TasksScreen(random: _DeterministicShuffleRandom()),
+          ),
         ),
       );
       await _pumpUntil(
@@ -207,6 +269,44 @@ void main() {
         find.byKey(const Key('categorization-task-screen')),
         findsOneWidget,
       );
+      final firstOpenOrder = _visualOrder(tester, [
+        'food',
+        'shampoo',
+        'comb',
+        'ball',
+        'bow',
+        'room_decoration',
+      ]);
+      expect(firstOpenOrder, [
+        'shampoo',
+        'comb',
+        'ball',
+        'bow',
+        'room_decoration',
+        'food',
+      ]);
+      await tester.tap(find.byTooltip('Закрыть'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('task-open-task_need_or_want_01')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      final secondOpenOrder = _visualOrder(tester, [
+        'food',
+        'shampoo',
+        'comb',
+        'ball',
+        'bow',
+        'room_decoration',
+      ]);
+      expect(secondOpenOrder, [
+        'food',
+        'comb',
+        'ball',
+        'bow',
+        'room_decoration',
+        'shampoo',
+      ]);
+      expect(secondOpenOrder, isNot(firstOpenOrder));
       for (final label in [
         'Корм',
         'Шампунь',
@@ -236,6 +336,13 @@ void main() {
       await _tapToCategory(tester, 'bow', 'need');
       await _tapToCategory(tester, 'room_decoration', 'want');
 
+      final needOrderBeforeIncorrect = _visualOrderInZone(tester, 'need', [
+        'shampoo',
+        'comb',
+        'bow',
+      ]);
+      expect(needOrderBeforeIncorrect, ['comb', 'bow', 'shampoo']);
+
       expect(
         tester
             .widget<FilledButton>(find.byKey(const Key('categorization-check')))
@@ -257,6 +364,10 @@ void main() {
       expect(
         find.byKey(const Key('categorization-feedback-bow')),
         findsOneWidget,
+      );
+      expect(
+        _visualOrderInZone(tester, 'need', ['shampoo', 'comb', 'bow']),
+        needOrderBeforeIncorrect,
       );
       final wantZone = find.byKey(const Key('categorization-zone-want'));
       expect(
