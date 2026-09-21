@@ -4,7 +4,7 @@
 
 **Дата проверки:** 21 сентября 2026 года
 
-**Base commit SHA:** `71fc6f9bdc7c72309fd267568d0b8cfc3ed4aaa9`
+**Base commit SHA:** `0d445edfe95ae7ea07508b2dfa9ee29b4a4b8937`
 
 Официальные требования определяют критерии проверки. Актуальный `origin/main`
 является источником истины для статуса реализации. Матрица построена по
@@ -48,7 +48,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Budget / plan-fact | `lib/features/budget/budget_screen.dart`, `lib/services/budget_service.dart`, `lib/repositories/game_repository.dart` | `test/home_budget_planning_test.dart`, `test/services/core_game_loop_test.dart`, `test/features/period_summary_screen_test.dart` |
 | Shop / inventory / item effects | `lib/features/shop/shop_screen.dart`, `lib/services/purchase_service.dart`, `lib/services/item_use_service.dart` | `test/features/shop/shop_screen_test.dart`, `test/services/shop_catalog_purchase_test.dart`, `test/services/item_use_test.dart` |
 | Savings / goals | `lib/features/savings/savings_screen.dart`, `lib/services/savings_service.dart`, `assets/content/goals.json` | `test/features/savings/savings_core_test.dart`, `test/features/savings/savings_screen_test.dart`, `test/features/savings/savings_controller_test.dart` |
-| Tasks / rewards | `lib/features/tasks/tasks_screen.dart`, `lib/services/task_service.dart`, `assets/content/tasks.json` | `test/services/task_categorization_test.dart`, `test/services/task_budget_priority_test.dart`, `test/services/task_completion_test.dart` |
+| Tasks / rewards | `lib/features/tasks/tasks_screen.dart`, `lib/features/tasks/budget_priority_task_screen.dart`, `lib/services/task_service.dart` и `assets/content/tasks.json` | `test/features/tasks/day2_budget_priority_task_test.dart`, `test/services/task_categorization_test.dart`, `test/services/task_completion_test.dart` |
 | Period / day lifecycle / Pet state | `lib/services/period_service.dart`, `lib/services/day_lifecycle_service.dart`, `lib/models/pet_state_rules.dart` | `test/services/day_lifecycle_test.dart`, `test/services/pet_state_test.dart`, `test/services/final_campaign_integration_test.dart` |
 | Summary / progress / Adult | `lib/features/period_summary/period_summary_screen.dart`, `lib/features/progress/progress_screen.dart`, `lib/features/adult/adult_screen.dart` | `test/features/period_summary_screen_test.dart`, `test/features/adult/adult_screen_test.dart` |
 | Persistence / migrations | `lib/core/database/app_database.dart`, `lib/repositories/game_repository.dart`, `lib/repositories/profile_repository.dart` | `test/repositories/game_repository_test.dart`, `test/core/database_migration_test.dart`, `test/core/database_v9_migration_test.dart` |
