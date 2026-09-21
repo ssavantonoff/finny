@@ -234,10 +234,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _showCampaignEvent(int walletBalance) async {
     if (_eventDialogOpen || !_isHomeVisible) return;
-    _eventDialogOpen = true;
     final event = ref.read(campaignEventControllerProvider);
-    if (event is CampaignEventReady &&
-        event.kind == CampaignEventKind.day3Bowl) {
+    if (event is! CampaignEventReady ||
+        (event.kind == CampaignEventKind.day3Bowl &&
+            event.storyEvent == null)) {
+      return;
+    }
+    _eventDialogOpen = true;
+    if (event.kind == CampaignEventKind.day3Bowl) {
       final isNewEvent = event.storyEvent?.status == StoryEventStatus.armed;
       await showGeneralDialog<void>(
         context: context,
@@ -247,8 +251,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             !isNewEvent || MediaQuery.of(context).disableAnimations
             ? Duration.zero
             : const Duration(milliseconds: 350),
-        pageBuilder: (_, _, _) =>
-            CampaignEventDialog(walletBalance: walletBalance),
+        pageBuilder: (_, _, _) => CampaignEventDialog(
+          initialState: event,
+          walletBalance: walletBalance,
+        ),
         transitionBuilder: (_, animation, _, child) {
           final entrance = CurvedAnimation(
             parent: animation,
@@ -267,7 +273,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => CampaignEventDialog(walletBalance: walletBalance),
+        builder: (_) => CampaignEventDialog(
+          initialState: event,
+          walletBalance: walletBalance,
+        ),
       );
     }
     _eventDialogOpen = false;
@@ -940,20 +949,43 @@ class _IncomeExplanation extends StatelessWidget {
   );
 }
 
-class CampaignEventDialog extends ConsumerWidget {
-  const CampaignEventDialog({super.key, required this.walletBalance});
+class CampaignEventDialog extends ConsumerStatefulWidget {
+  const CampaignEventDialog({
+    super.key,
+    required this.initialState,
+    required this.walletBalance,
+  });
 
+  final CampaignEventReady initialState;
   final int walletBalance;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(campaignEventControllerProvider);
-    if (state is! CampaignEventReady) {
-      return const PopScope(
-        canPop: false,
-        child: AlertDialog(content: Center(child: CircularProgressIndicator())),
-      );
-    }
+  ConsumerState<CampaignEventDialog> createState() =>
+      _CampaignEventDialogState();
+}
+
+class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
+  late CampaignEventReady _lastReady;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastReady = widget.initialState;
+  }
+
+  bool _isMatchingReady(CampaignEventState next) =>
+      next is CampaignEventReady &&
+      next.kind == _lastReady.kind &&
+      (next.kind != CampaignEventKind.day3Bowl || next.storyEvent != null);
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<CampaignEventState>(campaignEventControllerProvider, (_, next) {
+      if (_isMatchingReady(next) && mounted) {
+        setState(() => _lastReady = next as CampaignEventReady);
+      }
+    });
+    final state = _lastReady;
     final controller = ref.read(campaignEventControllerProvider.notifier);
     final isBowl = state.kind == CampaignEventKind.day3Bowl;
     final bowl = state.storyEvent;
@@ -970,7 +1002,7 @@ class CampaignEventDialog extends ConsumerWidget {
         state.pending == null &&
         (bowl?.status == StoryEventStatus.postponed ||
             bowl?.status == StoryEventStatus.purchased);
-    final bowlWallet = bowl?.walletBalance ?? walletBalance;
+    final bowlWallet = bowl?.walletBalance ?? widget.walletBalance;
     final bowlCanUseSavings = bowl?.canUseSavings == true;
     final bowlDeficit = bowl?.walletDeficit ?? 0;
     return PopScope(
@@ -1102,7 +1134,8 @@ class CampaignEventDialog extends ConsumerWidget {
           if (!isBowl || (!bowlDecisionShown && bowlWallet >= bowlPrice))
             FilledButton(
               key: Key(isBowl ? 'campaign-buy-bowl' : 'campaign-promo-buy'),
-              onPressed: state.mutating || (!isBowl && walletBalance < 35)
+              onPressed:
+                  state.mutating || (!isBowl && widget.walletBalance < 35)
                   ? null
                   : () async {
                       final success = isBowl
