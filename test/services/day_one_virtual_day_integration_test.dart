@@ -71,7 +71,8 @@ void main() {
 
     var period = (await periods.startNextPeriod(profileId: profileId))!;
     expect(period.dayProgress, 0);
-    period = await budget.confirmPlan(
+    period = await confirmPlanForTest(
+      budget,
       profileId: profileId,
       periodId: period.id!,
     );

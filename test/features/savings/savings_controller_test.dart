@@ -211,8 +211,11 @@ void main() {
       content,
     );
     final started = await periods.startNextPeriod(profileId: profileId);
-    await BudgetService(container.read(gameRepositoryProvider))
-        .confirmPlan(profileId: profileId, periodId: started!.id!);
+    await confirmPlanForTest(
+      BudgetService(container.read(gameRepositoryProvider)),
+      profileId: profileId,
+      periodId: started!.id!,
+    );
     final controller = container.read(savingsControllerProvider.notifier);
     await controller.load();
     await controller.selectGoal('goal_scooter');
@@ -240,8 +243,11 @@ void main() {
       container.read(gameRepositoryProvider),
       content,
     ).startNextPeriod(profileId: profileId);
-    await BudgetService(container.read(gameRepositoryProvider))
-        .confirmPlan(profileId: profileId, periodId: period!.id!);
+    await confirmPlanForTest(
+      BudgetService(container.read(gameRepositoryProvider)),
+      profileId: profileId,
+      periodId: period!.id!,
+    );
     final controller = container.read(savingsControllerProvider.notifier);
     await controller.load();
     await controller.deposit(51);
@@ -268,8 +274,11 @@ void main() {
       games,
       content,
     ).startNextPeriod(profileId: profileId);
-    await BudgetService(games)
-        .confirmPlan(profileId: profileId, periodId: started!.id!);
+    await confirmPlanForTest(
+      BudgetService(games),
+      profileId: profileId,
+      periodId: started!.id!,
+    );
     final controller = container.read(savingsControllerProvider.notifier);
     await controller.load();
 

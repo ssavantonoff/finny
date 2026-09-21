@@ -1,5 +1,7 @@
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/game_period.dart';
+import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/services/budget_service.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 AppDatabase createTestDatabase() {
@@ -8,6 +10,44 @@ AppDatabase createTestDatabase() {
     factory: databaseFactoryFfi,
     databasePath: inMemoryDatabasePath,
   );
+}
+
+Future<GamePeriod> confirmBudgetForTest(
+  GameRepository games, {
+  required int profileId,
+  required int periodId,
+}) async {
+  final period = await games.getPeriodById(profileId, periodId);
+  if (period == null) {
+    throw StateError('Test fixture period $periodId does not exist.');
+  }
+  if (period.status == GamePeriodStatus.planning) {
+    await games.saveBudget(
+      profileId: profileId,
+      periodId: periodId,
+      plannedNeed: GamePeriod.minimumBudgetCategoryAllocation,
+      plannedWant: GamePeriod.minimumBudgetCategoryAllocation,
+      plannedSavings: GamePeriod.minimumBudgetCategoryAllocation,
+    );
+  }
+  return games.confirmBudget(profileId: profileId, periodId: periodId);
+}
+
+Future<GamePeriod> confirmPlanForTest(
+  BudgetService budgets, {
+  required int profileId,
+  required int periodId,
+}) async {
+  await budgets.saveDraft(
+    profileId: profileId,
+    periodId: periodId,
+    allocation: const BudgetAllocation(
+      need: GamePeriod.minimumBudgetCategoryAllocation,
+      want: GamePeriod.minimumBudgetCategoryAllocation,
+      savings: GamePeriod.minimumBudgetCategoryAllocation,
+    ),
+  );
+  return budgets.confirmPlan(profileId: profileId, periodId: periodId);
 }
 
 Future<GamePeriod> completePeriodForTest(

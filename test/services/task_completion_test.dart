@@ -63,7 +63,8 @@ void main() {
       createdAt: DateTime.utc(2026, 1, 2),
     );
     if (active) {
-      period = await games.confirmBudget(
+      period = await confirmBudgetForTest(
+        games,
         profileId: profile.id!,
         periodId: period.id!,
       );
@@ -643,7 +644,8 @@ void main() {
       requiredCheckpoints: const ['financial_task'],
       createdAt: DateTime.utc(2026, 1, 2),
     );
-    await firstGames.confirmBudget(
+    await confirmBudgetForTest(
+      firstGames,
       profileId: profile.id!,
       periodId: period.id!,
     );

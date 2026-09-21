@@ -166,7 +166,8 @@ void main() {
       createdAt: DateTime.utc(2026, 9, 18),
     );
     final period = active
-        ? await games.confirmBudget(
+        ? await confirmBudgetForTest(
+            games,
             profileId: profileId,
             periodId: planning.id!,
           )
@@ -209,7 +210,8 @@ void main() {
       requiredCheckpoints: const ['done'],
       createdAt: DateTime.utc(2026, 9, 19),
     );
-    return games.confirmBudget(
+    return confirmBudgetForTest(
+      games,
       profileId: player.profileId,
       periodId: planning.id!,
     );
@@ -782,7 +784,8 @@ void main() {
       requiredCheckpoints: const ['done'],
       createdAt: DateTime.utc(2026, 9, 18),
     );
-    final period = await firstGames.confirmBudget(
+    final period = await confirmBudgetForTest(
+      firstGames,
       profileId: profileId,
       periodId: planning.id!,
     );

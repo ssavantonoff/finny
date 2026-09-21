@@ -64,7 +64,8 @@ void main() {
       ],
       createdAt: DateTime.utc(2026),
     );
-    period = await games.confirmBudget(
+    period = await confirmBudgetForTest(
+      games,
       profileId: profileId,
       periodId: period.id!,
     );
@@ -480,7 +481,11 @@ void main() {
         requiredCheckpoints: const ['financial_task'],
         createdAt: DateTime.utc(2026, 1, 4),
       );
-      await games.confirmBudget(profileId: profileId, periodId: day4.id!);
+      await confirmBudgetForTest(
+        games,
+        profileId: profileId,
+        periodId: day4.id!,
+      );
       final purchased = await events.purchaseDay3Bowl(
         profileId: profileId,
         currentPeriodId: day4.id!,
@@ -668,7 +673,11 @@ void main() {
         requiredCheckpoints: const ['financial_task'],
         createdAt: DateTime.utc(2026, 1, day),
       );
-      await games.confirmBudget(profileId: profileId, periodId: next.id!);
+      await confirmBudgetForTest(
+        games,
+        profileId: profileId,
+        periodId: next.id!,
+      );
       final activeSnapshot = await events.loadDay3Bowl(
         profileId: profileId,
         qualifyingActionIds: qualifying,

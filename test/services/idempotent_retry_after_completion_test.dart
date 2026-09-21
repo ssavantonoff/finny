@@ -69,7 +69,8 @@ void main() {
     );
     await games.ensureInitialState(profile.id!);
     final started = await periods.startNextPeriod(profileId: profile.id!);
-    final active = await budgets.confirmPlan(
+    final active = await confirmPlanForTest(
+      budgets,
       profileId: profile.id!,
       periodId: started!.id!,
     );

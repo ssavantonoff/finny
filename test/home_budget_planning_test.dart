@@ -355,9 +355,11 @@ void main() {
     expect(find.text('Продолжить план'), findsOneWidget);
 
     period = (await tester.runAsync(
-      () =>
-          BudgetService(games)
-              .confirmPlan(profileId: profile.id!, periodId: period.id!),
+      () => confirmPlanForTest(
+        BudgetService(games),
+        profileId: profile.id!,
+        periodId: period.id!,
+      ),
     ))!;
     await tester.runAsync(
       harness.container.read(homeControllerProvider.notifier).load,
@@ -491,7 +493,11 @@ void main() {
         () => periods.startNextPeriod(profileId: profile.id!),
       ))!;
       day1 = (await tester.runAsync(
-        () => budgets.confirmPlan(profileId: profile.id!, periodId: day1.id!),
+        () => confirmPlanForTest(
+          budgets,
+          profileId: profile.id!,
+          periodId: day1.id!,
+        ),
       ))!;
       await tester.runAsync(() async {
         for (final checkpoint in day1.requiredCheckpoints) {
@@ -591,7 +597,11 @@ void main() {
         () => games.getCurrentPeriod(profile.id!),
       ))!;
       day2 = (await tester.runAsync(
-        () => budgets.confirmPlan(profileId: profile.id!, periodId: day2.id!),
+        () => confirmPlanForTest(
+          budgets,
+          profileId: profile.id!,
+          periodId: day2.id!,
+        ),
       ))!;
       await tester.runAsync(() async {
         for (final checkpoint in day2.requiredCheckpoints) {
@@ -1056,7 +1066,7 @@ void main() {
   });
 
   testWidgets(
-    'zero plan confirms without moving wallet or savings and becomes read-only',
+    'confirm stays disabled until every budget category has 10 coins',
     (tester) async {
       final setup = (await tester.runAsync(() async {
         final profile = await _createPlayer(profiles, games, savings: 17);
@@ -1077,11 +1087,23 @@ void main() {
 
       final confirm = find.byKey(const Key('budget-confirm'));
       await tester.ensureVisible(confirm);
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+      expect(find.text('Всё готово?'), findsNothing);
+      expect(find.textContaining('минимум'), findsNothing);
+
+      for (final category in ['Нужно Финни', 'Хочется Финни', 'Копилка']) {
+        final plus = find.byKey(Key('budget-plus-$category'));
+        await tester.ensureVisible(plus);
+        await tester.tap(plus);
+        await _settleFeature(tester, harness.container);
+      }
+
+      expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
       await tester.tap(confirm);
       await _settleFeature(tester, harness.container);
       expect(find.text('Всё готово?'), findsOneWidget);
       expect(find.text('Останется'), findsOneWidget);
-      expect(find.text('500'), findsNWidgets(2));
+      expect(find.text('470'), findsOneWidget);
       await tester.tap(find.byKey(const Key('budget-confirm-sheet')));
       await _settleFeature(tester, harness.container);
 
@@ -1128,6 +1150,11 @@ void main() {
     final setup = (await tester.runAsync(() async {
       final profile = await _createPlayer(profiles, games);
       final period = await _startPlanning(profile.id!, games, content);
+      await BudgetService(games).saveDraft(
+        profileId: profile.id!,
+        periodId: period.id!,
+        allocation: const BudgetAllocation(need: 10, want: 10, savings: 10),
+      );
       return (profile, period);
     }))!;
     final profile = setup.$1;
@@ -1315,7 +1342,8 @@ void main() {
       );
 
       Future<void> finish(GamePeriod period) async {
-        final active = await games.confirmBudget(
+        final active = await confirmBudgetForTest(
+          games,
           profileId: profileId,
           periodId: period.id!,
         );
@@ -1407,7 +1435,11 @@ void main() {
         () => games.getCurrentPeriod(profileId),
       ))!;
       await tester.runAsync(
-        () => games.confirmBudget(profileId: profileId, periodId: day4.id!),
+        () => confirmBudgetForTest(
+          games,
+          profileId: profileId,
+          periodId: day4.id!,
+        ),
       );
       await reload();
       expectCard(enabled: true, message: '');

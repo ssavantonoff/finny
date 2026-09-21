@@ -148,7 +148,11 @@ void main() {
           requiredCheckpoints: const ['financial_task', 'savings_decision'],
           createdAt: DateTime.utc(2026, 1, 2),
         );
-        await games.confirmBudget(profileId: profileId, periodId: period.id!);
+        await confirmBudgetForTest(
+          games,
+          profileId: profileId,
+          periodId: period.id!,
+        );
         inventoryBefore = await (await database.database).query(
           'inventory',
           where: 'profile_id = ?',
@@ -224,15 +228,10 @@ void main() {
       final bow = find.byKey(const Key('budget-priority-item-bow'));
       final buyNow = find.byKey(const Key('budget-priority-zone-buy_now'));
       await _dragToDecision(tester, 'bow', 'buy_now');
-      final budgetError = find.byKey(
-        const Key('budget-priority-budget-error'),
-      );
+      final budgetError = find.byKey(const Key('budget-priority-budget-error'));
       expect(budgetError, findsOneWidget);
       expect(tester.getTopLeft(budgetError).dy, lessThan(200));
-      expect(
-        find.text('Не хватает 20 монет'),
-        findsOneWidget,
-      );
+      expect(find.text('Не хватает 20 монет'), findsOneWidget);
       expect(find.text('Осталось: 60 монет'), findsOneWidget);
       expect(
         find.descendant(

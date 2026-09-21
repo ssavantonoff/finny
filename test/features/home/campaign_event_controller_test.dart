@@ -102,7 +102,8 @@ void main() {
       requiredCheckpoints: checkpoints,
       createdAt: DateTime.utc(2026),
     );
-    period = await games.confirmBudget(
+    period = await confirmBudgetForTest(
+      games,
       profileId: profile.id!,
       periodId: period.id!,
     );
@@ -194,7 +195,7 @@ void main() {
     );
     expect(state?.walletBalance, 430);
     expect(period?.actualNeed, 120);
-    expect(period?.plannedNeed, 0);
+    expect(period?.plannedNeed, 10);
     expect(period?.resolvedCheckpoints, contains('changed_circumstance'));
     expect(
       await games.getInventoryQuantity(

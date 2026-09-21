@@ -660,6 +660,14 @@ class SqliteGameRepository implements GameRepository {
       if (period.status != GamePeriodStatus.planning) {
         throw StateError('Only a planning period budget can be confirmed.');
       }
+      if (period.plannedNeed < GamePeriod.minimumBudgetCategoryAllocation ||
+          period.plannedWant < GamePeriod.minimumBudgetCategoryAllocation ||
+          period.plannedSavings < GamePeriod.minimumBudgetCategoryAllocation) {
+        throw StateError(
+          'Each budget category must contain at least '
+          '${GamePeriod.minimumBudgetCategoryAllocation} coins.',
+        );
+      }
       final advanced = await _applyVirtualDayAction(
         txn,
         period: period,

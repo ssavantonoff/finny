@@ -71,8 +71,11 @@ void main() {
     final demoBefore = await games.ensureInitialState(demo.id!);
     final periods = PeriodService(games, content);
     final started = (await periods.startNextPeriod(profileId: normal.id!))!;
-    await BudgetService(games)
-        .confirmPlan(profileId: normal.id!, periodId: started.id!);
+    await confirmPlanForTest(
+      BudgetService(games),
+      profileId: normal.id!,
+      periodId: started.id!,
+    );
     final service = LostReplyPurchase(SqlitePurchasePort(database), content);
     final container = ProviderContainer(
       overrides: [

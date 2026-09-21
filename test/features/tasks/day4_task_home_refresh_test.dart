@@ -112,7 +112,11 @@ void main() {
           requiredCheckpoints: _dayFour.requiredCheckpoints,
           createdAt: DateTime.utc(2026, 1, 4),
         );
-        await games.confirmBudget(profileId: profileId, periodId: started.id!);
+        await confirmBudgetForTest(
+          games,
+          profileId: profileId,
+          periodId: started.id!,
+        );
       });
 
       final content = TestContentRepository(

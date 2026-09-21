@@ -11,6 +11,8 @@ import 'package:finny/repositories/profile_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../helpers/test_database.dart';
+
 void main() {
   sqfliteFfiInit();
 
@@ -72,7 +74,8 @@ void main() {
         ],
         createdAt: DateTime.utc(2026),
       );
-      period = await games.confirmBudget(
+      period = await confirmBudgetForTest(
+        games,
         profileId: profile.id!,
         periodId: period.id!,
       );

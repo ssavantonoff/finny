@@ -104,7 +104,11 @@ void main() {
           requiredCheckpoints: const ['financial_task'],
           createdAt: DateTime.utc(2026),
         );
-        await games.confirmBudget(profileId: profile.id!, periodId: period.id!);
+        await confirmBudgetForTest(
+          games,
+          profileId: profile.id!,
+          periodId: period.id!,
+        );
       });
       final task = testPlanAdaptationTask();
       final container = ProviderContainer(
