@@ -159,6 +159,66 @@ FinancialTask testBudgetPriorityTask({
   ),
 );
 
+FinancialTask testPlanAdaptationTask({
+  String id = 'task_changed_plan_03',
+  int period = 3,
+}) => FinancialTask(
+  id: id,
+  title: 'План изменился',
+  topic: 'adapting_plan',
+  description: 'Измени план после неожиданной потери денег.',
+  type: 'plan_adaptation',
+  reward: 50,
+  period: period,
+  requiredForCheckpoint: true,
+  planAdaptationScenario: const PlanAdaptationTaskScenario(
+    prompt: 'План был на 300 монет, но 80 потерялись.',
+    originalPlan: 300,
+    lostAmount: 80,
+    availableBudget: 220,
+    keepLabel: 'Оставить в плане',
+    keepDescription: 'Важное и накопления.',
+    laterLabel: 'Перенести на потом',
+    laterDescription: 'Можно купить позже.',
+    items: [
+      PlanAdaptationTaskItem(
+        id: 'food',
+        label: 'Корм',
+        price: 90,
+        category: 'need',
+        correctDecision: PlanAdaptationDecision.keep,
+        feedback: 'Корм нужен сейчас.',
+      ),
+      PlanAdaptationTaskItem(
+        id: 'shampoo',
+        label: 'Шампунь',
+        price: 60,
+        category: 'need',
+        correctDecision: PlanAdaptationDecision.keep,
+        feedback: 'Шампунь нужен сейчас.',
+      ),
+      PlanAdaptationTaskItem(
+        id: 'toy',
+        label: 'Игрушка',
+        price: 100,
+        category: 'want',
+        correctDecision: PlanAdaptationDecision.later,
+        feedback: 'Игрушку можно отложить.',
+      ),
+      PlanAdaptationTaskItem(
+        id: 'savings',
+        label: 'Накопления',
+        price: 50,
+        category: 'savings',
+        correctDecision: PlanAdaptationDecision.keep,
+        feedback: 'Накопления можно сохранить.',
+      ),
+    ],
+    incorrectExplanation: 'Проверь важные покупки и накопления.',
+    successExplanation: 'План адаптирован.',
+  ),
+);
+
 List<PeriodDefinition> testPeriodDefinitions({int count = 2}) => [
   for (var number = 1; number <= count; number++)
     PeriodDefinition(

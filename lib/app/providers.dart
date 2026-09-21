@@ -12,6 +12,7 @@ import 'package:finny/services/period_service.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:finny/services/savings_service.dart';
 import 'package:finny/services/special_purchase_service.dart';
+import 'package:finny/services/story_event_service.dart';
 import 'package:finny/services/task_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -72,6 +73,10 @@ final _specialPurchasePortProvider = Provider<SpecialPurchasePort>(
   (ref) => SqliteSpecialPurchasePort(ref.watch(appDatabaseProvider)),
 );
 
+final storyEventPortProvider = Provider<StoryEventPort>(
+  (ref) => SqliteStoryEventPort(ref.watch(appDatabaseProvider)),
+);
+
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => AssetContentRepository(),
 );
@@ -101,6 +106,13 @@ final specialPurchaseServiceProvider = Provider<SpecialPurchaseService>(
   ),
 );
 
+final storyEventServiceProvider = Provider<StoryEventService>(
+  (ref) => StoryEventService(
+    ref.watch(storyEventPortProvider),
+    ref.watch(contentRepositoryProvider),
+  ),
+);
+
 final savingsServiceProvider = Provider<SavingsService>(
   (ref) => SavingsService(
     ref.watch(gameRepositoryProvider),
@@ -112,6 +124,7 @@ final periodServiceProvider = Provider<PeriodService>(
   (ref) => PeriodService(
     ref.watch(gameRepositoryProvider),
     ref.watch(contentRepositoryProvider),
+    storyEventPort: ref.watch(storyEventPortProvider),
   ),
 );
 

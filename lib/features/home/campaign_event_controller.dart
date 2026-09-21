@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:finny/app/providers.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/purchase_exception.dart';
+import 'package:finny/models/story_event.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum CampaignEventKind { day3Bowl, day4Promotion }
@@ -14,6 +15,7 @@ class CampaignEventAttempt {
     required this.actionId,
     required this.operationId,
     required this.purchase,
+    this.useSavings = false,
   });
 
   final int profileId;
@@ -21,6 +23,7 @@ class CampaignEventAttempt {
   final String actionId;
   final String operationId;
   final bool purchase;
+  final bool useSavings;
 }
 
 sealed class CampaignEventState {
@@ -36,6 +39,7 @@ class CampaignEventReady extends CampaignEventState {
     required this.kind,
     required this.profileId,
     required this.period,
+    this.storyEvent,
     this.mutating = false,
     this.message,
     this.pending,
@@ -44,6 +48,7 @@ class CampaignEventReady extends CampaignEventState {
   final CampaignEventKind kind;
   final int profileId;
   final GamePeriod period;
+  final StoryEventSnapshot? storyEvent;
   final bool mutating;
   final String? message;
   final CampaignEventAttempt? pending;
@@ -58,6 +63,7 @@ class CampaignEventReady extends CampaignEventState {
     kind: kind,
     profileId: profileId,
     period: period,
+    storyEvent: storyEvent,
     mutating: mutating ?? this.mutating,
     message: clearMessage ? null : message ?? this.message,
     pending: clearPending ? null : pending ?? this.pending,
@@ -108,33 +114,91 @@ class CampaignEventController extends Notifier<CampaignEventState> {
           ref.read(activeProfileIdProvider) != profileId) {
         return;
       }
-      if (period == null || period.status != GamePeriodStatus.active) {
+      if (period == null ||
+          (period.status != GamePeriodStatus.active &&
+              period.status != GamePeriodStatus.readyToFinish)) {
         state = const CampaignEventIdle();
         return;
       }
-      final kind = switch (period.periodNumber) {
-        3 when !period.resolvedCheckpoints.contains('changed_circumstance') =>
-          CampaignEventKind.day3Bowl,
-        4
-            when period.resolvedCheckpoints.contains('financial_task') &&
-                !period.resolvedCheckpoints.contains('discount_decision') =>
-          CampaignEventKind.day4Promotion,
-        _ => null,
-      };
+      StoryEventSnapshot? bowl;
+      if (period.periodNumber >= 3 && period.periodNumber <= 5) {
+        bowl = await ref
+            .read(storyEventServiceProvider)
+            .armOrLoadDay3Bowl(profileId: profileId);
+      }
+      if (generation != _generation ||
+          ref.read(activeProfileIdProvider) != profileId) {
+        return;
+      }
+      final kind =
+          bowl != null && bowl.status == StoryEventStatus.armed && bowl.isDue
+          ? CampaignEventKind.day3Bowl
+          : switch (period.periodNumber) {
+              4
+                  when period.resolvedCheckpoints.contains('financial_task') &&
+                      !period.resolvedCheckpoints.contains(
+                        'discount_decision',
+                      ) =>
+                CampaignEventKind.day4Promotion,
+              _ => null,
+            };
       state = kind == null
           ? const CampaignEventIdle()
           : CampaignEventReady(
               kind: kind,
               profileId: profileId,
               period: period,
+              storyEvent: bowl,
             );
     } catch (_) {
       if (generation == _generation) state = const CampaignEventFailure();
     }
   }
 
-  Future<bool> purchaseBowl() =>
-      _perform(actionId: 'day3_bowl_replacement', purchase: true);
+  Future<bool> prepareBowlPurchase() async {
+    final profileId = ref.read(activeProfileIdProvider);
+    if (profileId == null) return false;
+    final period = await ref
+        .read(gameRepositoryProvider)
+        .getCurrentPeriod(profileId);
+    if (period == null ||
+        period.id == null ||
+        period.periodNumber < 3 ||
+        period.periodNumber > 5 ||
+        (period.status != GamePeriodStatus.active &&
+            period.status != GamePeriodStatus.readyToFinish)) {
+      return false;
+    }
+    final bowl = await ref
+        .read(storyEventServiceProvider)
+        .armOrLoadDay3Bowl(profileId: profileId);
+    if (bowl == null || bowl.isPurchased || !bowl.isOutstanding) return false;
+    state = CampaignEventReady(
+      kind: CampaignEventKind.day3Bowl,
+      profileId: profileId,
+      period: period,
+      storyEvent: bowl,
+    );
+    return true;
+  }
+
+  Future<bool> purchaseBowl() => _perform(
+    actionId: 'day3_bowl_replacement',
+    purchase: true,
+    useSavings: false,
+  );
+
+  Future<bool> purchaseBowlFromSavings() => _perform(
+    actionId: 'day3_bowl_replacement_savings',
+    purchase: true,
+    useSavings: true,
+  );
+
+  Future<bool> postponeBowl() => _perform(
+    actionId: 'day3_bowl_replacement_postpone',
+    purchase: false,
+    useSavings: false,
+  );
 
   Future<bool> buyPromotion() =>
       _perform(actionId: 'day4_treat_discount', purchase: true);
@@ -151,6 +215,7 @@ class CampaignEventController extends Notifier<CampaignEventState> {
   Future<bool> _perform({
     required String actionId,
     required bool purchase,
+    bool useSavings = false,
   }) async {
     final current = state;
     if (_mutating || current is! CampaignEventReady) return false;
@@ -158,7 +223,8 @@ class CampaignEventController extends Notifier<CampaignEventState> {
     final attempt =
         pending != null &&
             pending.actionId == actionId &&
-            pending.purchase == purchase
+            pending.purchase == purchase &&
+            pending.useSavings == useSavings
         ? pending
         : CampaignEventAttempt(
             profileId: current.profileId,
@@ -172,6 +238,7 @@ class CampaignEventController extends Notifier<CampaignEventState> {
                 ) ??
                 'campaign:${current.profileId}:${current.period.id}:$actionId:${purchase ? 'buy' : 'skip'}:${DateTime.now().microsecondsSinceEpoch}:${++_counter}',
             purchase: purchase,
+            useSavings: useSavings,
           );
     return _performAttempt(attempt);
   }
@@ -187,28 +254,40 @@ class CampaignEventController extends Notifier<CampaignEventState> {
     );
     Object? error;
     try {
-      final service = ref.read(specialPurchaseServiceProvider);
       if (current.kind == CampaignEventKind.day3Bowl) {
-        await service.purchaseStory(
-          profileId: attempt.profileId,
-          periodId: attempt.periodId,
-          storyPurchaseId: attempt.actionId,
-          operationId: attempt.operationId,
-        );
+        final storyService = ref.read(storyEventServiceProvider);
+        if (attempt.purchase) {
+          await storyService.purchaseDay3Bowl(
+            profileId: attempt.profileId,
+            currentPeriodId: attempt.periodId,
+            operationId: attempt.operationId,
+            useSavings: attempt.useSavings,
+          );
+        } else {
+          await storyService.postponeDay3Bowl(
+            profileId: attempt.profileId,
+            currentPeriodId: attempt.periodId,
+            operationId: attempt.operationId,
+          );
+        }
       } else if (attempt.purchase) {
-        await service.buyPromotion(
-          profileId: attempt.profileId,
-          periodId: attempt.periodId,
-          promotionId: attempt.actionId,
-          operationId: attempt.operationId,
-        );
+        await ref
+            .read(specialPurchaseServiceProvider)
+            .buyPromotion(
+              profileId: attempt.profileId,
+              periodId: attempt.periodId,
+              promotionId: attempt.actionId,
+              operationId: attempt.operationId,
+            );
       } else {
-        await service.skipPromotion(
-          profileId: attempt.profileId,
-          periodId: attempt.periodId,
-          promotionId: attempt.actionId,
-          operationId: attempt.operationId,
-        );
+        await ref
+            .read(specialPurchaseServiceProvider)
+            .skipPromotion(
+              profileId: attempt.profileId,
+              periodId: attempt.periodId,
+              promotionId: attempt.actionId,
+              operationId: attempt.operationId,
+            );
       }
     } catch (caught) {
       error = caught;
@@ -216,13 +295,55 @@ class CampaignEventController extends Notifier<CampaignEventState> {
     _mutating = false;
     if (ref.read(activeProfileIdProvider) != attempt.profileId) return false;
 
-    final refreshed = await ref
-        .read(gameRepositoryProvider)
-        .getPeriodById(attempt.profileId, attempt.periodId);
-    final checkpoint = current.kind == CampaignEventKind.day3Bowl
-        ? 'changed_circumstance'
-        : 'discount_decision';
-    if (refreshed?.resolvedCheckpoints.contains(checkpoint) == true) {
+    GamePeriod? refreshed;
+    try {
+      refreshed = await ref
+          .read(gameRepositoryProvider)
+          .getPeriodById(attempt.profileId, attempt.periodId);
+    } catch (_) {
+      state = current.copyWith(
+        mutating: false,
+        pending: attempt,
+        message: 'Не удалось подтвердить результат. Проверить ещё раз.',
+      );
+      return false;
+    }
+    StoryEventSnapshot? bowl;
+    if (current.kind == CampaignEventKind.day3Bowl) {
+      try {
+        bowl = await ref
+            .read(storyEventServiceProvider)
+            .loadDay3Bowl(profileId: attempt.profileId);
+      } catch (_) {
+        // Keep the dialog and operation identity available for retry.
+      }
+    }
+    final bowlDecisionPersisted =
+        bowl != null &&
+        bowl.decisionOperationId == attempt.operationId &&
+        (attempt.purchase
+            ? bowl.status == StoryEventStatus.purchased &&
+                  bowl.decisionKind ==
+                      (attempt.useSavings
+                          ? 'purchase_savings'
+                          : 'purchase_wallet')
+            : bowl.status == StoryEventStatus.postponed &&
+                  bowl.decisionKind == 'postpone');
+    if (current.kind == CampaignEventKind.day3Bowl && bowlDecisionPersisted) {
+      state = current
+          .copyWith(
+            mutating: false,
+            clearPending: true,
+            message: attempt.purchase
+                ? 'План остался прежним, а расходы изменились. Иногда важные траты '
+                      'появляются неожиданно.'
+                : 'Нужная покупка отложена. Пока Финни будет пользоваться временной миской.',
+          )
+          .copyWithStoryEvent(bowl);
+      return true;
+    }
+    if (current.kind != CampaignEventKind.day3Bowl &&
+        refreshed?.resolvedCheckpoints.contains('discount_decision') == true) {
       state = const CampaignEventIdle();
       return true;
     }
@@ -234,11 +355,37 @@ class CampaignEventController extends Notifier<CampaignEventState> {
       );
       return false;
     }
-    state = current.copyWith(
-      mutating: false,
-      pending: attempt,
-      message: 'Не удалось подтвердить результат. Проверить ещё раз.',
-    );
+    if (error is StoryEventInsufficientFundsException) {
+      final message =
+          error.walletBalance < error.price &&
+              error.walletBalance + error.savedAmount >= error.price
+          ? 'Не хватает ${error.deficit} монет. Можно взять их из копилки.'
+          : 'В кошельке и копилке пока не хватает монет для этой покупки.';
+      state = current
+          .copyWith(mutating: false, pending: attempt, message: message)
+          .copyWithStoryEvent(bowl ?? current.storyEvent);
+      return false;
+    }
+    state = current
+        .copyWith(
+          mutating: false,
+          pending: attempt,
+          message: 'Не удалось подтвердить результат. Проверить ещё раз.',
+        )
+        .copyWithStoryEvent(bowl ?? current.storyEvent);
     return false;
   }
+}
+
+extension on CampaignEventReady {
+  CampaignEventReady copyWithStoryEvent(StoryEventSnapshot? storyEvent) =>
+      CampaignEventReady(
+        kind: kind,
+        profileId: profileId,
+        period: period,
+        storyEvent: storyEvent,
+        mutating: mutating,
+        message: message,
+        pending: pending,
+      );
 }

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:finny/app/providers.dart';
+import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/game_period.dart';
@@ -7,6 +10,7 @@ import 'package:finny/models/pet.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/savings_goal.dart';
+import 'package:finny/models/story_event.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 sealed class HomeViewState {
@@ -35,6 +39,7 @@ class HomeReady extends HomeViewState {
     required this.completedDays,
     required this.allDaysCompleted,
     this.activeGoal,
+    this.bowlEvent,
     this.petUsageCount = 0,
     this.interacting = false,
     this.interactionNotice,
@@ -53,6 +58,7 @@ class HomeReady extends HomeViewState {
   final int completedDays;
   final bool allDaysCompleted;
   final SavingsGoal? activeGoal;
+  final StoryEventSnapshot? bowlEvent;
   final int petUsageCount;
   final bool interacting;
   final String? interactionNotice;
@@ -65,6 +71,7 @@ class HomeReady extends HomeViewState {
 
   HomeReady copyWith({
     SavingsGoal? activeGoal,
+    StoryEventSnapshot? bowlEvent,
     int? petUsageCount,
     bool? interacting,
     String? interactionNotice,
@@ -84,6 +91,7 @@ class HomeReady extends HomeViewState {
     completedDays: completedDays,
     allDaysCompleted: allDaysCompleted,
     activeGoal: activeGoal ?? this.activeGoal,
+    bowlEvent: bowlEvent ?? this.bowlEvent,
     petUsageCount: petUsageCount ?? this.petUsageCount,
     interacting: interacting ?? this.interacting,
     interactionNotice: clearInteractionNotice
@@ -267,6 +275,7 @@ class HomeController extends Notifier<HomeViewState> {
       _interacting = false;
       final refreshed = await _readSnapshot();
       state = refreshed;
+      unawaited(ref.read(campaignEventControllerProvider.notifier).load());
       return true;
     } on PetActionAlreadyUsedException {
       _pendingInteraction = null;
@@ -296,6 +305,21 @@ class HomeController extends Notifier<HomeViewState> {
       }
       return false;
     }
+  }
+
+  Future<bool> prepareBowlPurchase() async {
+    final current = state;
+    if (current is! HomeReady || current.period?.id == null) return false;
+    final snapshot = await ref
+        .read(storyEventServiceProvider)
+        .armOrLoadDay3Bowl(profileId: current.profile.id!);
+    if (snapshot == null || snapshot.isPurchased || !snapshot.isOutstanding) {
+      return false;
+    }
+    await ref
+        .read(campaignEventControllerProvider.notifier)
+        .prepareBowlPurchase();
+    return true;
   }
 
   Future<HomeViewState> _readSnapshot() async {
@@ -362,6 +386,19 @@ class HomeController extends Notifier<HomeViewState> {
             );
       }
 
+      StoryEventSnapshot? bowlEvent;
+      if (period != null &&
+          period.periodNumber >= 3 &&
+          period.periodNumber <= 5) {
+        bowlEvent = await ref
+            .read(storyEventServiceProvider)
+            .armOrLoadDay3Bowl(profileId: profileId);
+      } else if (periods.any((item) => item.periodNumber >= 3)) {
+        bowlEvent = await ref
+            .read(storyEventServiceProvider)
+            .loadDay3Bowl(profileId: profileId);
+      }
+
       return HomeReady(
         profile: profile,
         pet: pet,
@@ -376,6 +413,7 @@ class HomeController extends Notifier<HomeViewState> {
             periods.length == definitions.length &&
             periods.every((item) => item.status == GamePeriodStatus.completed),
         activeGoal: activeGoal,
+        bowlEvent: bowlEvent,
         petUsageCount: petUsageCount,
         pendingInteraction: _pendingInteraction,
       );

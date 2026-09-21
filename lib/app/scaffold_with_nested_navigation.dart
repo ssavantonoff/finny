@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/savings/savings_controller.dart';
 import 'package:finny/features/shop/shop_controller.dart';
@@ -21,6 +24,15 @@ class ScaffoldWithNestedNavigation extends ConsumerStatefulWidget {
 
 class _ScaffoldWithNestedNavigationState
     extends ConsumerState<ScaffoldWithNestedNavigation> {
+  @override
+  void didUpdateWidget(covariant ScaffoldWithNestedNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.navigationShell.currentIndex != 0 &&
+        widget.navigationShell.currentIndex == 0) {
+      unawaited(ref.read(campaignEventControllerProvider.notifier).load());
+    }
+  }
+
   void _onTap(BuildContext context, WidgetRef ref, int index) {
     widget.navigationShell.goBranch(
       index,
@@ -28,6 +40,7 @@ class _ScaffoldWithNestedNavigationState
     );
     if (index == 0) {
       ref.read(homeControllerProvider.notifier).load();
+      unawaited(ref.read(campaignEventControllerProvider.notifier).load());
     } else if (index == 1) {
       ref.read(thingsControllerProvider.notifier).load();
     } else if (index == 2) {

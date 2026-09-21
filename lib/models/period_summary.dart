@@ -12,6 +12,10 @@ class PeriodSummary {
     required this.factWant,
     required this.factSavings,
     required this.factRemainder,
+    this.unexpectedNeed = 0,
+    this.carriedUnexpectedNeed = false,
+    this.savingsWithdrawn = 0,
+    this.bowlPostponed = false,
   });
 
   final int openingWalletBalance;
@@ -26,6 +30,10 @@ class PeriodSummary {
   final int factWant;
   final int factSavings;
   final int factRemainder;
+  final int unexpectedNeed;
+  final bool carriedUnexpectedNeed;
+  final int savingsWithdrawn;
+  final bool bowlPostponed;
 
   int get totalExpenses => factNeed + factWant;
   int get endingWalletBalance => factRemainder;

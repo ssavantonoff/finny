@@ -1,11 +1,13 @@
+import 'dart:math';
+
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/models/game_period.dart';
-import 'package:finny/models/game_state.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/special_purchase.dart';
+import 'package:finny/models/story_event.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/special_purchase_service.dart';
@@ -55,33 +57,6 @@ class _ActiveProfile extends ActiveProfileIdController {
   int? build() => id;
 }
 
-class _RetrySpecialService extends SpecialPurchaseService {
-  _RetrySpecialService(super.port, super.content);
-
-  bool failNext = true;
-  final operationIds = <String>[];
-
-  @override
-  Future<GameState> purchaseStory({
-    required int profileId,
-    required int periodId,
-    required String storyPurchaseId,
-    required String operationId,
-  }) async {
-    operationIds.add(operationId);
-    if (failNext) {
-      failNext = false;
-      throw StateError('temporary result failure');
-    }
-    return super.purchaseStory(
-      profileId: profileId,
-      periodId: periodId,
-      storyPurchaseId: storyPurchaseId,
-      operationId: operationId,
-    );
-  }
-}
-
 void main() {
   late AppDatabase database;
   late SqliteGameRepository games;
@@ -97,6 +72,11 @@ void main() {
       shopItems: const [_treat],
       stories: const [_story],
       promotions: const [_promotion],
+      tasks: [
+        testPlanAdaptationTask(),
+        for (var day = 1; day <= 5; day++)
+          if (day != 3) testFinancialTask(day),
+      ],
     );
   });
   tearDown(() => database.close());
@@ -138,6 +118,9 @@ void main() {
       gameRepositoryProvider.overrideWithValue(games),
       contentRepositoryProvider.overrideWithValue(content),
       specialPurchaseServiceProvider.overrideWithValue(service),
+      storyEventPortProvider.overrideWithValue(
+        SqliteStoryEventPort(database, random: Random(1)),
+      ),
     ],
   );
 
@@ -147,7 +130,7 @@ void main() {
       'savings_decision',
       'changed_circumstance',
     ]);
-    final service = _RetrySpecialService(
+    final service = SpecialPurchaseService(
       SqliteSpecialPurchasePort(database),
       content,
     );
@@ -155,6 +138,42 @@ void main() {
     addTearDown(container.dispose);
     final controller = container.read(campaignEventControllerProvider.notifier);
 
+    await TaskService(
+      games,
+      SqliteTaskCompletionPort(database),
+      content,
+    ).submitPlanAdaptation(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      taskId: 'task_changed_plan_03',
+      assignments: const {
+        'food': 'keep',
+        'shampoo': 'keep',
+        'toy': 'later',
+        'savings': 'keep',
+      },
+    );
+    await controller.load();
+    final armed = await SqliteStoryEventPort(database, random: Random(1))
+        .loadDay3Bowl(
+          profileId: player.profileId,
+          qualifyingActionIds: const {'free:pet', 'food_treat'},
+        );
+    expect(armed?.status, StoryEventStatus.armed);
+    for (var i = 0; i < armed!.threshold; i++) {
+      final db = await database.database;
+      await db.insert('pet_action_operations', {
+        'profile_id': player.profileId,
+        'operation_id': 'fixture-pet-$i',
+        'period_id': player.period.id,
+        'action_id': i == 0 ? 'free:pet' : 'item:food_treat',
+        'usage_slot': 'default',
+        'created_at': DateTime.now()
+            .toUtc()
+            .add(Duration(seconds: i))
+            .toIso8601String(),
+      });
+    }
     await controller.load();
     expect(
       (container.read(
@@ -162,21 +181,18 @@ void main() {
       ) as CampaignEventReady).kind,
       CampaignEventKind.day3Bowl,
     );
-    expect(await controller.purchaseBowl(), isFalse);
+    expect(await controller.purchaseBowl(), isTrue);
     expect(
       container.read(campaignEventControllerProvider),
       isA<CampaignEventReady>(),
     );
-    expect(await controller.retry(), isTrue);
-    expect(service.operationIds, hasLength(2));
-    expect(service.operationIds.toSet(), hasLength(1));
 
     final state = await games.getGameState(player.profileId);
     final period = await games.getPeriodById(
       player.profileId,
       player.period.id!,
     );
-    expect(state?.walletBalance, 380);
+    expect(state?.walletBalance, 430);
     expect(period?.actualNeed, 120);
     expect(period?.plannedNeed, 0);
     expect(period?.resolvedCheckpoints, contains('changed_circumstance'));
@@ -188,6 +204,73 @@ void main() {
       0,
     );
   });
+
+  test(
+    'postponed bowl stays open after an unaffordable later purchase',
+    () async {
+      final player = await activeDay(3, const [
+        'financial_task',
+        'savings_decision',
+        'changed_circumstance',
+      ]);
+      final container = containerFor(
+        player.profileId,
+        SpecialPurchaseService(SqliteSpecialPurchasePort(database), content),
+      );
+      addTearDown(container.dispose);
+      final controller = container.read(
+        campaignEventControllerProvider.notifier,
+      );
+      await TaskService(
+        games,
+        SqliteTaskCompletionPort(database),
+        content,
+      ).submitPlanAdaptation(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+        taskId: 'task_changed_plan_03',
+        assignments: const {
+          'food': 'keep',
+          'shampoo': 'keep',
+          'toy': 'later',
+          'savings': 'keep',
+        },
+      );
+      await controller.load();
+      final db = await database.database;
+      for (var i = 0; i < 2; i++) {
+        await db.insert('pet_action_operations', {
+          'profile_id': player.profileId,
+          'operation_id': 'pet-after-task-$i',
+          'period_id': player.period.id,
+          'action_id': 'free:pet',
+          'usage_slot': 'default',
+          'created_at': DateTime.now()
+              .toUtc()
+              .add(Duration(seconds: i))
+              .toIso8601String(),
+        });
+      }
+      await controller.load();
+      expect(await controller.postponeBowl(), isTrue);
+      await db.update(
+        'game_states',
+        {'wallet_balance': 20, 'saved_amount': 30},
+        where: 'profile_id = ?',
+        whereArgs: [player.profileId],
+      );
+      expect(await controller.prepareBowlPurchase(), isTrue);
+      expect(await controller.purchaseBowlFromSavings(), isFalse);
+      final state = container.read(campaignEventControllerProvider);
+      expect(state, isA<CampaignEventReady>());
+      final ready = state as CampaignEventReady;
+      expect(ready.storyEvent?.status, StoryEventStatus.postponed);
+      expect(ready.storyEvent?.walletBalance, 20);
+      expect(ready.storyEvent?.savedAmount, 30);
+      expect(ready.pending, isNotNull);
+      expect(ready.message, contains('не хватает монет'));
+    },
+  );
 
   test(
     'Day 4 promotion appears only after task and BUY is canonical once',
