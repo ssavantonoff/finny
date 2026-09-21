@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:math';
 
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/completed_goal.dart';
@@ -14,6 +15,7 @@ import 'package:finny/models/savings_exception.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/special_purchase.dart';
+import 'package:finny/models/story_event.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/models/task_progress.dart';
 import 'package:finny/models/task_submission_result.dart';
@@ -120,6 +122,13 @@ abstract interface class TaskCompletionPort {
     required FinancialTask task,
     required Map<String, String> assignments,
   });
+
+  Future<TaskSubmissionResult> submitFinancialTaskPlanAdaptation({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required Map<String, String> assignments,
+  });
 }
 
 abstract interface class PurchasePort {
@@ -145,6 +154,33 @@ abstract interface class SpecialPurchasePort {
     required ShopItem item,
     required String operationId,
     required bool purchase,
+  });
+}
+
+abstract interface class StoryEventPort {
+  Future<StoryEventSnapshot?> loadDay3Bowl({
+    required int profileId,
+    required Set<String> qualifyingActionIds,
+  });
+
+  Future<StoryEventSnapshot?> armDay3Bowl({
+    required int profileId,
+    required Set<String> qualifyingActionIds,
+  });
+
+  Future<StoryEventSnapshot> postponeDay3Bowl({
+    required int profileId,
+    required int currentPeriodId,
+    required String operationId,
+    required Set<String> qualifyingActionIds,
+  });
+
+  Future<StoryEventSnapshot> purchaseDay3Bowl({
+    required int profileId,
+    required int currentPeriodId,
+    required String operationId,
+    required bool useSavings,
+    required Set<String> qualifyingActionIds,
   });
 }
 
@@ -1141,6 +1177,7 @@ class SqliteGameRepository implements GameRepository {
       for (final table in [
         'task_progress',
         'pet_action_operations',
+        'campaign_story_events',
         'pet_daily_usage',
         'inventory',
         'transactions',
@@ -2118,6 +2155,74 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
     );
   }
 
+  @override
+  Future<TaskSubmissionResult> submitFinancialTaskPlanAdaptation({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required Map<String, String> assignments,
+  }) async {
+    task.validate();
+    if (profileId <= 0 ||
+        periodId <= 0 ||
+        task.type != 'plan_adaptation' ||
+        task.period != 3 ||
+        !task.planAdaptationScenario.isCanonicalDay3 ||
+        !_isValidPlanAdaptationSubmission(
+          task.planAdaptationScenario,
+          assignments,
+        )) {
+      throw ArgumentError('Invalid financial task plan adaptation.');
+    }
+    final scenario = task.planAdaptationScenario;
+    final incorrectItemIds = {
+      for (final item in scenario.items)
+        if (assignments[item.id] != item.correctDecision.wireValue) item.id,
+    };
+    final keepTotal = scenario.items
+        .where(
+          (item) =>
+              assignments[item.id] == PlanAdaptationDecision.keep.wireValue,
+        )
+        .fold<int>(0, (total, item) => total + item.price);
+    final overBudgetBy = keepTotal > scenario.availableBudget
+        ? keepTotal - scenario.availableBudget
+        : 0;
+    final canonicalAssignments = scenario.correctAssignments;
+    final delayedWantAndSavings =
+        scenario.items.any(
+          (item) =>
+              item.category == 'want' &&
+              assignments[item.id] == PlanAdaptationDecision.later.wireValue,
+        ) &&
+        scenario.items.any(
+          (item) =>
+              item.category == 'savings' &&
+              assignments[item.id] == PlanAdaptationDecision.later.wireValue,
+        );
+    return _submitFinancialTask(
+      profileId: profileId,
+      periodId: periodId,
+      task: task,
+      isCorrect: incorrectItemIds.isEmpty && overBudgetBy == 0,
+      incorrectResult: TaskPlanAdaptationIncorrect(
+        explanation: delayedWantAndSavings
+            ? 'Игрушку уже можно отложить. Накопления пока можно сохранить.'
+            : scenario.incorrectExplanation,
+        incorrectItemIds: Set.unmodifiable(incorrectItemIds),
+        overBudgetBy: overBudgetBy,
+      ),
+      completedScenarioState: {
+        'type': 'plan_adaptation',
+        'assignments': canonicalAssignments,
+      },
+      completionExplanation: scenario.successExplanation,
+      isValidCompletedScenario: (state) =>
+          _isCanonicalPlanAdaptationState(state, canonicalAssignments) ||
+          _isLegacyDayThreeChoiceState(task, state),
+    );
+  }
+
   Future<TaskSubmissionResult> _submitFinancialTask({
     required int profileId,
     required int periodId,
@@ -2327,6 +2432,47 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       task.id == 'task_priority_02' &&
       state.length == 1 &&
       state['answerId'] == 'food';
+
+  bool _isValidPlanAdaptationSubmission(
+    PlanAdaptationTaskScenario scenario,
+    Map<String, String> assignments,
+  ) {
+    final itemIds = scenario.items.map((item) => item.id).toSet();
+    final decisions = PlanAdaptationDecision.values
+        .map((decision) => decision.wireValue)
+        .toSet();
+    return assignments.length == itemIds.length &&
+        assignments.keys.every(
+          (itemId) => itemId.trim().isNotEmpty && itemIds.contains(itemId),
+        ) &&
+        itemIds.every(assignments.containsKey) &&
+        assignments.values.every(
+          (decision) =>
+              decision.trim().isNotEmpty && decisions.contains(decision),
+        );
+  }
+
+  bool _isCanonicalPlanAdaptationState(
+    Map<String, Object?> state,
+    Map<String, String> canonicalAssignments,
+  ) {
+    if (state['type'] != 'plan_adaptation' || state['assignments'] is! Map) {
+      return false;
+    }
+    final stored = Map<Object?, Object?>.from(state['assignments'] as Map);
+    return stored.length == canonicalAssignments.length &&
+        canonicalAssignments.entries.every(
+          (entry) => stored[entry.key] == entry.value,
+        );
+  }
+
+  bool _isLegacyDayThreeChoiceState(
+    FinancialTask task,
+    Map<String, Object?> state,
+  ) =>
+      task.id == 'task_changed_plan_03' &&
+      state.length == 1 &&
+      state['answerId'] == 'adapt';
 }
 
 class SqlitePurchasePort implements PurchasePort {
@@ -2669,5 +2815,501 @@ class SqliteSpecialPurchasePort implements SpecialPurchasePort {
       );
       return updated;
     });
+  }
+}
+
+class SqliteStoryEventPort implements StoryEventPort {
+  SqliteStoryEventPort(AppDatabase database, {Random? random})
+    : _database = database,
+      _core = SqliteGameRepository(database),
+      _random = random ?? Random();
+
+  static const storyId = 'day3_bowl_replacement';
+  static const storyPrice = 120;
+  static const storyCheckpoint = 'changed_circumstance';
+
+  final AppDatabase _database;
+  final SqliteGameRepository _core;
+  final Random _random;
+
+  @override
+  Future<StoryEventSnapshot?> loadDay3Bowl({
+    required int profileId,
+    required Set<String> qualifyingActionIds,
+  }) async {
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      await _migrateLegacyPurchaseIfNeeded(txn, profileId);
+      final row = await _readEvent(txn, profileId);
+      return row == null ? null : _snapshot(txn, row, qualifyingActionIds);
+    });
+  }
+
+  @override
+  Future<StoryEventSnapshot?> armDay3Bowl({
+    required int profileId,
+    required Set<String> qualifyingActionIds,
+  }) async {
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      await _migrateLegacyPurchaseIfNeeded(txn, profileId);
+      final existing = await _readEvent(txn, profileId);
+      if (existing != null) {
+        return _snapshot(txn, existing, qualifyingActionIds);
+      }
+      final current = await _readCurrentPeriod(txn, profileId);
+      final origin = await _readPeriodByNumber(txn, profileId, 3);
+      if (current == null ||
+          origin == null ||
+          current.periodNumber != 3 ||
+          origin.id == null ||
+          current.status == GamePeriodStatus.planning ||
+          !origin.resolvedCheckpoints.contains('financial_task') ||
+          await _readCompletedTask(txn, profileId) == null) {
+        return null;
+      }
+      final now = DateTime.now().toUtc();
+      await txn.insert('campaign_story_events', {
+        'profile_id': profileId,
+        'story_id': storyId,
+        'origin_period_id': origin.id,
+        'threshold': _random.nextInt(2) + 1,
+        'status': StoryEventStatus.armed.name,
+        'armed_at': now.toIso8601String(),
+        'postponed_at': null,
+        'purchased_at': null,
+        'decision_operation_id': null,
+        'decision_kind': null,
+        'purchase_period_id': null,
+        'savings_used': 0,
+      });
+      final row = await _readEvent(txn, profileId);
+      return row == null ? null : _snapshot(txn, row, qualifyingActionIds);
+    });
+  }
+
+  @override
+  Future<StoryEventSnapshot> postponeDay3Bowl({
+    required int profileId,
+    required int currentPeriodId,
+    required String operationId,
+    required Set<String> qualifyingActionIds,
+  }) async {
+    _core._validateOperationId(operationId);
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      final row = await _requireEvent(txn, profileId);
+      final current = await _core._requirePeriod(
+        txn,
+        profileId,
+        currentPeriodId,
+      );
+      if (row['status'] == StoryEventStatus.purchased.name) {
+        throw StoryEventConflictException(operationId);
+      }
+      if (row['status'] == StoryEventStatus.postponed.name) {
+        if (row['decision_operation_id'] != operationId ||
+            row['decision_kind'] != 'postpone') {
+          throw StoryEventConflictException(operationId);
+        }
+        return _snapshot(txn, row, qualifyingActionIds);
+      }
+      await _requireCurrentCampaignPeriod(txn, current);
+      await _requireUnusedStoryOperation(txn, profileId, operationId);
+      final snapshot = await _snapshot(txn, row, qualifyingActionIds);
+      if (!snapshot.isDue) {
+        throw StateError('The Day 3 bowl event is not due yet.');
+      }
+      final now = DateTime.now().toUtc();
+      await txn.update(
+        'campaign_story_events',
+        {
+          'status': StoryEventStatus.postponed.name,
+          'postponed_at': now.toIso8601String(),
+          'decision_operation_id': operationId,
+          'decision_kind': 'postpone',
+          'purchase_period_id': null,
+          'savings_used': 0,
+        },
+        where: 'profile_id = ? AND story_id = ?',
+        whereArgs: [profileId, storyId],
+      );
+      if (current.periodNumber == 3 &&
+          !current.resolvedCheckpoints.contains(storyCheckpoint)) {
+        await _core._resolveCheckpointInTransaction(
+          txn,
+          await _core._requirePeriod(txn, profileId, currentPeriodId),
+          storyCheckpoint,
+        );
+      }
+      final updated = await _requireEvent(txn, profileId);
+      return _snapshot(txn, updated, qualifyingActionIds);
+    });
+  }
+
+  @override
+  Future<StoryEventSnapshot> purchaseDay3Bowl({
+    required int profileId,
+    required int currentPeriodId,
+    required String operationId,
+    required bool useSavings,
+    required Set<String> qualifyingActionIds,
+  }) async {
+    _core._validateOperationId(operationId);
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      final row = await _requireEvent(txn, profileId);
+      final current = await _core._requirePeriod(
+        txn,
+        profileId,
+        currentPeriodId,
+      );
+      if (row['status'] == StoryEventStatus.purchased.name) {
+        if (row['decision_operation_id'] != operationId ||
+            row['decision_kind'] !=
+                (useSavings ? 'purchase_savings' : 'purchase_wallet')) {
+          throw StoryEventConflictException(operationId);
+        }
+        return _snapshot(txn, row, qualifyingActionIds);
+      }
+      if (row['decision_operation_id'] == operationId) {
+        throw StoryEventConflictException(operationId);
+      }
+      await _requireCurrentCampaignPeriod(txn, current);
+      await _requireUnusedStoryOperation(txn, profileId, operationId);
+      final snapshot = await _snapshot(txn, row, qualifyingActionIds);
+      if (!snapshot.isDue) {
+        throw StateError('The Day 3 bowl event is not due yet.');
+      }
+      final state = await _core._requireState(txn, profileId);
+      final savingsUsed = useSavings
+          ? (storyPrice - state.walletBalance).clamp(0, storyPrice)
+          : 0;
+      if (state.walletBalance < storyPrice && !useSavings) {
+        throw StoryEventInsufficientFundsException(
+          price: storyPrice,
+          walletBalance: state.walletBalance,
+          savedAmount: state.savedAmount,
+        );
+      }
+      if (state.walletBalance + state.savedAmount < storyPrice) {
+        throw StoryEventInsufficientFundsException(
+          price: storyPrice,
+          walletBalance: state.walletBalance,
+          savedAmount: state.savedAmount,
+        );
+      }
+      if (savingsUsed > state.savedAmount) {
+        throw StoryEventInsufficientFundsException(
+          price: storyPrice,
+          walletBalance: state.walletBalance,
+          savedAmount: state.savedAmount,
+        );
+      }
+
+      final now = DateTime.now().toUtc();
+      var updatedState = state;
+      if (savingsUsed > 0) {
+        final withdrawal = GameTransaction(
+          profileId: profileId,
+          periodId: currentPeriodId,
+          type: GameTransactionType.savingsWithdrawal,
+          amount: savingsUsed,
+          source: 'story_day3_bowl_replacement_savings',
+          description: 'Взято из копилки на новую миску',
+          createdAt: now,
+          deduplicationKey: 'story_event:$operationId:savings',
+        );
+        updatedState = await _applyIdempotentStoryTransaction(txn, withdrawal);
+        await _core._writeState(
+          txn,
+          updatedState.copyWith(
+            savedAmount: updatedState.savedAmount - savingsUsed,
+            updatedAt: now,
+          ),
+        );
+        updatedState = updatedState.copyWith(
+          savedAmount: updatedState.savedAmount - savingsUsed,
+        );
+      }
+      final purchase = GameTransaction(
+        profileId: profileId,
+        periodId: currentPeriodId,
+        type: GameTransactionType.needExpense,
+        amount: -storyPrice,
+        source: storyId,
+        description: 'Покупка: Новая миска',
+        createdAt: now,
+        deduplicationKey: 'story_event:$operationId:purchase',
+      );
+      updatedState = await _applyIdempotentStoryTransaction(txn, purchase);
+      await txn.update(
+        'campaign_story_events',
+        {
+          'status': StoryEventStatus.purchased.name,
+          'purchased_at': now.toIso8601String(),
+          'decision_operation_id': operationId,
+          'decision_kind': useSavings ? 'purchase_savings' : 'purchase_wallet',
+          'purchase_period_id': currentPeriodId,
+          'savings_used': savingsUsed,
+        },
+        where: 'profile_id = ? AND story_id = ?',
+        whereArgs: [profileId, storyId],
+      );
+      if (current.periodNumber == 3 &&
+          !current.resolvedCheckpoints.contains(storyCheckpoint)) {
+        await _core._resolveCheckpointInTransaction(
+          txn,
+          await _core._requirePeriod(txn, profileId, currentPeriodId),
+          storyCheckpoint,
+        );
+      }
+      final updated = await _requireEvent(txn, profileId);
+      return _snapshot(txn, updated, qualifyingActionIds);
+    });
+  }
+
+  Future<GameState> _applyIdempotentStoryTransaction(
+    DatabaseExecutor txn,
+    GameTransaction transaction,
+  ) async {
+    final key = transaction.deduplicationKey!;
+    final existing = await _core._readTransactionByKey(
+      txn,
+      transaction.profileId,
+      key,
+    );
+    if (existing != null) {
+      try {
+        _core._requireSameCommand(existing, transaction);
+      } on StateError {
+        throw StoryEventConflictException(transaction.deduplicationKey!);
+      }
+      return _core._requireState(txn, transaction.profileId);
+    }
+    _core._requireFinancialActionsAllowed(
+      await _core._requirePeriod(
+        txn,
+        transaction.profileId,
+        transaction.periodId!,
+      ),
+    );
+    return _core._applyWalletTransaction(txn, transaction);
+  }
+
+  Future<Map<String, Object?>> _requireEvent(
+    DatabaseExecutor txn,
+    int profileId,
+  ) async =>
+      await _readEvent(txn, profileId) ??
+      (throw StateError('Day 3 bowl event is not armed.'));
+
+  Future<Map<String, Object?>?> _readEvent(
+    DatabaseExecutor txn,
+    int profileId,
+  ) async {
+    final rows = await txn.query(
+      'campaign_story_events',
+      where: 'profile_id = ? AND story_id = ?',
+      whereArgs: [profileId, storyId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  Future<GamePeriod?> _readCurrentPeriod(
+    DatabaseExecutor txn,
+    int profileId,
+  ) async {
+    final rows = await txn.query(
+      'game_periods',
+      where: 'profile_id = ? AND status != ?',
+      whereArgs: [profileId, GamePeriodStatus.completed.name],
+      orderBy: 'period_number DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : GamePeriod.fromMap(rows.single);
+  }
+
+  Future<GamePeriod?> _readPeriodByNumber(
+    DatabaseExecutor txn,
+    int profileId,
+    int periodNumber,
+  ) async {
+    final rows = await txn.query(
+      'game_periods',
+      where: 'profile_id = ? AND period_number = ?',
+      whereArgs: [profileId, periodNumber],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : GamePeriod.fromMap(rows.single);
+  }
+
+  Future<Map<String, Object?>?> _readCompletedTask(
+    DatabaseExecutor txn,
+    int profileId,
+  ) async {
+    final rows = await txn.query(
+      'task_progress',
+      where: "profile_id = ? AND task_id = ? AND status = 'completed' AND reward_claimed = 1",
+      whereArgs: [profileId, 'task_changed_plan_03'],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  Future<int> _readQualifyingCount(
+    DatabaseExecutor txn,
+    Map<String, Object?> row,
+    Set<String> qualifyingActionIds,
+  ) async {
+    if (qualifyingActionIds.isEmpty) return 0;
+    final placeholders = List.filled(qualifyingActionIds.length, '?').join(',');
+    final rows = await txn.rawQuery(
+      '''
+      SELECT COUNT(DISTINCT operation_id) AS count
+      FROM pet_action_operations
+      WHERE profile_id = ? AND period_id = ? AND created_at >= ?
+        AND action_id IN ($placeholders)
+      ''',
+      [
+        row['profile_id'],
+        row['origin_period_id'],
+        row['armed_at'],
+        ...qualifyingActionIds,
+      ],
+    );
+    return rows.single['count'] as int? ?? 0;
+  }
+
+  Future<StoryEventSnapshot> _snapshot(
+    DatabaseExecutor txn,
+    Map<String, Object?> row,
+    Set<String> qualifyingActionIds,
+  ) async {
+    var current = await _readCurrentPeriod(txn, row['profile_id']! as int);
+    if (current == null) {
+      final periods = await txn.query(
+        'game_periods',
+        where: 'profile_id = ?',
+        whereArgs: [row['profile_id']],
+        orderBy: 'period_number DESC',
+        limit: 1,
+      );
+      current = periods.isEmpty ? null : GamePeriod.fromMap(periods.single);
+    }
+    if (current?.id == null) {
+      throw StateError('Campaign period is missing.');
+    }
+    final currentPeriod = current!;
+    final purchasePeriodId = row['purchase_period_id'] as int?;
+    final purchasePeriod = purchasePeriodId == null
+        ? null
+        : await _core._requirePeriod(
+            txn,
+            row['profile_id']! as int,
+            purchasePeriodId,
+          );
+    final state = await _core._requireState(txn, row['profile_id']! as int);
+    return StoryEventSnapshot(
+      profileId: row['profile_id']! as int,
+      storyId: row['story_id']! as String,
+      originPeriodId: row['origin_period_id']! as int,
+      originPeriodNumber: 3,
+      threshold: row['threshold']! as int,
+      qualifyingInteractionCount: await _readQualifyingCount(
+        txn,
+        row,
+        qualifyingActionIds,
+      ),
+      status: StoryEventStatus.fromStorage(row['status']! as String),
+      currentPeriodId: currentPeriod.id!,
+      currentPeriodNumber: currentPeriod.periodNumber,
+      walletBalance: state.walletBalance,
+      savedAmount: state.savedAmount,
+      price: storyPrice,
+      savingsUsed: row['savings_used']! as int,
+      wasPostponed: row['postponed_at'] != null,
+      purchasePeriodNumber: purchasePeriod?.periodNumber,
+      decisionOperationId: row['decision_operation_id'] as String?,
+      decisionKind: row['decision_kind'] as String?,
+    );
+  }
+
+  Future<void> _migrateLegacyPurchaseIfNeeded(
+    DatabaseExecutor txn,
+    int profileId,
+  ) async {
+    if (await _readEvent(txn, profileId) != null) return;
+    final rows = await txn.query(
+      'period_special_actions',
+      where: 'profile_id = ? AND action_id = ? AND outcome = ?',
+      whereArgs: [profileId, storyId, 'purchased'],
+      limit: 1,
+    );
+    if (rows.isEmpty) return;
+    final row = rows.single;
+    final originPeriod = await _core._requirePeriod(
+      txn,
+      profileId,
+      row['period_id']! as int,
+    );
+    if (originPeriod.periodNumber != 3 ||
+        !originPeriod.resolvedCheckpoints.contains(storyCheckpoint)) {
+      return;
+    }
+    final createdAt = row['created_at']! as String;
+    await txn.insert('campaign_story_events', {
+      'profile_id': profileId,
+      'story_id': storyId,
+      'origin_period_id': originPeriod.id,
+      'threshold': 1,
+      'status': StoryEventStatus.purchased.name,
+      'armed_at': createdAt,
+      'postponed_at': null,
+      'purchased_at': createdAt,
+      'decision_operation_id': row['operation_id'],
+      'decision_kind': 'purchase_wallet',
+      'purchase_period_id': originPeriod.id,
+      'savings_used': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  Future<void> _requireCurrentCampaignPeriod(
+    DatabaseExecutor txn,
+    GamePeriod period,
+  ) async {
+    if (period.periodNumber < 3 || period.periodNumber > 5) {
+      throw StateError('The bowl event is only available during Days 3–5.');
+    }
+    _core._requireFinancialActionsAllowed(period);
+    final current = await _readCurrentPeriod(txn, period.profileId);
+    if (current?.id != period.id) {
+      throw StateError('The selected period is not current.');
+    }
+  }
+
+  Future<void> _requireUnusedStoryOperation(
+    DatabaseExecutor txn,
+    int profileId,
+    String operationId,
+  ) async {
+    final otherStories = await txn.query(
+      'campaign_story_events',
+      columns: ['story_id'],
+      where: 'profile_id = ? AND decision_operation_id = ? AND story_id != ?',
+      whereArgs: [profileId, operationId, storyId],
+      limit: 1,
+    );
+    final specialActions = await txn.query(
+      'period_special_actions',
+      columns: ['action_id'],
+      where: 'profile_id = ? AND operation_id = ?',
+      whereArgs: [profileId, operationId],
+      limit: 1,
+    );
+    if (otherStories.isNotEmpty || specialActions.isNotEmpty) {
+      throw StoryEventConflictException(operationId);
+    }
   }
 }

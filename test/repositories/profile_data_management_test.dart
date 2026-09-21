@@ -18,6 +18,7 @@ const _runtimeTables = [
   'pet_action_operations',
   'pet_daily_usage',
   'period_special_actions',
+  'campaign_story_events',
   'task_progress',
   'transactions',
   'inventory',
@@ -174,6 +175,16 @@ void main() {
       'operation_id': 'special-$profileId',
       'created_at': DateTime.utc(2026, 2, 3).toIso8601String(),
     });
+    await db.insert('campaign_story_events', {
+      'profile_id': profileId,
+      'story_id': 'day3_bowl_replacement',
+      'origin_period_id': periodId,
+      'threshold': 1,
+      'status': 'postponed',
+      'armed_at': DateTime.utc(2026, 2, 3).toIso8601String(),
+      'postponed_at': DateTime.utc(2026, 2, 3).toIso8601String(),
+      'savings_used': 0,
+    });
     return periodId;
   }
 
@@ -236,6 +247,7 @@ void main() {
         'pet_action_operations',
         'pet_daily_usage',
         'period_special_actions',
+        'campaign_story_events',
         'task_progress',
         'transactions',
         'game_periods',

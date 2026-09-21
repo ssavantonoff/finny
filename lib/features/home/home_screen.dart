@@ -6,6 +6,7 @@ import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
+import 'package:finny/models/story_event.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -77,6 +78,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _incomeSheetOpen = false;
   bool _eventDialogOpen = false;
   String? _eventLoadKey;
+
+  bool get _isHomeVisible {
+    if (!mounted) return false;
+    try {
+      return GoRouter.of(context).routeInformationProvider.value.uri.path ==
+          '/home';
+    } catch (_) {
+      return ModalRoute.of(context)?.isCurrent ?? true;
+    }
+  }
 
   @override
   void initState() {
@@ -222,16 +233,58 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _showCampaignEvent(int walletBalance) async {
-    if (_eventDialogOpen || !mounted) return;
+    if (_eventDialogOpen || !_isHomeVisible) return;
     _eventDialogOpen = true;
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => CampaignEventDialog(walletBalance: walletBalance),
-    );
+    final event = ref.read(campaignEventControllerProvider);
+    if (event is CampaignEventReady &&
+        event.kind == CampaignEventKind.day3Bowl) {
+      final isNewEvent = event.storyEvent?.status == StoryEventStatus.armed;
+      await showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Colors.black54,
+        transitionDuration:
+            !isNewEvent || MediaQuery.of(context).disableAnimations
+            ? Duration.zero
+            : const Duration(milliseconds: 350),
+        pageBuilder: (_, _, _) =>
+            CampaignEventDialog(walletBalance: walletBalance),
+        transitionBuilder: (_, animation, _, child) {
+          final entrance = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+          return FadeTransition(
+            opacity: entrance,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.9, end: 1).animate(entrance),
+              child: child,
+            ),
+          );
+        },
+      );
+    } else {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => CampaignEventDialog(walletBalance: walletBalance),
+      );
+    }
     _eventDialogOpen = false;
     if (mounted) {
       await ref.read(homeControllerProvider.notifier).load();
+    }
+  }
+
+  Future<void> _openBowlPurchase() async {
+    if (_eventDialogOpen) return;
+    final prepared = await ref
+        .read(homeControllerProvider.notifier)
+        .prepareBowlPurchase();
+    if (!mounted || !prepared) return;
+    final home = ref.read(homeControllerProvider);
+    if (home is HomeReady) {
+      await _showCampaignEvent(home.gameState.walletBalance);
     }
   }
 
@@ -245,8 +298,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     'financial_task' => 'Осталось выполнить сегодняшнее финансовое задание.',
     'savings_decision' =>
       'Осталось решить, будешь ли ты сегодня откладывать монеты.',
-    'changed_circumstance' =>
-      'Осталось разобраться с сегодняшней неожиданной ситуацией.',
+    'changed_circumstance' => 'Проведи ещё немного времени с Финни.',
     'discount_decision' =>
       'Осталось принять решение о сегодняшнем предложении.',
     _ => 'Осталось завершить одно важное дело этого дня.',
@@ -258,12 +310,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final controller = ref.read(homeControllerProvider.notifier);
 
     ref.listen<CampaignEventState>(campaignEventControllerProvider, (_, next) {
-      if (next is CampaignEventReady && !_eventDialogOpen) {
+      if (next is CampaignEventReady && !_eventDialogOpen && _isHomeVisible) {
         final home = ref.read(homeControllerProvider);
         if (home is HomeReady) {
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => _showCampaignEvent(home.gameState.walletBalance),
-          );
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_isHomeVisible) {
+              _showCampaignEvent(home.gameState.walletBalance);
+            }
+          });
         }
       }
     });
@@ -280,7 +334,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (state is HomeReady && state.period?.id != null) {
       final key =
           '${state.profile.id}:${state.period!.id}:'
-          '${state.period!.resolvedCheckpoints.join(',')}';
+          '${state.period!.resolvedCheckpoints.join(',')}: '
+          '${state.bowlEvent?.status.name}:${state.bowlEvent?.qualifyingInteractionCount}';
       if (_eventLoadKey != key) {
         _eventLoadKey = key;
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -301,6 +356,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         controller: controller,
         onStartDay: _startDay,
         onFinishDay: _finishDay,
+        onOpenBowl: _openBowlPurchase,
       ),
     };
   }
@@ -312,12 +368,14 @@ class _HomeContent extends StatelessWidget {
     required this.controller,
     required this.onStartDay,
     required this.onFinishDay,
+    required this.onOpenBowl,
   });
 
   final HomeReady state;
   final HomeController controller;
   final VoidCallback onStartDay;
   final VoidCallback onFinishDay;
+  final VoidCallback onOpenBowl;
 
   @override
   Widget build(BuildContext context) {
@@ -564,6 +622,22 @@ class _HomeContent extends StatelessWidget {
                     const SizedBox(height: AppSpacing.medium),
                     _TodayCard(period: period),
                   ],
+                  if (state.bowlEvent?.isOutstanding == true) ...[
+                    const SizedBox(height: AppSpacing.medium),
+                    _BowlObligationCard(
+                      event: state.bowlEvent!,
+                      onPressed:
+                          period?.status == GamePeriodStatus.active ||
+                              period?.status == GamePeriodStatus.readyToFinish
+                          ? onOpenBowl
+                          : null,
+                      unavailableText: state.completedDays >= 5
+                          ? 'Кампания завершена. Покупка осталась отложенной.'
+                          : period == null
+                          ? 'Купить можно после начала следующего дня.'
+                          : 'Купить можно после подтверждения плана дня.',
+                    ),
+                  ],
                   // Active Savings Goal (Compact)
                   if (state.activeGoal case final goal?) ...[
                     const SizedBox(height: AppSpacing.medium),
@@ -670,6 +744,55 @@ class _TodayCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BowlObligationCard extends StatelessWidget {
+  const _BowlObligationCard({
+    required this.event,
+    required this.onPressed,
+    required this.unavailableText,
+  });
+
+  final StoryEventSnapshot event;
+  final VoidCallback? onPressed;
+  final String unavailableText;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    key: const Key('home-bowl-obligation'),
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.medium),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.pets_outlined),
+              const SizedBox(width: AppSpacing.small),
+              Text(
+                'Новая миска нужна',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('Отложенная нужная покупка · ${event.price} монет'),
+          const SizedBox(height: 4),
+          const Text('Сейчас Финни пользуется временной миской'),
+          const SizedBox(height: AppSpacing.small),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonal(
+              key: const Key('home-bowl-purchase'),
+              onPressed: onPressed,
+              child: const Text('Купить'),
+            ),
+          ),
+          if (onPressed == null) Text(unavailableText),
+        ],
+      ),
+    ),
+  );
 }
 
 class _CheckpointChip extends StatelessWidget {
@@ -833,27 +956,137 @@ class CampaignEventDialog extends ConsumerWidget {
     }
     final controller = ref.read(campaignEventControllerProvider.notifier);
     final isBowl = state.kind == CampaignEventKind.day3Bowl;
+    final bowl = state.storyEvent;
+    if (isBowl && bowl == null) {
+      return const PopScope(
+        canPop: false,
+        child: AlertDialog(content: Text('Не удалось загрузить событие.')),
+      );
+    }
+    final bowlPrice = bowl?.price ?? 0;
+    final bowlDecisionShown =
+        isBowl &&
+        state.message != null &&
+        state.pending == null &&
+        (bowl?.status == StoryEventStatus.postponed ||
+            bowl?.status == StoryEventStatus.purchased);
+    final bowlWallet = bowl?.walletBalance ?? walletBalance;
+    final bowlCanUseSavings = bowl?.canUseSavings == true;
+    final bowlDeficit = bowl?.walletDeficit ?? 0;
     return PopScope(
       canPop: false,
       child: AlertDialog(
-        title: Text(isBowl ? 'Ой! Миска Финни сломалась' : 'Сегодня акция!'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              isBowl
-                  ? 'Это неожиданная нужная трата. Новая миска стоит 120 монет.'
-                  : 'Лакомство обычно стоит 60 монет, а сейчас одну штуку '
-                        'можно купить за 35. Купить по акции?',
-            ),
-            if (state.message case final message?) ...[
-              const SizedBox(height: AppSpacing.small),
-              Text(message),
+        title: Text(
+          isBowl
+              ? bowl?.status == StoryEventStatus.postponed
+                    ? 'Новая миска'
+                    : 'Ой! Миска Финни сломалась'
+              : 'Сегодня акция!',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                isBowl
+                    ? bowlDecisionShown
+                          ? bowl?.status == StoryEventStatus.purchased
+                                ? 'Новая миска куплена.'
+                                : 'Пока Финни будет пользоваться временной миской.'
+                          : bowl?.status == StoryEventStatus.postponed
+                          ? 'Новая миска всё ещё нужна. Пока Финни пользуется временной миской.'
+                          : 'Финни нужна новая миска. Этой покупки не было в плане.'
+                    : 'Лакомство обычно стоит 60 монет, а сейчас одну штуку '
+                          'можно купить за 35. Купить по акции?',
+              ),
+              if (isBowl &&
+                  bowlDecisionShown &&
+                  bowl?.status == StoryEventStatus.purchased) ...[
+                const SizedBox(height: AppSpacing.small),
+                Text('Баланс сейчас: $bowlWallet монет'),
+              ],
+              if (isBowl && !bowlDecisionShown) ...[
+                const SizedBox(height: AppSpacing.small),
+                Text('Баланс сейчас: $bowlWallet монет'),
+                Text('Новая миска: -$bowlPrice монет · Нужно'),
+                if (bowlWallet >= bowlPrice)
+                  Text(
+                    'После покупки останется ${bowlWallet - bowlPrice} монет',
+                  ),
+                if (bowlWallet < bowlPrice)
+                  Text('Не хватает $bowlDeficit монет'),
+                if (bowlCanUseSavings && bowlWallet < bowlPrice)
+                  Text('В копилке: ${bowl?.savedAmount ?? 0} монет'),
+              ],
+              if (state.message case final message?) ...[
+                const SizedBox(height: AppSpacing.small),
+                Semantics(liveRegion: true, child: Text(message)),
+              ],
             ],
-          ],
+          ),
         ),
         actions: [
+          if (isBowl && bowlDecisionShown)
+            FilledButton(
+              key: const Key('campaign-bowl-understood'),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Понятно'),
+            ),
+          if (isBowl &&
+              !bowlDecisionShown &&
+              bowlCanUseSavings &&
+              bowlWallet < bowlPrice)
+            FilledButton(
+              key: const Key('campaign-bowl-savings'),
+              onPressed: state.mutating
+                  ? null
+                  : () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Использовать накопления?'),
+                          content: Text(
+                            'Использовать $bowlDeficit монет из копилки? '
+                            'Цель останется активной, но накоплений станет меньше.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Отмена'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Использовать'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await controller.purchaseBowlFromSavings();
+                      }
+                    },
+              child: Text('Взять $bowlDeficit из копилки и купить'),
+            ),
+          if (isBowl && !bowlDecisionShown)
+            TextButton(
+              key: const Key('campaign-bowl-postpone'),
+              onPressed: state.mutating
+                  ? null
+                  : () async {
+                      if (bowl?.status == StoryEventStatus.postponed) {
+                        Navigator.pop(context);
+                      } else {
+                        await controller.postponeBowl();
+                      }
+                    },
+              child: Text(
+                bowlCanUseSavings && bowlWallet < bowlPrice
+                    ? 'Не трогать копилку'
+                    : 'Отложить покупку',
+              ),
+            ),
           if (!isBowl)
             TextButton(
               key: const Key('campaign-promo-skip'),
@@ -866,25 +1099,34 @@ class CampaignEventDialog extends ConsumerWidget {
                     },
               child: const Text('Пропустить'),
             ),
-          FilledButton(
-            key: Key(isBowl ? 'campaign-buy-bowl' : 'campaign-promo-buy'),
-            onPressed: state.mutating || (!isBowl && walletBalance < 35)
-                ? null
-                : () async {
-                    final success = isBowl
-                        ? await controller.purchaseBowl()
-                        : await controller.buyPromotion();
-                    if (success && context.mounted) Navigator.pop(context);
-                  },
-            child: Text(isBowl ? 'Купить новую миску — 120' : 'Купить за 35'),
-          ),
-          if (state.pending != null && state.message != null)
+          if (!isBowl || (!bowlDecisionShown && bowlWallet >= bowlPrice))
+            FilledButton(
+              key: Key(isBowl ? 'campaign-buy-bowl' : 'campaign-promo-buy'),
+              onPressed: state.mutating || (!isBowl && walletBalance < 35)
+                  ? null
+                  : () async {
+                      final success = isBowl
+                          ? await controller.purchaseBowl()
+                          : await controller.buyPromotion();
+                      if (success && !isBowl && context.mounted) {
+                        Navigator.pop(context);
+                      }
+                    },
+              child: Text(
+                isBowl ? 'Купить новую миску — $bowlPrice' : 'Купить за 35',
+              ),
+            ),
+          if (state.pending != null &&
+              state.message != null &&
+              !bowlDecisionShown)
             FilledButton.tonal(
               key: const Key('campaign-retry'),
               onPressed: state.mutating
                   ? null
                   : () async {
-                      if (await controller.retry() && context.mounted) {
+                      if (await controller.retry() &&
+                          !isBowl &&
+                          context.mounted) {
                         Navigator.pop(context);
                       }
                     },

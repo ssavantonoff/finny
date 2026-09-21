@@ -14,6 +14,7 @@ import 'package:finny/services/item_use_service.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:finny/services/savings_service.dart';
 import 'package:finny/services/special_purchase_service.dart';
+import 'package:finny/services/story_event_service.dart';
 import 'package:finny/services/task_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -40,6 +41,10 @@ void main() {
       final savings = SavingsService(games, content);
       final special = SpecialPurchaseService(
         SqliteSpecialPurchasePort(database),
+        content,
+      );
+      final storyEvents = StoryEventService(
+        SqliteStoryEventPort(database),
         content,
       );
       final lifecycle = DayLifecycleService(
@@ -76,7 +81,6 @@ void main() {
       await savings.selectGoal(profileId: profileId, goalId: goal.id);
 
       const answers = {
-        3: ('task_changed_plan_03', 'adapt'),
         4: ('task_discount_04', 'consider'),
         5: ('task_final_choice_05', 'balanced'),
       };
@@ -93,15 +97,6 @@ void main() {
           profileId: profileId,
           periodId: period.id!,
         );
-
-        if (day == 3) {
-          await special.purchaseStory(
-            profileId: profileId,
-            periodId: period.id!,
-            storyPurchaseId: 'day3_bowl_replacement',
-            operationId: 'campaign-day3-bowl',
-          );
-        }
 
         final TaskSubmissionResult taskResult;
         if (day == 1) {
@@ -129,6 +124,22 @@ void main() {
               'bow': 'later',
             },
           );
+        } else if (day == 3) {
+          taskResult = await tasks.submitPlanAdaptation(
+            profileId: profileId,
+            periodId: period.id!,
+            taskId: 'task_changed_plan_03',
+            assignments: const {
+              'food': 'keep',
+              'shampoo': 'keep',
+              'toy': 'later',
+              'savings': 'keep',
+            },
+          );
+          final bowl = await storyEvents.armOrLoadDay3Bowl(
+            profileId: profileId,
+          );
+          expect(bowl?.status.name, 'armed');
         } else {
           final answer = answers[day]!;
           taskResult = await tasks.submitAnswer(
@@ -153,7 +164,9 @@ void main() {
           profileId: profileId,
           periodId: period.id!,
         );
-        expect(period.status.name, 'readyToFinish');
+        if (day != 3) {
+          expect(period.status.name, 'readyToFinish');
+        }
 
         if (day == 5) {
           final bonus = await tasks.submitAnswer(
@@ -211,6 +224,21 @@ void main() {
           interaction: FreePetInteraction.pet,
           operationId: 'campaign-day$day-pet',
         );
+        if (day == 3) {
+          final bowl = await storyEvents.loadDay3Bowl(profileId: profileId);
+          expect(bowl?.isDue, isTrue);
+          await storyEvents.purchaseDay3Bowl(
+            profileId: profileId,
+            currentPeriodId: period.id!,
+            operationId: 'campaign-day3-bowl',
+            useSavings: false,
+          );
+          final resolvedPeriod = await games.getPeriodById(
+            profileId,
+            period.id!,
+          );
+          expect(resolvedPeriod?.status.name, 'readyToFinish');
+        }
         if (day >= 3) {
           await purchases.purchase(
             profileId: profileId,
@@ -269,6 +297,7 @@ void main() {
       final transactions = await games.getTransactions(profileId);
       final db = await database.database;
       final proofs = await db.query('period_special_actions');
+      final storyEventRows = await db.query('campaign_story_events');
 
       expect(history, hasLength(5));
       expect(
@@ -287,7 +316,9 @@ void main() {
         ),
         hasLength(6),
       );
-      expect(proofs, hasLength(2));
+      expect(proofs, hasLength(1));
+      expect(storyEventRows, hasLength(1));
+      expect(storyEventRows.single['status'], 'purchased');
       expect(
         history.every(
           (period) => period.requiredCheckpoints.every(

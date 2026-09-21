@@ -18,6 +18,7 @@ class SqliteProfileDataManagement implements ProfileDataManagementPort {
     'pet_action_operations',
     'pet_daily_usage',
     'period_special_actions',
+    'campaign_story_events',
     'task_progress',
     'transactions',
     'inventory',

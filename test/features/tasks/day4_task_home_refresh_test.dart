@@ -37,6 +37,15 @@ const _promotion = ShopPromotion(
   checkpoint: 'discount_decision',
 );
 
+const _bowlStory = StoryPurchase(
+  id: 'day3_bowl_replacement',
+  name: 'Временная миска',
+  period: 3,
+  price: 120,
+  category: ShopItemCategory.need,
+  checkpoint: 'changed_circumstance',
+);
+
 const _dayFour = PeriodDefinition(
   id: 'period_4',
   number: 4,
@@ -110,6 +119,7 @@ void main() {
         const [_dayFour],
         shopItems: const [_treat],
         tasks: [testFinancialTask(4)],
+        stories: const [_bowlStory],
         promotions: const [_promotion],
       );
       final container = ProviderContainer(

@@ -3,14 +3,21 @@ import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/period_summary.dart';
 import 'package:finny/models/transaction.dart';
+import 'package:finny/models/pet_action.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 
 class PeriodService {
-  PeriodService(this._gameRepository, this._contentRepository);
+  PeriodService(
+    this._gameRepository,
+    this._contentRepository, {
+    this._storyEventPort,
+  });
 
   final GameRepository _gameRepository;
   final ContentRepository _contentRepository;
+  final StoryEventPort? _storyEventPort;
 
   Future<GamePeriod?> startNextPeriod({required int profileId}) async {
     final definitions = await _loadValidDefinitions();
@@ -125,17 +132,25 @@ class PeriodService {
     var factNeed = 0;
     var factWant = 0;
     var factSavings = 0;
+    var unexpectedNeed = 0;
+    var savingsWithdrawn = 0;
     for (final transaction in transactions) {
       switch (transaction.type) {
         case GameTransactionType.periodIncome:
           break;
         case GameTransactionType.needExpense:
           factNeed += -transaction.amount;
+          if (transaction.source == 'day3_bowl_replacement') {
+            unexpectedNeed += -transaction.amount;
+          }
         case GameTransactionType.wantExpense:
           factWant += -transaction.amount;
         case GameTransactionType.savingsDeposit:
           factSavings += -transaction.amount;
         case GameTransactionType.savingsWithdrawal:
+          if (transaction.source == 'story_day3_bowl_replacement_savings') {
+            savingsWithdrawn += transaction.amount;
+          }
           break;
         default:
           if (transaction.amount > 0) {
@@ -147,6 +162,29 @@ class PeriodService {
     final factRemainder = period.status == GamePeriodStatus.completed
         ? period.endWalletBalance!
         : state.walletBalance;
+    var bowlPostponed = false;
+    if (unexpectedNeed == 0 &&
+        _storyEventPort != null &&
+        period.periodNumber >= 3 &&
+        period.periodNumber <= 5) {
+      final items = await _contentRepository.loadShopItems();
+      final qualifying = {
+        FreePetInteraction.pet.actionId,
+        for (final item in items)
+          if (item.displaySection == ShopDisplaySection.food ||
+              item.displaySection == ShopDisplaySection.care ||
+              item.displaySection == ShopDisplaySection.toys)
+            'item:${item.id}',
+      };
+      final event = await _storyEventPort.loadDay3Bowl(
+        profileId: profileId,
+        qualifyingActionIds: qualifying,
+      );
+      bowlPostponed =
+          event?.wasPostponed == true &&
+          (event?.purchasePeriodNumber == null ||
+              period.periodNumber < event!.purchasePeriodNumber!);
+    }
     return PeriodSummary(
       openingWalletBalance: period.startWalletBalance,
       baseIncome: period.baseIncome,
@@ -160,6 +198,10 @@ class PeriodService {
       factWant: factWant,
       factSavings: factSavings,
       factRemainder: factRemainder,
+      unexpectedNeed: unexpectedNeed,
+      carriedUnexpectedNeed: unexpectedNeed > 0 && period.periodNumber > 3,
+      savingsWithdrawn: savingsWithdrawn,
+      bowlPostponed: bowlPostponed,
     );
   }
 

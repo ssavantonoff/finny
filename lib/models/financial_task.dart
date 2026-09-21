@@ -383,6 +383,229 @@ class BudgetPriorityTaskScenario {
   }
 }
 
+enum PlanAdaptationDecision {
+  keep('keep'),
+  later('later');
+
+  const PlanAdaptationDecision(this.wireValue);
+
+  final String wireValue;
+
+  factory PlanAdaptationDecision.fromJson(String value) =>
+      PlanAdaptationDecision.values.firstWhere(
+        (decision) => decision.wireValue == value,
+        orElse: () => throw FormatException(
+          'Unsupported plan adaptation decision: $value',
+        ),
+      );
+}
+
+class PlanAdaptationTaskItem {
+  const PlanAdaptationTaskItem({
+    required this.id,
+    required this.label,
+    required this.price,
+    required this.category,
+    required this.correctDecision,
+    required this.feedback,
+  });
+
+  final String id;
+  final String label;
+  final int price;
+  final String category;
+  final PlanAdaptationDecision correctDecision;
+  final String feedback;
+
+  factory PlanAdaptationTaskItem.fromJson(Map<String, Object?> json) =>
+      PlanAdaptationTaskItem(
+        id: _requiredString(json, 'id'),
+        label: _requiredString(json, 'label'),
+        price: _requiredInt(json, 'price'),
+        category: _requiredString(json, 'category'),
+        correctDecision: PlanAdaptationDecision.fromJson(
+          _requiredString(json, 'correctDecision'),
+        ),
+        feedback: _requiredString(json, 'feedback'),
+      );
+}
+
+class PlanAdaptationTaskScenario {
+  const PlanAdaptationTaskScenario({
+    required this.prompt,
+    required this.originalPlan,
+    required this.lostAmount,
+    required this.availableBudget,
+    required this.keepLabel,
+    required this.keepDescription,
+    required this.laterLabel,
+    required this.laterDescription,
+    required this.items,
+    required this.incorrectExplanation,
+    required this.successExplanation,
+  });
+
+  final String prompt;
+  final int originalPlan;
+  final int lostAmount;
+  final int availableBudget;
+  final String keepLabel;
+  final String keepDescription;
+  final String laterLabel;
+  final String laterDescription;
+  final List<PlanAdaptationTaskItem> items;
+  final String incorrectExplanation;
+  final String successExplanation;
+
+  factory PlanAdaptationTaskScenario.fromJson(Map<String, Object?> json) {
+    final items = json['items'];
+    if (items is! List) {
+      throw const FormatException('Plan adaptation items must be a list.');
+    }
+    return PlanAdaptationTaskScenario(
+      prompt: _requiredString(json, 'prompt'),
+      originalPlan: _requiredInt(json, 'originalPlan'),
+      lostAmount: _requiredInt(json, 'lostAmount'),
+      availableBudget: _requiredInt(json, 'availableBudget'),
+      keepLabel: _requiredString(json, 'keepLabel'),
+      keepDescription: _requiredString(json, 'keepDescription'),
+      laterLabel: _requiredString(json, 'laterLabel'),
+      laterDescription: _requiredString(json, 'laterDescription'),
+      items: items
+          .map((value) {
+            if (value is! Map) {
+              throw const FormatException(
+                'Plan adaptation item must be an object.',
+              );
+            }
+            return PlanAdaptationTaskItem.fromJson(
+              Map<String, Object?>.from(value),
+            );
+          })
+          .toList(growable: false),
+      incorrectExplanation: _requiredString(json, 'incorrectExplanation'),
+      successExplanation: _requiredString(json, 'successExplanation'),
+    );
+  }
+
+  Map<String, String> get correctAssignments => {
+    for (final item in items) item.id: item.correctDecision.wireValue,
+  };
+
+  int get canonicalKeepTotal => items
+      .where((item) => item.correctDecision == PlanAdaptationDecision.keep)
+      .fold<int>(0, (total, item) => total + item.price);
+
+  bool get isCanonicalDay3 =>
+      originalPlan == 300 &&
+      lostAmount == 80 &&
+      availableBudget == 220 &&
+      items.length == 4 &&
+      _matchesCanonicalItem(
+        id: 'food',
+        price: 90,
+        category: 'need',
+        decision: PlanAdaptationDecision.keep,
+      ) &&
+      _matchesCanonicalItem(
+        id: 'shampoo',
+        price: 60,
+        category: 'need',
+        decision: PlanAdaptationDecision.keep,
+      ) &&
+      _matchesCanonicalItem(
+        id: 'toy',
+        price: 100,
+        category: 'want',
+        decision: PlanAdaptationDecision.later,
+      ) &&
+      _matchesCanonicalItem(
+        id: 'savings',
+        price: 50,
+        category: 'savings',
+        decision: PlanAdaptationDecision.keep,
+      );
+
+  bool _matchesCanonicalItem({
+    required String id,
+    required int price,
+    required String category,
+    required PlanAdaptationDecision decision,
+  }) {
+    final matches = items.where((item) => item.id == id).toList();
+    return matches.length == 1 &&
+        matches.single.price == price &&
+        matches.single.category == category &&
+        matches.single.correctDecision == decision;
+  }
+
+  void validate() {
+    if (prompt.trim().isEmpty ||
+        keepLabel.trim().isEmpty ||
+        keepDescription.trim().isEmpty ||
+        laterLabel.trim().isEmpty ||
+        laterDescription.trim().isEmpty ||
+        incorrectExplanation.trim().isEmpty ||
+        successExplanation.trim().isEmpty) {
+      throw const FormatException(
+        'Plan adaptation task text must not be empty.',
+      );
+    }
+    if (originalPlan <= 0 ||
+        lostAmount < 0 ||
+        availableBudget <= 0 ||
+        originalPlan - lostAmount != availableBudget) {
+      throw const FormatException('Plan adaptation budget values are invalid.');
+    }
+    if (items.length < 2) {
+      throw const FormatException(
+        'Plan adaptation task needs at least two items.',
+      );
+    }
+    final itemIds = <String>{};
+    for (final item in items) {
+      if (item.id.trim().isEmpty ||
+          item.label.trim().isEmpty ||
+          item.category.trim().isEmpty ||
+          item.feedback.trim().isEmpty ||
+          item.price <= 0) {
+        throw const FormatException(
+          'Plan adaptation item fields must be valid.',
+        );
+      }
+      if (!itemIds.add(item.id)) {
+        throw FormatException('Duplicate plan adaptation item ID: ${item.id}');
+      }
+      if (!const {'need', 'want', 'savings'}.contains(item.category)) {
+        throw FormatException(
+          'Unknown plan adaptation category: ${item.category}',
+        );
+      }
+    }
+    if (!items.any((item) => item.category == 'need') ||
+        !items.any((item) => item.category == 'want') ||
+        !items.any((item) => item.category == 'savings')) {
+      throw const FormatException(
+        'Plan adaptation needs need, want and savings items.',
+      );
+    }
+    final originalItemsTotal = items.fold<int>(
+      0,
+      (total, item) => total + item.price,
+    );
+    if (originalItemsTotal != originalPlan) {
+      throw const FormatException(
+        'Plan adaptation items must match the original plan.',
+      );
+    }
+    if (canonicalKeepTotal > availableBudget) {
+      throw const FormatException(
+        'Plan adaptation canonical solution exceeds available budget.',
+      );
+    }
+  }
+}
+
 class FinancialTask {
   const FinancialTask({
     required this.id,
@@ -396,13 +619,16 @@ class FinancialTask {
     ChoiceTaskScenario? choiceScenario,
     CategorizationTaskScenario? categorizationScenario,
     BudgetPriorityTaskScenario? budgetPriorityScenario,
+    PlanAdaptationTaskScenario? planAdaptationScenario,
   }) : // The public parameter names preserve the existing choice constructor.
        // ignore: prefer_initializing_formals
        _choiceScenario = choiceScenario,
        // ignore: prefer_initializing_formals
        _categorizationScenario = categorizationScenario,
        // ignore: prefer_initializing_formals
-       _budgetPriorityScenario = budgetPriorityScenario;
+       _budgetPriorityScenario = budgetPriorityScenario,
+       // ignore: prefer_initializing_formals
+       _planAdaptationScenario = planAdaptationScenario;
 
   // Stable identity: a new period, reward, correct answer, or task meaning
   // requires a new ID rather than reusing persisted task progress.
@@ -417,6 +643,7 @@ class FinancialTask {
   final ChoiceTaskScenario? _choiceScenario;
   final CategorizationTaskScenario? _categorizationScenario;
   final BudgetPriorityTaskScenario? _budgetPriorityScenario;
+  final PlanAdaptationTaskScenario? _planAdaptationScenario;
 
   ChoiceTaskScenario get choiceScenario =>
       _choiceScenario ?? (throw StateError('Task $id is not a choice task.'));
@@ -428,6 +655,10 @@ class FinancialTask {
   BudgetPriorityTaskScenario get budgetPriorityScenario =>
       _budgetPriorityScenario ??
       (throw StateError('Task $id is not a budget priority task.'));
+
+  PlanAdaptationTaskScenario get planAdaptationScenario =>
+      _planAdaptationScenario ??
+      (throw StateError('Task $id is not a plan adaptation task.'));
 
   factory FinancialTask.fromJson(Map<String, Object?> json) {
     final scenario = json['scenarioData'];
@@ -457,6 +688,11 @@ class FinancialTask {
               Map<String, Object?>.from(scenario),
             )
           : null,
+      planAdaptationScenario: type == 'plan_adaptation'
+          ? PlanAdaptationTaskScenario.fromJson(
+              Map<String, Object?>.from(scenario),
+            )
+          : null,
     );
     task.validate();
     return task;
@@ -473,7 +709,8 @@ class FinancialTask {
       case 'choice':
         if (_choiceScenario == null ||
             _categorizationScenario != null ||
-            _budgetPriorityScenario != null) {
+            _budgetPriorityScenario != null ||
+            _planAdaptationScenario != null) {
           throw const FormatException('Choice task scenario is invalid.');
         }
         _choiceScenario.validate();
@@ -481,7 +718,8 @@ class FinancialTask {
       case 'categorization':
         if (_categorizationScenario == null ||
             _choiceScenario != null ||
-            _budgetPriorityScenario != null) {
+            _budgetPriorityScenario != null ||
+            _planAdaptationScenario != null) {
           throw const FormatException(
             'Categorization task scenario is invalid.',
           );
@@ -491,12 +729,24 @@ class FinancialTask {
       case 'budget_priority':
         if (_budgetPriorityScenario == null ||
             _choiceScenario != null ||
-            _categorizationScenario != null) {
+            _categorizationScenario != null ||
+            _planAdaptationScenario != null) {
           throw const FormatException(
             'Budget priority task scenario is invalid.',
           );
         }
         _budgetPriorityScenario.validate();
+        break;
+      case 'plan_adaptation':
+        if (_planAdaptationScenario == null ||
+            _choiceScenario != null ||
+            _categorizationScenario != null ||
+            _budgetPriorityScenario != null) {
+          throw const FormatException(
+            'Plan adaptation task scenario is invalid.',
+          );
+        }
+        _planAdaptationScenario.validate();
         break;
       default:
         throw FormatException('Unsupported task type: $type');

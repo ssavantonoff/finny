@@ -795,6 +795,70 @@ void main() {
   });
 
   test(
+    'canonical Day 3 plan adaptation parses with a valid 20 coin remainder',
+    () async {
+      final tasks = await AssetContentRepository().loadTasks();
+      final task = tasks.singleWhere(
+        (item) => item.id == 'task_changed_plan_03',
+      );
+      expect(task.type, 'plan_adaptation');
+      expect(task.planAdaptationScenario.isCanonicalDay3, isTrue);
+      expect(task.planAdaptationScenario.canonicalKeepTotal, 200);
+      expect(task.planAdaptationScenario.availableBudget, 220);
+      expect(task.planAdaptationScenario.correctAssignments, {
+        'food': 'keep',
+        'shampoo': 'keep',
+        'toy': 'later',
+        'savings': 'keep',
+      });
+      expect(tasks.length, greaterThanOrEqualTo(6));
+      expect(
+        tasks.map((item) => item.topic).toSet().length,
+        greaterThanOrEqualTo(3),
+      );
+    },
+  );
+
+  test('plan adaptation rejects malformed scenario fields', () async {
+    final source = jsonDecode(
+      await rootBundle.loadString('assets/content/tasks.json'),
+    ) as List;
+    final canonical = Map<String, Object?>.from(
+      source.singleWhere((item) => item['id'] == 'task_changed_plan_03') as Map,
+    );
+    final invalidCases = <String, void Function(Map<String, Object?>)>{
+      'unknown type': (task) => task['type'] = 'unknown',
+      'missing scenario': (task) => task['scenarioData'] = null,
+      'duplicate item': (task) {
+        final items = (task['scenarioData'] as Map)['items'] as List;
+        (items[1] as Map)['id'] = 'food';
+      },
+      'unknown decision': (task) {
+        final items = (task['scenarioData'] as Map)['items'] as List;
+        (items[0] as Map)['correctDecision'] = 'other';
+      },
+      'zero item price': (task) {
+        final items = (task['scenarioData'] as Map)['items'] as List;
+        (items[0] as Map)['price'] = 0;
+      },
+      'negative lost amount': (task) =>
+          (task['scenarioData'] as Map)['lostAmount'] = -1,
+      'inconsistent available budget': (task) =>
+          (task['scenarioData'] as Map)['availableBudget'] = 219,
+    };
+    for (final entry in invalidCases.entries) {
+      final candidate =
+          jsonDecode(jsonEncode(canonical)) as Map<String, dynamic>;
+      entry.value(candidate);
+      expect(
+        () => FinancialTask.fromJson(candidate),
+        throwsFormatException,
+        reason: entry.key,
+      );
+    }
+  });
+
+  test(
     'campaign keeps exactly one required categorization task on Day 1',
     () async {
       final tasks = await AssetContentRepository().loadTasks();
@@ -811,7 +875,7 @@ void main() {
       expect(dayTwoRequired.single.id, 'task_priority_02');
       expect(dayTwoRequired.single.type, 'budget_priority');
       expect(() => validateCampaignTaskContent(tasks), returnsNormally);
-      expect(tasks.where((task) => task.type == 'choice'), hasLength(4));
+      expect(tasks.where((task) => task.type == 'choice'), hasLength(3));
     },
   );
 }

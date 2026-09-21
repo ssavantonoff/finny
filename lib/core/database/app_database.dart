@@ -7,7 +7,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 9;
+  static const schemaVersion = 10;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -163,6 +163,7 @@ class AppDatabase {
     await _createPetDailyUsageTable(db);
     await _createPetActionOperationsTable(db);
     await _createPeriodSpecialActionsTable(db);
+    await _createCampaignStoryEventsTable(db);
   }
 
   static Future<void> _upgradeSchema(
@@ -262,6 +263,9 @@ class AppDatabase {
     }
     if (oldVersion < 9) {
       await _migrateVirtualDayV9(db);
+    }
+    if (oldVersion < 10) {
+      await _createCampaignStoryEventsTable(db);
     }
   }
 
@@ -386,6 +390,32 @@ class AppDatabase {
       FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
       FOREIGN KEY (profile_id, period_id)
         REFERENCES game_periods(profile_id, id) ON DELETE CASCADE
+    )
+  ''');
+
+  static Future<void> _createCampaignStoryEventsTable(
+    sqflite.DatabaseExecutor db,
+  ) => db.execute('''
+    CREATE TABLE IF NOT EXISTS campaign_story_events (
+      profile_id INTEGER NOT NULL,
+      story_id TEXT NOT NULL CHECK (length(trim(story_id)) > 0),
+      origin_period_id INTEGER NOT NULL,
+      threshold INTEGER NOT NULL CHECK (threshold IN (1, 2)),
+      status TEXT NOT NULL CHECK (status IN ('armed', 'postponed', 'purchased')),
+      armed_at TEXT NOT NULL,
+      postponed_at TEXT,
+      purchased_at TEXT,
+      decision_operation_id TEXT,
+      decision_kind TEXT CHECK (decision_kind IN ('postpone', 'purchase_wallet', 'purchase_savings')),
+      purchase_period_id INTEGER,
+      savings_used INTEGER NOT NULL DEFAULT 0 CHECK (savings_used >= 0),
+      PRIMARY KEY (profile_id, story_id),
+      UNIQUE (profile_id, decision_operation_id),
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+      FOREIGN KEY (profile_id, origin_period_id)
+        REFERENCES game_periods(profile_id, id) ON DELETE CASCADE,
+      FOREIGN KEY (profile_id, purchase_period_id)
+        REFERENCES game_periods(profile_id, id) ON DELETE SET NULL
     )
   ''');
 

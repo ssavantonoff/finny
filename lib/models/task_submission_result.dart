@@ -37,6 +37,19 @@ final class TaskBudgetPriorityIncorrect extends TaskSubmissionResult {
   bool get rewardAppliedNow => false;
 }
 
+final class TaskPlanAdaptationIncorrect extends TaskSubmissionResult {
+  const TaskPlanAdaptationIncorrect({
+    required super.explanation,
+    required this.incorrectItemIds,
+    this.overBudgetBy = 0,
+  });
+
+  final Set<String> incorrectItemIds;
+  final int overBudgetBy;
+
+  bool get rewardAppliedNow => false;
+}
+
 final class TaskAnswerCompleted extends TaskSubmissionResult {
   const TaskAnswerCompleted({
     required super.explanation,

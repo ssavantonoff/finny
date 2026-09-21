@@ -108,6 +108,30 @@ class _SummaryBody extends StatelessWidget {
             key: const Key('summary-additional-income'),
           ),
         ],
+        if (state.summary.unexpectedNeed > 0) ...[
+          const SizedBox(height: AppSpacing.small),
+          Text(
+            '${state.summary.carriedUnexpectedNeed ? 'Перенесённая' : 'Незапланированная'} нужная трата: Новая миска — '
+            '${state.summary.unexpectedNeed} монет',
+            key: const Key('summary-unexpected-bowl'),
+          ),
+        ],
+        if (state.summary.savingsWithdrawn > 0) ...[
+          const SizedBox(height: AppSpacing.small),
+          Text(
+            'Из копилки использовано: ${state.summary.savingsWithdrawn} монет',
+            key: const Key('summary-savings-withdrawn'),
+          ),
+        ],
+        if (state.summary.bowlPostponed) ...[
+          const SizedBox(height: AppSpacing.small),
+          Text(
+            state.period.periodNumber == 3
+                ? 'Нужная покупка отложена.'
+                : 'Новая миска всё ещё отложена.',
+            key: Key('summary-bowl-postponed'),
+          ),
+        ],
         const SizedBox(height: AppSpacing.large),
         FilledButton(
           key: const Key('summary-home'),

@@ -85,4 +85,70 @@ void main() {
     expect(find.text('На потом'), findsOneWidget);
     expect(find.byKey(const Key('summary-home')), findsOneWidget);
   });
+
+  testWidgets('carried bowl expense and savings withdrawal are explicit', (
+    tester,
+  ) async {
+    final state = PeriodSummaryReady(
+      period: GamePeriod(
+        id: 4,
+        profileId: 1,
+        definitionId: 'period_4',
+        periodNumber: 4,
+        startWalletBalance: 80,
+        baseIncome: 0,
+        extraIncome: 0,
+        plannedNeed: 0,
+        plannedWant: 0,
+        plannedSavings: 50,
+        plannedFree: 30,
+        actualNeed: 120,
+        actualWant: 0,
+        actualSavings: 50,
+        requiredCheckpoints: const [],
+        resolvedCheckpoints: const [],
+        endWalletBalance: 0,
+        growthPointsEarned: 0,
+        status: GamePeriodStatus.completed,
+        createdAt: DateTime.utc(2026, 1, 4),
+      ),
+      summary: const PeriodSummary(
+        openingWalletBalance: 80,
+        baseIncome: 0,
+        startingBudget: 80,
+        additionalIncome: 0,
+        plannedNeed: 0,
+        plannedWant: 0,
+        plannedSavings: 50,
+        plannedRemainder: 30,
+        factNeed: 120,
+        factWant: 0,
+        factSavings: 50,
+        factRemainder: 0,
+        unexpectedNeed: 120,
+        carriedUnexpectedNeed: true,
+        savingsWithdrawn: 40,
+      ),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          periodSummaryControllerProvider.overrideWith(
+            () => _StaticSummaryController(state),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: const PeriodSummaryScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Перенесённая нужная трата: Новая миска — 120 монет'),
+      findsOneWidget,
+    );
+    expect(find.text('Из копилки использовано: 40 монет'), findsOneWidget);
+    expect(find.text('50'), findsNWidgets(2));
+  });
 }

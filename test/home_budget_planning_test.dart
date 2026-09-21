@@ -11,6 +11,8 @@ import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/pet_state_rules.dart';
 import 'package:finny/models/profile.dart';
+import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/special_purchase.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
@@ -113,6 +115,7 @@ class _Harness {
 
 Future<_Harness> _pumpFeature(
   WidgetTester tester, {
+  required AppDatabase database,
   required int? profileId,
   required ProfileRepository profiles,
   required GameRepository games,
@@ -123,6 +126,7 @@ Future<_Harness> _pumpFeature(
 }) async {
   final container = ProviderContainer(
     overrides: [
+      appDatabaseProvider.overrideWithValue(database),
       activeProfileIdProvider.overrideWith(
         () => _ActiveProfileController(profileId),
       ),
@@ -332,6 +336,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
     );
 
     expect(find.text('Первый день с Финни'), findsOneWidget);
@@ -409,6 +414,7 @@ void main() {
         profiles: profiles,
         games: games,
         content: content,
+        database: database,
       );
 
       final start = find.byKey(const Key('home-start-day'));
@@ -438,6 +444,7 @@ void main() {
         profiles: profiles,
         games: games,
         content: content,
+        database: database,
       );
       expect(find.text('Новый день начался!'), findsNothing);
       expect(find.text('Продолжить план'), findsOneWidget);
@@ -451,7 +458,19 @@ void main() {
   testWidgets(
     'completed Day 1 enters Day 2 without first-day state or repeated morning',
     (tester) async {
-      content = TestContentRepository(testPeriodDefinitions(count: 3));
+      content = TestContentRepository(
+        testPeriodDefinitions(count: 3),
+        stories: const [
+          StoryPurchase(
+            id: 'day3_bowl_replacement',
+            name: 'Новая миска',
+            period: 3,
+            price: 120,
+            category: ShopItemCategory.need,
+            checkpoint: 'changed_circumstance',
+          ),
+        ],
+      );
       final profile = (await tester.runAsync(
         () => _createPlayer(
           profiles,
@@ -515,6 +534,7 @@ void main() {
         profiles: profiles,
         games: games,
         content: content,
+        database: database,
       );
       expect(find.text('Первый день с Финни'), findsNothing);
       expect(find.text('День 1 завершён'), findsOneWidget);
@@ -639,6 +659,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
       periods: _AmbiguousPeriodService(games, content),
     );
 
@@ -670,6 +691,7 @@ void main() {
       profiles: profiles,
       games: failing,
       content: content,
+      database: database,
     );
 
     expect(find.text('Не получилось открыть дом Финни.'), findsOneWidget);
@@ -697,6 +719,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
     );
     expect(find.text('Startup route'), findsOneWidget);
     expect(
@@ -726,6 +749,7 @@ void main() {
         profiles: profiles,
         games: games,
         content: content,
+        database: database,
         initialLocation: '/budget',
       );
 
@@ -794,6 +818,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
       initialLocation: '/budget',
     );
 
@@ -866,6 +891,7 @@ void main() {
         profiles: profiles,
         games: games,
         content: content,
+        database: database,
         initialLocation: '/budget',
         budgets: controlled,
       );
@@ -909,6 +935,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
       initialLocation: '/budget',
     );
     expect(find.text('200 🪙'), findsOneWidget);
@@ -919,6 +946,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
       initialLocation: '/budget',
     );
     expect(find.text('200 🪙'), findsOneWidget);
@@ -955,6 +983,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
       initialLocation: '/budget',
       budgets: controlled,
     );
@@ -1007,6 +1036,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
       initialLocation: '/budget',
       budgets: controlled,
     );
@@ -1041,6 +1071,7 @@ void main() {
         profiles: profiles,
         games: games,
         content: content,
+        database: database,
         initialLocation: '/budget',
       );
 
@@ -1109,6 +1140,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
       initialLocation: '/budget',
       budgets: controlled,
     );
@@ -1159,6 +1191,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
     );
     expect(find.text('550 🪙'), findsOneWidget);
     await tester.tap(find.text('Посмотреть план'));
@@ -1224,6 +1257,7 @@ void main() {
       profiles: profiles,
       games: games,
       content: content,
+      database: database,
     );
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Продолжить план'));
