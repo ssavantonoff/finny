@@ -28,7 +28,8 @@ Final-only artifact не становится автоматически blocker
 | NORMAL profile для live demo | VERIFY | Нужна организационная подготовка состояния; готового отдельного DEMO reset/reseed flow в текущем `main` нет |
 | Day 1 categorization evidence | READY | Код, assets и tests подтверждают 6 карточек, две зоны и исправляемый feedback |
 | Day 2 budget-priority evidence | READY | Код и test подтверждают лимит 150, цены 90/60/80, overflow guard и feedback |
-| Day 3–5 choice flow | VERIFY | Контент есть, но полный пятидневный manual smoke и внешний Interim artifact нужно проверить |
+| Day 3 plan adaptation evidence | READY | Current main содержит typed `plan_adaptation`, потерю 80 монет, новый бюджет 220 и widget/core tests |
+| Day 4–5 choice flow | VERIFY | Контент и choice validation есть; полный пятидневный manual smoke и внешний Interim artifact нужно проверить |
 | Offline Core / no mandatory account | READY | README/spec/architecture и локальные repositories описывают offline scope |
 | Safety/privacy scope | READY | Нет real money, bank, ads, subscription, mandatory account, public child chat или cloud sync в заявленном Core |
 | Known README discrepancy записана для эксперта | READY | См. раздел `Риски и расхождения` ниже; README намеренно не меняется этим follow-up |
@@ -110,6 +111,14 @@ documentation-only package.
 уже проведён. Planned work, внешний artifact и captain decision остаются
 `VERIFY`/`MISSING` по таблицам выше.
 
+### Requirements Matrix против current main
+
+После создания этой ветки `origin/main` продвинулся до
+`cab87fb35334bb5c222011393bd8951004e8990b` с Day 3 `plan_adaptation` и
+связанными tests. `docs/REQUIREMENTS_MATRIX.md` на этом SHA всё ещё описывает
+Day 3–5 как `choice`. В этом package используется фактический current code как
+source of truth, расхождение отмечено для капитана, а matrix не изменяется.
+
 ### Метрики матрицы
 
 Requirements Matrix атомизирует составные requirements в audit checks и включает
@@ -125,5 +134,7 @@ Requirements Matrix атомизирует составные requirements в au
 - `docs/PRODUCT_SPEC.md`, `docs/ARCHITECTURE.md`, `docs/CORE_GAME_LOOP.md`
 - `lib/features/adult/adult_screen.dart`,
   `lib/repositories/profile_data_management_repository.dart`
+- `lib/features/tasks/plan_adaptation_task_screen.dart`,
+  `test/features/tasks/day3_plan_adaptation_task_test.dart`
 - `test/features/adult/adult_screen_test.dart`,
   `test/repositories/profile_data_management_test.dart`

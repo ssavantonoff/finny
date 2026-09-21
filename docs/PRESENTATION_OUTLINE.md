@@ -2,7 +2,8 @@
 
 Это outline для презентации, а не готовый PPTX/PDF. Он рассчитан примерно на
 9 слайдов и использует только подтверждённые возможности текущего `main`
-(`a22335cc86c6a3fbb177a08721e9b78deb98bffe`).
+(`cab87fb35334bb5c222011393bd8951004e8990b`, актуальный `origin/main` на
+момент проверки; ветка этого пакета создана от `a22335cc86c6a3fbb177a08721e9b78deb98bffe`).
 
 Формулировки описывают Finny как инструмент тренировки базовых финансовых
 навыков. Они не обещают гарантированного результата обучения и не называют
@@ -105,7 +106,13 @@ plan / fact и следующий период
   «на потом».
 - В Day 2 показываются корм за 90, шампунь за 60 и бантик за 80; превышение
   лимита блокируется с сообщением о дефиците.
-- Day 3–5 сейчас используют более простой тип `choice`.
+- Day 3 в актуальном `main` использует typed `plan_adaptation`: потеря 80 монет
+  требует пересобрать план с 300 до 220, сохранить корм/шампунь и накопление,
+  а игрушку перенести на потом.
+- Day 4 (`discounts`) и Day 5 (`planning`/`reserve`) остаются типом `choice`.
+- Текущая Requirements Matrix всё ещё описывает Day 3–5 как `choice`; это
+  зафиксированное расхождение документа и кода, а не повод менять matrix этим
+  documentation-only пакетом.
 
 **Визуал**
 
@@ -115,15 +122,18 @@ plan / fact и следующий период
 **Что сказать устно**
 
 Главный интерактивный пример лучше строить вокруг Day 2: эксперт сразу видит
-ограниченный ресурс, компромисс и feedback. Не следует описывать Day 3–5 как
-самостоятельные drag/minigame-механики — в текущем `main` это `choice`.
+ограниченный ресурс, компромисс и feedback. При необходимости Day 3 можно
+показать как второй интерактивный пример адаптации плана. Day 4 и Day 5 не нужно
+описывать как более сложные механики, чем их текущий `choice` flow.
 
 **Evidence**
 
 `assets/content/tasks.json`, `lib/features/tasks/tasks_screen.dart`,
 `lib/features/tasks/budget_priority_task_screen.dart`,
+`lib/features/tasks/plan_adaptation_task_screen.dart`,
 `test/features/tasks/day1_categorization_task_test.dart`,
-`test/features/tasks/day2_budget_priority_task_test.dart`.
+`test/features/tasks/day2_budget_priority_task_test.dart`,
+`test/features/tasks/day3_plan_adaptation_task_test.dart`.
 
 ### Slide 5 — Накопления и финансовые цели
 
@@ -256,7 +266,8 @@ Offline-first здесь означает, что основной Core не з�
 - Stack: Flutter/Dart, Riverpod, GoRouter, SQLite/sqflite, JSON content,
   Material 3.
 - Current main содержит MVP Core, тесты и Requirements Matrix.
-- Day 1 и Day 2 имеют отдельные mechanics; Day 3–5 — `choice`.
+- Day 1 и Day 2 имеют отдельные mechanics; Day 3 имеет `plan_adaptation`, а Day
+  4–5 используют `choice`.
 - Физический Android 8+ smoke, portrait, performance measurements, release APK,
   RuStore package, final screenshots, presentation и backup video требуют
   отдельного verification/final package.
@@ -286,4 +297,7 @@ Offline-first здесь означает, что основной Core не з�
 - Выбрать основной live-demo route по `docs/DEMO_SCRIPT.md`.
 - Заменить placeholders ссылками на фактический repository/APK/video только
   после проверки доступа.
+- Перед выпуском сверить подпись Day 3 между current code и Requirements Matrix:
+  код уже содержит `plan_adaptation`, а matrix на актуальном `main` пока
+  сохраняет старое описание `choice`.
 - Не называть outline готовой презентацией и не обещать final artifacts.
