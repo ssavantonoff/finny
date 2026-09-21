@@ -87,8 +87,7 @@ class _BudgetPriorityTaskScreenState extends State<BudgetPriorityTaskScreen> {
       final attemptedTotal = totalWithoutItem + item.price;
       if (attemptedTotal > scenario.budget) {
         setState(() {
-          budgetError =
-              'Не хватает ${attemptedTotal - scenario.budget} монет. Попробуй изменить выбор.';
+          budgetError = 'Не хватает ${attemptedTotal - scenario.budget} монет';
           failed = false;
         });
         return false;
@@ -168,6 +167,28 @@ class _BudgetPriorityTaskScreenState extends State<BudgetPriorityTaskScreen> {
                   'Это бюджет только для задания.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
+                if (budgetError case final message?) ...[
+                  const SizedBox(height: AppSpacing.small),
+                  Semantics(
+                    liveRegion: true,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.account_balance_wallet_outlined,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        const SizedBox(width: AppSpacing.small),
+                        Expanded(
+                          child: Text(
+                            message,
+                            key: const Key('budget-priority-budget-error'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -216,28 +237,6 @@ class _BudgetPriorityTaskScreenState extends State<BudgetPriorityTaskScreen> {
                   scenario.laterLabel,
                   scenario.laterDescription,
                 ),
-                if (budgetError case final message?) ...[
-                  const SizedBox(height: AppSpacing.medium),
-                  Semantics(
-                    liveRegion: true,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.account_balance_wallet_outlined,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(width: AppSpacing.small),
-                        Expanded(
-                          child: Text(
-                            message,
-                            key: const Key('budget-priority-budget-error'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
                 if (result case TaskBudgetPriorityIncorrect(
                   :final explanation,
                 )) ...[
