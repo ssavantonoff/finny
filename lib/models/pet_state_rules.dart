@@ -11,8 +11,10 @@ abstract final class PetStateRules {
 
   static int nextMorningValue(int eveningValue) {
     final evening = clampStat(eveningValue);
-    if (evening < greenThreshold) return 35;
-    return (35 + (evening - greenThreshold) ~/ 2).clamp(35, initialValue);
+    final target = evening < greenThreshold
+        ? 35
+        : (35 + (evening - greenThreshold) ~/ 2).clamp(35, initialValue);
+    return target.clamp(0, evening);
   }
 
   static Pet nextMorningPet(Pet eveningPet) => eveningPet.copyWith(

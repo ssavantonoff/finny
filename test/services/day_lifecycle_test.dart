@@ -569,6 +569,31 @@ void main() {
     },
   );
 
+  test('starting Day 2 never raises low Day 1 pet stats overnight', () async {
+    final player = await createPlayer(satiety: 20, care: 34, mood: 20);
+    await lifecycle.sleep(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      allowFallback: true,
+    );
+    final evening = await games.getPet(player.profileId);
+    expect((evening?.satiety, evening?.care, evening?.mood), (20, 34, 20));
+
+    await games.startPeriod(
+      profileId: player.profileId,
+      definitionId: 'period_2',
+      periodNumber: 2,
+      baseIncome: 500,
+      requiredCheckpoints: const ['savings_decision'],
+      createdAt: DateTime.utc(2026, 1, 2),
+    );
+    final morning = await games.getPet(player.profileId);
+    expect((morning?.satiety, morning?.care, morning?.mood), (20, 34, 20));
+    expect(morning?.satiety, lessThanOrEqualTo(evening!.satiety));
+    expect(morning?.care, lessThanOrEqualTo(evening.care));
+    expect(morning?.mood, lessThanOrEqualTo(evening.mood));
+  });
+
   test(
     'restart with an existing next period does not repeat morning',
     () async {

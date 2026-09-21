@@ -24,8 +24,18 @@ void main() {
       (55, 80, 80),
     );
     expect(PetStateRules.initialValue, 40);
+    expect(PetStateRules.nextMorningValue(20), 20);
+    expect(PetStateRules.nextMorningValue(34), 34);
+    expect(PetStateRules.nextMorningValue(35), 35);
+    expect(PetStateRules.nextMorningValue(50), 35);
     expect(PetStateRules.nextMorningValue(100), 40);
     expect(PetStateRules.nextMorningValue(70), 35);
+    expect(PetStateRules.nextMorningValue(80), 40);
+    for (var evening = 0; evening <= 100; evening++) {
+      final morning = PetStateRules.nextMorningValue(evening);
+      expect(morning, inInclusiveRange(0, 100));
+      expect(morning, lessThanOrEqualTo(evening));
+    }
   });
 
   test('virtual progress has canonical phases and cumulative decay', () {
