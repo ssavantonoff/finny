@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/adult/adult_controller.dart';
 import 'package:flutter/material.dart';
@@ -158,14 +159,18 @@ class _AdultBody extends ConsumerWidget {
         ),
         AdultReady(:final overview) => _AdultOverviewContent(
           overview: overview,
+          dataManagementState: ref.watch(adultDataManagementControllerProvider),
         ),
       },
     );
   }
 }
 
-class _AdultOverviewContent extends StatelessWidget {
-  const _AdultOverviewContent({required this.overview});
+class _AdultOverviewContent extends ConsumerWidget {
+  const _AdultOverviewContent({
+    required this.overview,
+    required this.dataManagementState,
+  });
 
   static const learningTopics = [
     'отличать нужное от желаемого',
@@ -177,12 +182,24 @@ class _AdultOverviewContent extends StatelessWidget {
   ];
 
   final AdultOverview overview;
+  final AdultDataManagementState dataManagementState;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final progress = (overview.completedDays / adultCampaignDays)
         .clamp(0.0, 1.0)
         .toDouble();
+    final operationRunning = dataManagementState is AdultDataManagementRunning;
+    String? failureMessage;
+    final failureState = dataManagementState;
+    if (failureState is AdultDataManagementFailure) {
+      failureMessage = switch (failureState.operation) {
+        AdultDataManagementOperation.reset =>
+          'Не получилось сбросить прогресс. Попробуйте ещё раз.',
+        AdultDataManagementOperation.delete =>
+          'Не получилось удалить профиль. Попробуйте ещё раз.',
+      };
+    }
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 560),
@@ -254,15 +271,114 @@ class _AdultOverviewContent extends StatelessWidget {
                 'В копилке: ${overview.savedAmount} монет',
               ),
             ),
+            const SizedBox(height: AppSpacing.medium),
+            _SectionCard(
+              key: const Key('adult-data-management'),
+              title: 'Управление данными',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  OutlinedButton.icon(
+                    key: const Key('adult-reset-progress'),
+                    onPressed: operationRunning
+                        ? null
+                        : () => unawaited(_confirmReset(context, ref)),
+                    icon: const Icon(Icons.restart_alt),
+                    label: const Text('Сбросить игровой прогресс'),
+                  ),
+                  const SizedBox(height: AppSpacing.small),
+                  OutlinedButton.icon(
+                    key: const Key('adult-delete-profile'),
+                    onPressed: operationRunning
+                        ? null
+                        : () => unawaited(_confirmDelete(context, ref)),
+                    icon: const Icon(Icons.delete_outline),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    label: const Text('Удалить локальный профиль'),
+                  ),
+                  if (failureMessage != null) ...[
+                    const SizedBox(height: AppSpacing.small),
+                    Text(
+                      failureMessage,
+                      key: Key('adult-data-management-error'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  Future<void> _confirmReset(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Сбросить игровой прогресс?'),
+        content: const Text(
+          'Дни, монеты, накопления, покупки и задания будут удалены. '
+          'Имя профиля и внешний вид Финни сохранятся.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Сбросить прогресс'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final succeeded = await ref
+        .read(adultDataManagementControllerProvider.notifier)
+        .resetProgress();
+    if (!succeeded || !context.mounted) return;
+    ref.read(activeProfileIdProvider.notifier).clear();
+    context.go('/startup');
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Удалить локальный профиль?'),
+        content: const Text(
+          'Будут удалены профиль, Финни и весь игровой прогресс на этом '
+          'устройстве. После удаления восстановить данные нельзя.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Удалить профиль'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final succeeded = await ref
+        .read(adultDataManagementControllerProvider.notifier)
+        .deleteProfile();
+    if (!succeeded || !context.mounted) return;
+    ref.read(activeProfileIdProvider.notifier).clear();
+    context.go('/startup');
+  }
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child});
+  const _SectionCard({super.key, required this.title, required this.child});
 
   final String title;
   final Widget child;

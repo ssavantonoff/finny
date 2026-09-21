@@ -24,7 +24,9 @@ SQLite / JSON assets
 UI может читать состояние через Riverpod и вызывать сервисы, но не должен
 напрямую менять кошелёк, накопления, периоды, задания или развитие питомца.
 `lib/app/providers.dart` является composition root и связывает сервисы с
-repository-контрактами.
+repository-контрактами. Деструктивные lifecycle-операции локального профиля
+идут через узкий `ProfileDataManagementPort` и не добавляются в общий
+`GameRepository`.
 
 ## Runtime state и content
 
@@ -123,7 +125,9 @@ Day 3 story purchase и Day 4 promotion загружаются из отдель
 `ProfileType` поддерживает `NORMAL` и `DEMO`. Состояние всегда запрашивается и
 изменяется с `profileId`. Операция очистки demo runtime state сначала проверяет
 тип профиля и не разрешена для NORMAL. Сами профили при такой очистке
-сохраняются.
+сохраняются. Adult reset/delete — отдельные атомарные операции только для
+NORMAL: reset сохраняет профиль и identity Pet, возвращая runtime к началу Day 1,
+а delete удаляет профиль и связанные строки через foreign-key cascade.
 
 `activeProfileIdProvider` в `lib/app/providers.dart` — единый shared-контракт
 текущего активного профиля. До app-level инициализации его значение равно

@@ -40,8 +40,35 @@ class AdultFailure extends AdultViewState {
   const AdultFailure();
 }
 
+enum AdultDataManagementOperation { reset, delete }
+
+sealed class AdultDataManagementState {
+  const AdultDataManagementState();
+}
+
+class AdultDataManagementIdle extends AdultDataManagementState {
+  const AdultDataManagementIdle();
+}
+
+class AdultDataManagementRunning extends AdultDataManagementState {
+  const AdultDataManagementRunning(this.operation);
+
+  final AdultDataManagementOperation operation;
+}
+
+class AdultDataManagementFailure extends AdultDataManagementState {
+  const AdultDataManagementFailure(this.operation);
+
+  final AdultDataManagementOperation operation;
+}
+
 final adultControllerProvider =
     NotifierProvider<AdultController, AdultViewState>(AdultController.new);
+
+final adultDataManagementControllerProvider =
+    NotifierProvider<AdultDataManagementController, AdultDataManagementState>(
+      AdultDataManagementController.new,
+    );
 
 class AdultController extends Notifier<AdultViewState> {
   int _generation = 0;
@@ -94,4 +121,61 @@ class AdultController extends Notifier<AdultViewState> {
       _alive &&
       generation == _generation &&
       ref.read(activeProfileIdProvider) == profileId;
+}
+
+class AdultDataManagementController extends Notifier<AdultDataManagementState> {
+  Future<void>? _pending;
+
+  @override
+  AdultDataManagementState build() => const AdultDataManagementIdle();
+
+  Future<bool> resetProgress() => _run(
+    AdultDataManagementOperation.reset,
+    (profileId) => ref
+        .read(profileDataManagementPortProvider)
+        .resetNormalProfile(profileId),
+  );
+
+  Future<bool> deleteProfile() => _run(
+    AdultDataManagementOperation.delete,
+    (profileId) => ref
+        .read(profileDataManagementPortProvider)
+        .deleteNormalProfile(profileId),
+  );
+
+  Future<bool> _run(
+    AdultDataManagementOperation operation,
+    Future<void> Function(int profileId) action,
+  ) async {
+    if (_pending != null) return false;
+    final profileId = ref.read(activeProfileIdProvider);
+    if (profileId == null) {
+      state = AdultDataManagementFailure(operation);
+      return false;
+    }
+
+    state = AdultDataManagementRunning(operation);
+    final pending = _execute(operation, profileId, action);
+    _pending = pending;
+    try {
+      return await pending;
+    } finally {
+      if (identical(_pending, pending)) _pending = null;
+    }
+  }
+
+  Future<bool> _execute(
+    AdultDataManagementOperation operation,
+    int profileId,
+    Future<void> Function(int profileId) action,
+  ) async {
+    try {
+      await action(profileId);
+      state = const AdultDataManagementIdle();
+      return true;
+    } catch (_) {
+      state = AdultDataManagementFailure(operation);
+      return false;
+    }
+  }
 }

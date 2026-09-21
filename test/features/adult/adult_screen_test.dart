@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/features/adult/adult_controller.dart';
 import 'package:finny/features/adult/adult_screen.dart';
 import 'package:finny/features/settings/settings_screen.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/repositories/profile_data_management_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,6 +65,29 @@ class _AdultGames extends SqliteGameRepository {
     return gameStatesByProfile.containsKey(profileId)
         ? gameStatesByProfile[profileId]
         : gameState;
+  }
+}
+
+class _AdultDataManagementFake implements ProfileDataManagementPort {
+  int resetCalls = 0;
+  int deleteCalls = 0;
+  bool failReset = false;
+  bool failDelete = false;
+  Completer<void>? resetGate;
+  Completer<void>? deleteGate;
+
+  @override
+  Future<void> resetNormalProfile(int profileId) async {
+    resetCalls++;
+    if (failReset) throw StateError('reset failed');
+    await resetGate?.future;
+  }
+
+  @override
+  Future<void> deleteNormalProfile(int profileId) async {
+    deleteCalls++;
+    if (failDelete) throw StateError('delete failed');
+    await deleteGate?.future;
   }
 }
 
@@ -130,9 +155,14 @@ Future<_Harness> _pumpAdult(
   _AdultGames games, {
   int? profileId = 1,
   String initialLocation = '/adult',
+  _AdultDataManagementFake? dataManagement,
 }) async {
+  final management = dataManagement ?? _AdultDataManagementFake();
   final container = ProviderContainer(
-    overrides: [gameRepositoryProvider.overrideWithValue(games)],
+    overrides: [
+      gameRepositoryProvider.overrideWithValue(games),
+      profileDataManagementPortProvider.overrideWithValue(management),
+    ],
   );
   addTearDown(container.dispose);
   if (profileId != null) {
@@ -144,6 +174,7 @@ Future<_Harness> _pumpAdult(
   final router = GoRouter(
     initialLocation: initialLocation,
     routes: [
+      GoRoute(path: '/startup', builder: (_, _) => const Text('startup')),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(path: '/adult', builder: (_, _) => const AdultScreen()),
     ],
@@ -201,6 +232,7 @@ void main() {
     expect(find.byKey(const Key('adult-barrier')), findsOneWidget);
     expect(find.byKey(const Key('adult-unlock')), findsOneWidget);
     expect(find.text('О проекте'), findsNothing);
+    expect(find.text('Управление данными'), findsNothing);
     expect(games.readCalls, 0);
   });
 
@@ -238,6 +270,22 @@ void main() {
     }
     expect(find.text('Пройдено дней: 0 из 5'), findsOneWidget);
     expect(games.readCalls, 3);
+  });
+
+  testWidgets('data management is reachable only after unlock', (tester) async {
+    final games = _games();
+    await _pumpAdult(tester, games);
+
+    expect(find.text('Управление данными'), findsNothing);
+    await _unlock(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-data-management')),
+      300,
+    );
+
+    expect(find.text('Управление данными'), findsOneWidget);
+    expect(find.byKey(const Key('adult-reset-progress')), findsOneWidget);
+    expect(find.byKey(const Key('adult-delete-profile')), findsOneWidget);
   });
 
   testWidgets('leaving and reopening Adult restores the barrier', (
@@ -419,6 +467,190 @@ void main() {
       find.byKey(const Key('adult-savings')),
       300,
     );
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-data-management')),
+      300,
+    );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('reset confirmation can be cancelled without mutation', (
+    tester,
+  ) async {
+    final games = _games();
+    final management = _AdultDataManagementFake();
+    await _pumpAdult(tester, games, dataManagement: management);
+    await _unlock(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-reset-progress')),
+      300,
+    );
+
+    await tester.tap(find.byKey(const Key('adult-reset-progress')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Сбросить игровой прогресс?'), findsOneWidget);
+    expect(
+      find.text(
+        'Дни, монеты, накопления, покупки и задания будут удалены. '
+        'Имя профиля и внешний вид Финни сохранятся.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Отмена'), findsOneWidget);
+    expect(find.text('Сбросить прогресс'), findsOneWidget);
+
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(management.resetCalls, 0);
+    expect(find.byKey(const Key('adult-data-management')), findsOneWidget);
+  });
+
+  testWidgets('delete confirmation can be cancelled without mutation', (
+    tester,
+  ) async {
+    final games = _games();
+    final management = _AdultDataManagementFake();
+    await _pumpAdult(tester, games, dataManagement: management);
+    await _unlock(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-delete-profile')),
+      300,
+    );
+
+    await tester.tap(find.byKey(const Key('adult-delete-profile')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Удалить локальный профиль?'), findsOneWidget);
+    expect(
+      find.text(
+        'Будут удалены профиль, Финни и весь игровой прогресс на этом '
+        'устройстве. После удаления восстановить данные нельзя.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Удалить профиль'), findsOneWidget);
+
+    await tester.tap(find.text('Отмена'));
+    await tester.pumpAndSettle();
+    expect(management.deleteCalls, 0);
+    expect(find.byKey(const Key('adult-data-management')), findsOneWidget);
+  });
+
+  testWidgets('confirmed reset runs once and routes through startup', (
+    tester,
+  ) async {
+    final games = _games();
+    final management = _AdultDataManagementFake();
+    final harness = await _pumpAdult(tester, games, dataManagement: management);
+    await _unlock(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-reset-progress')),
+      300,
+    );
+
+    await tester.tap(find.byKey(const Key('adult-reset-progress')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сбросить прогресс'));
+    await tester.pumpAndSettle();
+
+    expect(management.resetCalls, 1);
+    expect(harness.container.read(activeProfileIdProvider), isNull);
+    expect(find.text('startup'), findsOneWidget);
+  });
+
+  testWidgets('running reset prevents a duplicate operation', (tester) async {
+    final games = _games();
+    final management = _AdultDataManagementFake()
+      ..resetGate = Completer<void>();
+    final harness = await _pumpAdult(tester, games, dataManagement: management);
+    await _unlock(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-reset-progress')),
+      300,
+    );
+
+    await tester.tap(find.byKey(const Key('adult-reset-progress')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сбросить прогресс'));
+    await tester.pump();
+
+    final duplicate = harness.container
+        .read(adultDataManagementControllerProvider.notifier)
+        .resetProgress();
+    expect(await duplicate, isFalse);
+    expect(management.resetCalls, 1);
+
+    management.resetGate!.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('startup'), findsOneWidget);
+  });
+
+  testWidgets('confirmed delete runs once and routes through startup', (
+    tester,
+  ) async {
+    final games = _games();
+    final management = _AdultDataManagementFake();
+    final harness = await _pumpAdult(tester, games, dataManagement: management);
+    await _unlock(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-delete-profile')),
+      300,
+    );
+
+    await tester.tap(find.byKey(const Key('adult-delete-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить профиль'));
+    await tester.pumpAndSettle();
+
+    expect(management.deleteCalls, 1);
+    expect(harness.container.read(activeProfileIdProvider), isNull);
+    expect(find.text('startup'), findsOneWidget);
+  });
+
+  testWidgets('reset failure stays in Adult and is retryable', (tester) async {
+    final games = _games();
+    final management = _AdultDataManagementFake()..failReset = true;
+    await _pumpAdult(tester, games, dataManagement: management);
+    await _unlock(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-reset-progress')),
+      300,
+    );
+
+    await tester.tap(find.byKey(const Key('adult-reset-progress')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Сбросить прогресс'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Не получилось сбросить прогресс. Попробуйте ещё раз.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('adult-data-management')), findsOneWidget);
+    expect(find.text('startup'), findsNothing);
+  });
+
+  testWidgets('delete failure stays in Adult and is retryable', (tester) async {
+    final games = _games();
+    final management = _AdultDataManagementFake()..failDelete = true;
+    await _pumpAdult(tester, games, dataManagement: management);
+    await _unlock(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-delete-profile')),
+      300,
+    );
+
+    await tester.tap(find.byKey(const Key('adult-delete-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Удалить профиль'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Не получилось удалить профиль. Попробуйте ещё раз.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('adult-data-management')), findsOneWidget);
+    expect(find.text('startup'), findsNothing);
   });
 }
