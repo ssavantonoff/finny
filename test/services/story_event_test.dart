@@ -2,16 +2,32 @@ import 'dart:math';
 
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/game_period.dart';
+import 'package:finny/models/pet.dart';
+import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/profile.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/story_event.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/task_service.dart';
 import 'package:finny/services/period_service.dart';
+import 'package:finny/services/purchase_service.dart';
+import 'package:finny/services/item_use_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_content_repository.dart';
 import '../helpers/test_database.dart';
+
+class _ChooseTwoRandom implements Random {
+  @override
+  int nextInt(int max) => max - 1;
+
+  @override
+  bool nextBool() => true;
+
+  @override
+  double nextDouble() => 0.999;
+}
 
 void main() {
   late AppDatabase database;
@@ -92,10 +108,37 @@ void main() {
 
   const qualifying = {
     'free:pet',
+    'item:food_apple',
     'item:food_treat',
     'item:care_toothbrush',
     'item:toy_ball',
   };
+  const qualifyingItems = [
+    ShopItem(
+      id: 'food_apple',
+      name: 'Яблоко',
+      category: ShopItemCategory.need,
+      price: 40,
+      persistent: false,
+      effectType: 'satiety',
+      effectValue: 20,
+      unlockType: 'available',
+      displaySection: ShopDisplaySection.food,
+      usagePolicy: ItemUsagePolicy.unlimited,
+    ),
+    ShopItem(
+      id: 'care_toothbrush',
+      name: 'Щётка',
+      category: ShopItemCategory.need,
+      price: 80,
+      persistent: true,
+      effectType: 'care',
+      effectValue: 8,
+      unlockType: 'available',
+      displaySection: ShopDisplaySection.care,
+      usagePolicy: ItemUsagePolicy.toothbrush,
+    ),
+  ];
 
   test(
     'arms only after task, persists threshold and counts post-arm actions',
@@ -104,6 +147,7 @@ void main() {
         await events.armDay3Bowl(
           profileId: profileId,
           qualifyingActionIds: qualifying,
+          qualifyingItems: qualifyingItems,
         ),
         isNull,
       );
@@ -111,6 +155,7 @@ void main() {
       final armed = await events.armDay3Bowl(
         profileId: profileId,
         qualifyingActionIds: qualifying,
+        qualifyingItems: qualifyingItems,
       );
       expect(armed?.status, StoryEventStatus.armed);
       expect(armed?.threshold, anyOf(1, 2));
@@ -118,6 +163,7 @@ void main() {
       final replay = await events.armDay3Bowl(
         profileId: profileId,
         qualifyingActionIds: qualifying,
+        qualifyingItems: qualifyingItems,
       );
       expect(replay?.threshold, armed?.threshold);
 
@@ -131,11 +177,135 @@ void main() {
     },
   );
 
+  test(
+    'persists threshold 2 when two post-arm actions are affordable',
+    () async {
+      events = SqliteStoryEventPort(database, random: _ChooseTwoRandom());
+      await completeTask();
+      final armed = await events.armDay3Bowl(
+        profileId: profileId,
+        qualifyingActionIds: qualifying,
+        qualifyingItems: qualifyingItems,
+      );
+      expect(armed?.threshold, 2);
+      expect(
+        (await events.armDay3Bowl(
+          profileId: profileId,
+          qualifyingActionIds: qualifying,
+          qualifyingItems: qualifyingItems,
+        ))?.threshold,
+        2,
+      );
+    },
+  );
+
+  test(
+    'falls back to one reachable action after pre-task exhaustion',
+    () async {
+      final petActions = SqlitePetActionPort(database);
+      await games.savePet(
+        Pet(
+          profileId: profileId,
+          name: 'Финни',
+          colorId: 'purple',
+          patternId: 'spots',
+          developmentStage: 1,
+          growthPoints: 0,
+          satiety: 80,
+          care: 80,
+          mood: 80,
+        ),
+      );
+      await petActions.performFreePetInteraction(
+        profileId: profileId,
+        periodId: period.id!,
+        interaction: FreePetInteraction.pet,
+        operationId: 'pre-task-pet',
+      );
+      await petActions.useItem(
+        profileId: profileId,
+        periodId: period.id!,
+        item: qualifyingItems[1],
+        operationId: 'pre-task-brush',
+        slot: PetActionSlot.morning,
+      );
+      final db = await database.database;
+      await db.delete(
+        'inventory',
+        where: 'profile_id = ?',
+        whereArgs: [profileId],
+      );
+      await db.update(
+        'game_states',
+        {'wallet_balance': 0},
+        where: 'profile_id = ?',
+        whereArgs: [profileId],
+      );
+
+      await completeTask();
+      expect((await games.getGameState(profileId))?.walletBalance, 50);
+      events = SqliteStoryEventPort(database, random: _ChooseTwoRandom());
+      final armed = await events.armDay3Bowl(
+        profileId: profileId,
+        qualifyingActionIds: qualifying,
+        qualifyingItems: qualifyingItems,
+      );
+      expect(armed?.threshold, 1);
+      expect(armed?.qualifyingInteractionCount, 0);
+      expect(
+        (await events.armDay3Bowl(
+          profileId: profileId,
+          qualifyingActionIds: qualifying,
+          qualifyingItems: qualifyingItems,
+        ))?.threshold,
+        1,
+      );
+
+      final content = TestContentRepository(
+        testPeriodDefinitions(count: 3),
+        shopItems: qualifyingItems,
+      );
+      await PurchaseService(SqlitePurchasePort(database), content).purchase(
+        profileId: profileId,
+        periodId: period.id!,
+        itemId: 'food_apple',
+        operationId: 'post-task-apple-purchase',
+      );
+      await ItemUseService(petActions, content).useItem(
+        profileId: profileId,
+        periodId: period.id!,
+        itemId: 'food_apple',
+        operationId: 'post-task-apple-use',
+      );
+      final due = await events.loadDay3Bowl(
+        profileId: profileId,
+        qualifyingActionIds: qualifying,
+      );
+      expect(due?.qualifyingInteractionCount, 1);
+      expect(due?.isDue, isTrue);
+      await events.postponeDay3Bowl(
+        profileId: profileId,
+        currentPeriodId: period.id!,
+        operationId: 'post-task-postpone',
+        qualifyingActionIds: qualifying,
+      );
+      final completed = await resolveCheckpointForTest(
+        database,
+        profileId: profileId,
+        periodId: period.id!,
+        checkpointId: 'savings_decision',
+      );
+      expect(completed.status, GamePeriodStatus.readyToFinish);
+      expect(completed.resolvedCheckpoints, contains('changed_circumstance'));
+    },
+  );
+
   test('postpone resolves Day 3 without financial mutation', () async {
     await completeTask();
     await events.armDay3Bowl(
       profileId: profileId,
       qualifyingActionIds: qualifying,
+      qualifyingItems: qualifyingItems,
     );
     await addPetProof('pet-1', 'free:pet');
     await addPetProof('pet-2', 'item:food_treat');
@@ -170,6 +340,7 @@ void main() {
       await events.armDay3Bowl(
         profileId: profileId,
         qualifyingActionIds: qualifying,
+        qualifyingItems: qualifyingItems,
       );
       await addPetProof('pet-1', 'free:pet');
       await addPetProof('pet-2', 'item:food_treat');
@@ -238,6 +409,7 @@ void main() {
     final armed = await events.armDay3Bowl(
       profileId: profileId,
       qualifyingActionIds: qualifying,
+      qualifyingItems: qualifyingItems,
     );
     expect(armed?.qualifyingInteractionCount, 0);
     await addPetProof('shop-purchase', 'purchase:toy_ball');
@@ -258,6 +430,7 @@ void main() {
       await events.armDay3Bowl(
         profileId: profileId,
         qualifyingActionIds: qualifying,
+        qualifyingItems: qualifyingItems,
       );
       await addPetProof('pet-1', 'free:pet');
       await addPetProof('pet-2', 'item:food_treat');
@@ -350,6 +523,7 @@ void main() {
     await events.armDay3Bowl(
       profileId: profileId,
       qualifyingActionIds: qualifying,
+      qualifyingItems: qualifyingItems,
     );
     await addPetProof('pet-1', 'free:pet');
     await addPetProof('pet-2', 'item:food_treat');
@@ -403,6 +577,7 @@ void main() {
     final snapshot = await events.armDay3Bowl(
       profileId: profileId,
       qualifyingActionIds: qualifying,
+      qualifyingItems: qualifyingItems,
     );
     expect(snapshot?.status, StoryEventStatus.purchased);
     expect(snapshot?.decisionOperationId, 'legacy-bowl');
@@ -426,6 +601,7 @@ void main() {
       await events.armDay3Bowl(
         profileId: profileId,
         qualifyingActionIds: qualifying,
+        qualifyingItems: qualifyingItems,
       );
       await addPetProof('pet-1', 'free:pet');
       await addPetProof('pet-2', 'item:toy_ball');
@@ -462,6 +638,7 @@ void main() {
     await events.armDay3Bowl(
       profileId: profileId,
       qualifyingActionIds: qualifying,
+      qualifyingItems: qualifyingItems,
     );
     await addPetProof('pet-1', 'free:pet');
     await addPetProof('pet-2', 'item:toy_ball');

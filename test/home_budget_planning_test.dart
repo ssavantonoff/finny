@@ -1271,4 +1271,180 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'postponed bowl remains visible between days and after campaign',
+    (tester) async {
+      final definitions = testPeriodDefinitions(count: 5);
+      definitions[2] = PeriodDefinition(
+        id: 'period_3',
+        number: 3,
+        title: 'Период 3',
+        baseIncome: 500,
+        requiredCheckpoints: const [
+          'financial_task',
+          'savings_decision',
+          'changed_circumstance',
+        ],
+      );
+      content = TestContentRepository(
+        definitions,
+        stories: const [
+          StoryPurchase(
+            id: 'day3_bowl_replacement',
+            name: 'Новая миска',
+            period: 3,
+            price: 120,
+            category: ShopItemCategory.need,
+            checkpoint: 'changed_circumstance',
+          ),
+        ],
+      );
+      final profile = (await tester.runAsync(
+        () => _createPlayer(profiles, games),
+      ))!;
+      final profileId = profile.id!;
+
+      Future<GamePeriod> start(int number) => games.startPeriod(
+        profileId: profileId,
+        definitionId: 'period_$number',
+        periodNumber: number,
+        baseIncome: 500,
+        requiredCheckpoints: definitions[number - 1].requiredCheckpoints,
+        createdAt: DateTime.utc(2026, 1, number),
+      );
+
+      Future<void> finish(GamePeriod period) async {
+        final active = await games.confirmBudget(
+          profileId: profileId,
+          periodId: period.id!,
+        );
+        for (final checkpoint in active.requiredCheckpoints) {
+          await resolveCheckpointForTest(
+            database,
+            profileId: profileId,
+            periodId: period.id!,
+            checkpointId: checkpoint,
+          );
+        }
+        await completePeriodForTest(
+          database,
+          profileId: profileId,
+          periodId: period.id!,
+        );
+      }
+
+      await tester.runAsync(() async {
+        await finish(await start(1));
+        await finish(await start(2));
+        final day3 = await start(3);
+        final db = await database.database;
+        await db.insert('campaign_story_events', {
+          'profile_id': profileId,
+          'story_id': 'day3_bowl_replacement',
+          'origin_period_id': day3.id,
+          'threshold': 1,
+          'status': 'postponed',
+          'armed_at': DateTime.utc(2026, 1, 3).toIso8601String(),
+          'postponed_at': DateTime.utc(2026, 1, 3).toIso8601String(),
+          'purchased_at': null,
+          'decision_operation_id': 'postponed-day3',
+          'decision_kind': 'postpone',
+          'purchase_period_id': null,
+          'savings_used': 0,
+        });
+        await finish(day3);
+      });
+      expect(
+        await tester.runAsync(() => games.getCurrentPeriod(profileId)),
+        isNull,
+      );
+
+      final harness = await _pumpFeature(
+        tester,
+        profileId: profileId,
+        profiles: profiles,
+        games: games,
+        content: content,
+        database: database,
+      );
+
+      Future<void> reload() async {
+        await tester.runAsync(
+          harness.container.read(homeControllerProvider.notifier).load,
+        );
+        await _settleFeature(tester, harness.container);
+      }
+
+      void expectCard({required bool enabled, required String message}) {
+        final state =
+            harness.container.read(homeControllerProvider) as HomeReady;
+        expect(state.bowlEvent?.isOutstanding, isTrue);
+        expect(find.byKey(const Key('home-bowl-obligation')), findsOneWidget);
+        expect(
+          tester
+                  .widget<FilledButton>(
+                    find.byKey(const Key('home-bowl-purchase')),
+                  )
+                  .onPressed !=
+              null,
+          enabled,
+        );
+        if (!enabled) expect(find.text(message), findsOneWidget);
+      }
+
+      expectCard(
+        enabled: false,
+        message: 'Купить можно после начала следующего дня.',
+      );
+      await tester.runAsync(() => start(4));
+      await reload();
+      expectCard(
+        enabled: false,
+        message: 'Купить можно после подтверждения плана дня.',
+      );
+      final day4 = (await tester.runAsync(
+        () => games.getCurrentPeriod(profileId),
+      ))!;
+      await tester.runAsync(
+        () => games.confirmBudget(profileId: profileId, periodId: day4.id!),
+      );
+      await reload();
+      expectCard(enabled: true, message: '');
+      expect(find.byKey(const Key('home-today-card')), findsOneWidget);
+
+      await tester.runAsync(() async {
+        for (final checkpoint in day4.requiredCheckpoints) {
+          await resolveCheckpointForTest(
+            database,
+            profileId: profileId,
+            periodId: day4.id!,
+            checkpointId: checkpoint,
+          );
+        }
+        await completePeriodForTest(
+          database,
+          profileId: profileId,
+          periodId: day4.id!,
+        );
+      });
+      await reload();
+      expectCard(
+        enabled: false,
+        message: 'Купить можно после начала следующего дня.',
+      );
+      await tester.runAsync(() async => finish(await start(5)));
+      await reload();
+      expect(
+        (harness.container.read(
+          homeControllerProvider,
+        ) as HomeReady).allDaysCompleted,
+        isTrue,
+      );
+      expectCard(
+        enabled: false,
+        message: 'Кампания завершена. Покупка осталась отложенной.',
+      );
+    },
+  );
 }

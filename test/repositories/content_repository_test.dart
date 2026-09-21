@@ -843,6 +843,10 @@ void main() {
       },
       'negative lost amount': (task) =>
           (task['scenarioData'] as Map)['lostAmount'] = -1,
+      'zero lost amount': (task) {
+        (task['scenarioData'] as Map)['lostAmount'] = 0;
+        (task['scenarioData'] as Map)['availableBudget'] = 300;
+      },
       'inconsistent available budget': (task) =>
           (task['scenarioData'] as Map)['availableBudget'] = 219,
     };

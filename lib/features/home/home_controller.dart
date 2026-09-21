@@ -393,6 +393,10 @@ class HomeController extends Notifier<HomeViewState> {
         bowlEvent = await ref
             .read(storyEventServiceProvider)
             .armOrLoadDay3Bowl(profileId: profileId);
+      } else if (periods.any((item) => item.periodNumber >= 3)) {
+        bowlEvent = await ref
+            .read(storyEventServiceProvider)
+            .loadDay3Bowl(profileId: profileId);
       }
 
       return HomeReady(

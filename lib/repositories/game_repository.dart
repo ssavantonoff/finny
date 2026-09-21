@@ -166,6 +166,7 @@ abstract interface class StoryEventPort {
   Future<StoryEventSnapshot?> armDay3Bowl({
     required int profileId,
     required Set<String> qualifyingActionIds,
+    required List<ShopItem> qualifyingItems,
   });
 
   Future<StoryEventSnapshot> postponeDay3Bowl({
@@ -2849,6 +2850,7 @@ class SqliteStoryEventPort implements StoryEventPort {
   Future<StoryEventSnapshot?> armDay3Bowl({
     required int profileId,
     required Set<String> qualifyingActionIds,
+    required List<ShopItem> qualifyingItems,
   }) async {
     final db = await _database.database;
     return db.transaction((txn) async {
@@ -2869,11 +2871,22 @@ class SqliteStoryEventPort implements StoryEventPort {
         return null;
       }
       final now = DateTime.now().toUtc();
+      final requestedThreshold = _random.nextInt(2) + 1;
+      final threshold =
+          requestedThreshold == 2 &&
+              !await _canCompleteTwoPetActions(
+                txn,
+                current,
+                qualifyingActionIds,
+                qualifyingItems,
+              )
+          ? 1
+          : requestedThreshold;
       await txn.insert('campaign_story_events', {
         'profile_id': profileId,
         'story_id': storyId,
         'origin_period_id': origin.id,
-        'threshold': _random.nextInt(2) + 1,
+        'threshold': threshold,
         'status': StoryEventStatus.armed.name,
         'armed_at': now.toIso8601String(),
         'postponed_at': null,
@@ -3156,6 +3169,71 @@ class SqliteStoryEventPort implements StoryEventPort {
       limit: 1,
     );
     return rows.isEmpty ? null : rows.single;
+  }
+
+  Future<bool> _canCompleteTwoPetActions(
+    DatabaseExecutor txn,
+    GamePeriod period,
+    Set<String> qualifyingActionIds,
+    List<ShopItem> qualifyingItems,
+  ) async {
+    final profileId = period.profileId;
+    final periodId = period.id!;
+    final costs = <int>[];
+    if (qualifyingActionIds.contains(FreePetInteraction.pet.actionId) &&
+        await _core._readPetDailyUsageCount(
+              txn,
+              profileId: profileId,
+              periodId: periodId,
+              actionId: FreePetInteraction.pet.actionId,
+              slot: PetActionSlot.defaultSlot,
+            ) ==
+            0) {
+      costs.add(0);
+    }
+
+    for (final item in qualifyingItems) {
+      final actionId = 'item:${item.id}';
+      if (!qualifyingActionIds.contains(actionId) ||
+          item.usagePolicy == ItemUsagePolicy.none ||
+          item.petEffects.isEmpty) {
+        continue;
+      }
+      final owned = await _core._readInventoryQuantity(txn, profileId, item.id);
+      if (item.usagePolicy == ItemUsagePolicy.unlimited) {
+        costs.addAll(List.filled(owned.clamp(0, 2), 0));
+        costs.addAll([item.price, item.price]);
+        continue;
+      }
+      final slots = item.usagePolicy == ItemUsagePolicy.toothbrush
+          ? [
+              if (VirtualDayRules.morningToothbrushAvailable(
+                period.dayProgress,
+              ))
+                PetActionSlot.morning,
+              if (VirtualDayRules.eveningToothbrushAvailable(
+                period.dayProgress,
+              ))
+                PetActionSlot.evening,
+            ]
+          : [PetActionSlot.defaultSlot];
+      for (final slot in slots) {
+        if (await _core._readPetDailyUsageCount(
+              txn,
+              profileId: profileId,
+              periodId: periodId,
+              actionId: actionId,
+              slot: slot,
+            ) ==
+            0) {
+          costs.add(owned > 0 ? 0 : item.price);
+        }
+      }
+    }
+    if (costs.length < 2) return false;
+    costs.sort();
+    final wallet = (await _core._requireState(txn, profileId)).walletBalance;
+    return costs[0] + costs[1] <= wallet;
   }
 
   Future<int> _readQualifyingCount(

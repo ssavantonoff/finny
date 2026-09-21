@@ -552,7 +552,7 @@ class PlanAdaptationTaskScenario {
       );
     }
     if (originalPlan <= 0 ||
-        lostAmount < 0 ||
+        lostAmount <= 0 ||
         availableBudget <= 0 ||
         originalPlan - lostAmount != availableBudget) {
       throw const FormatException('Plan adaptation budget values are invalid.');

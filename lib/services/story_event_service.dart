@@ -28,6 +28,7 @@ class StoryEventService {
     return _port.armDay3Bowl(
       profileId: profileId,
       qualifyingActionIds: _qualifyingActionIds(canonical.items),
+      qualifyingItems: canonical.items,
     );
   }
 
