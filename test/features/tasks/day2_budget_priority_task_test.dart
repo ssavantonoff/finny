@@ -223,27 +223,28 @@ void main() {
 
       final bow = find.byKey(const Key('budget-priority-item-bow'));
       final buyNow = find.byKey(const Key('budget-priority-zone-buy_now'));
-      await _reveal(tester, bow);
-      await tester.tap(bow);
-      await tester.pump();
-      await _reveal(tester, buyNow);
-      await tester.tap(buyNow);
-      await tester.pump();
-      await _reveal(
-        tester,
-        find.byKey(const Key('budget-priority-budget-error')),
+      await _dragToDecision(tester, 'bow', 'buy_now');
+      final budgetError = find.byKey(
+        const Key('budget-priority-budget-error'),
       );
+      expect(budgetError, findsOneWidget);
+      expect(tester.getTopLeft(budgetError).dy, lessThan(200));
       expect(
-        find.text('Не хватает 20 монет. Попробуй изменить выбор.'),
+        find.text('Не хватает 20 монет'),
         findsOneWidget,
       );
       expect(find.text('Осталось: 60 монет'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: buyNow,
+          matching: find.byKey(const Key('budget-priority-item-food')),
+        ),
+        findsOneWidget,
+      );
       expect(find.descendant(of: buyNow, matching: bow), findsNothing);
 
       final later = find.byKey(const Key('budget-priority-zone-later'));
-      await _reveal(tester, later);
-      await tester.tap(later);
-      await tester.pump();
+      await _tapToDecision(tester, 'bow', 'later');
       expect(
         find.byKey(const Key('budget-priority-budget-error')),
         findsNothing,
@@ -251,6 +252,13 @@ void main() {
 
       await _dragToDecision(tester, 'shampoo', 'buy_now');
       expect(find.text('Осталось: 0 монет'), findsOneWidget);
+      await _tapToDecision(tester, 'bow', 'buy_now');
+      expect(find.text('Не хватает 80 монет'), findsOneWidget);
+      expect(find.descendant(of: buyNow, matching: bow), findsNothing);
+      await _reveal(tester, later);
+      await tester.tap(later);
+      await tester.pump();
+      expect(budgetError, findsNothing);
       await _tapToDecision(tester, 'food', 'later');
       await _tapToDecision(tester, 'bow', 'buy_now');
       expect(find.text('Осталось: 10 монет'), findsOneWidget);
