@@ -128,9 +128,11 @@ void main() {
       final period = await container
           .read(periodServiceProvider)
           .startNextPeriod(profileId: profile.id!);
-      await container
-          .read(budgetServiceProvider)
-          .confirmPlan(profileId: profile.id!, periodId: period!.id!);
+      await confirmPlanForTest(
+        container.read(budgetServiceProvider),
+        profileId: profile.id!,
+        periodId: period!.id!,
+      );
 
       final state = await container
           .read(purchaseServiceProvider)
@@ -200,9 +202,11 @@ void main() {
     final period = await container
         .read(periodServiceProvider)
         .startNextPeriod(profileId: profile.id!);
-    await container
-        .read(budgetServiceProvider)
-        .confirmPlan(profileId: profile.id!, periodId: period!.id!);
+    await confirmPlanForTest(
+      container.read(budgetServiceProvider),
+      profileId: profile.id!,
+      periodId: period!.id!,
+    );
     final forbiddenReward = GameTransaction(
       profileId: profile.id!,
       periodId: period.id!,
@@ -297,9 +301,11 @@ void main() {
         ),
       );
       final planning = await periods.startNextPeriod(profileId: profile.id!);
-      final active = await container
-          .read(budgetServiceProvider)
-          .confirmPlan(profileId: profile.id!, periodId: planning!.id!);
+      final active = await confirmPlanForTest(
+        container.read(budgetServiceProvider),
+        profileId: profile.id!,
+        periodId: planning!.id!,
+      );
       await savings.selectGoal(
         profileId: profile.id!,
         goalId: 'goal_night_light',

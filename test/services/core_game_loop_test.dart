@@ -134,7 +134,11 @@ void main() {
 
   Future<GamePeriod> startActivePeriod(int profileId) async {
     final period = await periods.startNextPeriod(profileId: profileId);
-    return budgets.confirmPlan(profileId: profileId, periodId: period!.id!);
+    return confirmPlanForTest(
+      budgets,
+      profileId: profileId,
+      periodId: period!.id!,
+    );
   }
 
   Future<GamePeriod> resolveAll(GamePeriod period) async {
@@ -161,6 +165,57 @@ void main() {
     }
     return current;
   }
+
+  test('budget allocation requires the minimum in every category', () {
+    expect(
+      const BudgetAllocation(
+        need: 0,
+        want: 0,
+        savings: 0,
+      ).meetsMinimumAllocation,
+      isFalse,
+    );
+    expect(
+      const BudgetAllocation(
+        need: 10,
+        want: 0,
+        savings: 10,
+      ).meetsMinimumAllocation,
+      isFalse,
+    );
+    expect(
+      const BudgetAllocation(
+        need: 9,
+        want: 10,
+        savings: 10,
+      ).meetsMinimumAllocation,
+      isFalse,
+    );
+    expect(
+      const BudgetAllocation(
+        need: 10,
+        want: 9,
+        savings: 10,
+      ).meetsMinimumAllocation,
+      isFalse,
+    );
+    expect(
+      const BudgetAllocation(
+        need: 10,
+        want: 10,
+        savings: 9,
+      ).meetsMinimumAllocation,
+      isFalse,
+    );
+    expect(
+      const BudgetAllocation(
+        need: 10,
+        want: 10,
+        savings: 10,
+      ).meetsMinimumAllocation,
+      isTrue,
+    );
+  });
 
   test('period start is atomic, persisted, and cannot be doubled', () async {
     final profile = await createPlayer();
@@ -284,7 +339,8 @@ void main() {
       final restored = await games.getPeriodById(profile.id!, period!.id!);
       expect(restored?.baseIncome, 100);
       expect(restored?.requiredCheckpoints, ['decision']);
-      period = await budgets.confirmPlan(
+      period = await confirmPlanForTest(
+        budgets,
         profileId: profile.id!,
         periodId: period.id!,
       );
@@ -338,6 +394,14 @@ void main() {
       ),
       throwsStateError,
     );
+    await expectLater(
+      budgets.saveDraft(
+        profileId: profile.id!,
+        periodId: period.id!,
+        allocation: const BudgetAllocation(need: 500, want: 10, savings: 10),
+      ),
+      throwsStateError,
+    );
 
     final confirmed = await budgets.confirmPlan(
       profileId: profile.id!,
@@ -362,7 +426,7 @@ void main() {
     expect(replay.dayProgress, 10);
   });
 
-  test('zero budget plan is valid and keeps all money as remainder', () async {
+  test('zero budget draft saves but cannot be confirmed', () async {
     final profile = await createPlayer();
     final period = await periods.startNextPeriod(profileId: profile.id!);
 
@@ -371,14 +435,30 @@ void main() {
       periodId: period!.id!,
       allocation: const BudgetAllocation(need: 0, want: 0, savings: 0),
     );
+    expect(draft.plannedFree, 500);
+    await expectLater(
+      budgets.confirmPlan(profileId: profile.id!, periodId: period.id!),
+      throwsStateError,
+    );
+
+    final persisted = await games.getPeriodById(profile.id!, period.id!);
+    expect(persisted?.status, GamePeriodStatus.planning);
+    expect(persisted?.dayProgress, 0);
+    expect(persisted?.plannedFree, 500);
+    expect((await games.getGameState(profile.id!))?.walletBalance, 500);
+
+    final valid = await budgets.saveDraft(
+      profileId: profile.id!,
+      periodId: period.id!,
+      allocation: const BudgetAllocation(need: 10, want: 10, savings: 10),
+    );
     final confirmed = await budgets.confirmPlan(
       profileId: profile.id!,
       periodId: period.id!,
     );
-
-    expect(draft.plannedFree, 500);
-    expect(confirmed.plannedFree, 500);
-    expect((await games.getGameState(profile.id!))?.walletBalance, 500);
+    expect(valid.plannedFree, 470);
+    expect(confirmed.status, GamePeriodStatus.active);
+    expect(confirmed.plannedFree, 470);
   });
 
   test('financial actions are rejected while planning', () async {
@@ -887,7 +967,8 @@ void main() {
       );
 
       final next = await periods.startNextPeriod(profileId: profile.id!);
-      final activeNext = await budgets.confirmPlan(
+      final activeNext = await confirmPlanForTest(
+        budgets,
         profileId: profile.id!,
         periodId: next!.id!,
       );
@@ -955,7 +1036,8 @@ void main() {
       expect(secondSummary.totalExpenses, 0);
 
       for (var number = 2; number <= 5; number++) {
-        next = await budgets.confirmPlan(
+        next = await confirmPlanForTest(
+          budgets,
           profileId: profile.id!,
           periodId: next!.id!,
         );

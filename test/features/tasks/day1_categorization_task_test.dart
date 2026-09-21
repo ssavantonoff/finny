@@ -227,7 +227,11 @@ void main() {
           requiredCheckpoints: const ['financial_task', 'savings_decision'],
           createdAt: DateTime.utc(2026, 1, 2),
         );
-        await games.confirmBudget(profileId: profileId, periodId: period.id!);
+        await confirmBudgetForTest(
+          games,
+          profileId: profileId,
+          periodId: period.id!,
+        );
       });
 
       final container = ProviderContainer(

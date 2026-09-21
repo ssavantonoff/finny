@@ -60,6 +60,7 @@ class BudgetReady extends BudgetViewState {
       !confirming &&
       draftIsPersisted &&
       !draft.hasNegativeValue &&
+      draft.meetsMinimumAllocation &&
       remainder >= 0;
 
   BudgetReady copyWith({

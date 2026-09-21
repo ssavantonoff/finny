@@ -91,7 +91,7 @@ void main() {
         await budget.saveDraft(
           profileId: profileId,
           periodId: period.id!,
-          allocation: const BudgetAllocation(need: 0, want: 0, savings: 0),
+          allocation: const BudgetAllocation(need: 10, want: 10, savings: 10),
         );
         period = await budget.confirmPlan(
           profileId: profileId,

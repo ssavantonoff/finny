@@ -161,7 +161,8 @@ void main() {
         requiredCheckpoints: const ['financial_task'],
         createdAt: DateTime.utc(2026),
       );
-      final active = await games.confirmBudget(
+      final active = await confirmBudgetForTest(
+        games,
         profileId: profile.id!,
         periodId: planning.id!,
       );
@@ -210,6 +211,12 @@ void main() {
         ),
       );
       await games.ensureInitialState(profile.id!);
+      await (await database.database).update(
+        'game_states',
+        {'wallet_balance': 30},
+        where: 'profile_id = ?',
+        whereArgs: [profile.id],
+      );
       await games.savePet(
         Pet(
           profileId: profile.id!,
@@ -236,14 +243,18 @@ void main() {
 
     final normal = await create(ProfileType.normal);
     final demo = await create(ProfileType.demo);
-    await games.confirmBudget(profileId: normal.$1, periodId: normal.$2.id!);
+    await confirmBudgetForTest(
+      games,
+      profileId: normal.$1,
+      periodId: normal.$2.id!,
+    );
     expect(
       (await games.getPeriodById(normal.$1, normal.$2.id!))?.dayProgress,
       10,
     );
     expect((await games.getPeriodById(demo.$1, demo.$2.id!))?.dayProgress, 0);
     await expectLater(
-      games.confirmBudget(profileId: normal.$1, periodId: demo.$2.id!),
+      confirmBudgetForTest(games, profileId: normal.$1, periodId: demo.$2.id!),
       throwsStateError,
     );
   });

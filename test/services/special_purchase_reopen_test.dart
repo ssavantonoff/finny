@@ -90,7 +90,11 @@ void main() {
           createdAt: DateTime.utc(2026),
         );
         final periodId = period.id!;
-        await games.confirmBudget(profileId: profileId, periodId: periodId);
+        await confirmBudgetForTest(
+          games,
+          profileId: profileId,
+          periodId: periodId,
+        );
         final service = SpecialPurchaseService(
           SqliteSpecialPurchasePort(initial),
           content,

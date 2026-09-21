@@ -13,6 +13,8 @@ enum GamePeriodStatus {
 }
 
 class GamePeriod {
+  static const minimumBudgetCategoryAllocation = 10;
+
   const GamePeriod({
     this.id,
     required this.profileId,

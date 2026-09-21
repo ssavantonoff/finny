@@ -91,7 +91,11 @@ void main() {
         requiredCheckpoints: const ['changed_circumstance'],
         createdAt: DateTime.utc(2026),
       );
-      await games.confirmBudget(profileId: profile.id!, periodId: period.id!);
+      await confirmBudgetForTest(
+        games,
+        profileId: profile.id!,
+        periodId: period.id!,
+      );
       const item = ShopItem(
         id: 'food_apple',
         name: 'Яблоко',

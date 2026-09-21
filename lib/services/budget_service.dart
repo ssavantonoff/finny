@@ -14,6 +14,10 @@ class BudgetAllocation {
 
   int get allocated => need + want + savings;
   bool get hasNegativeValue => need < 0 || want < 0 || savings < 0;
+  bool get meetsMinimumAllocation =>
+      need >= GamePeriod.minimumBudgetCategoryAllocation &&
+      want >= GamePeriod.minimumBudgetCategoryAllocation &&
+      savings >= GamePeriod.minimumBudgetCategoryAllocation;
   int remainderFor(int startingBudget) => startingBudget - allocated;
 }
 

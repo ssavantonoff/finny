@@ -112,7 +112,11 @@ void main() {
 
   Future<GamePeriod> startActive(int profileId) async {
     final started = await periods.startNextPeriod(profileId: profileId);
-    return budgets.confirmPlan(profileId: profileId, periodId: started!.id!);
+    return confirmPlanForTest(
+      budgets,
+      profileId: profileId,
+      periodId: started!.id!,
+    );
   }
 
   test(
@@ -664,8 +668,11 @@ void main() {
     );
     final firstPeriods = PeriodService(firstGames, content);
     final started = await firstPeriods.startNextPeriod(profileId: profile.id!);
-    await BudgetService(firstGames)
-        .confirmPlan(profileId: profile.id!, periodId: started!.id!);
+    await confirmPlanForTest(
+      BudgetService(firstGames),
+      profileId: profile.id!,
+      periodId: started!.id!,
+    );
     await firstSavings.deposit(
       profileId: profile.id!,
       periodId: started.id!,

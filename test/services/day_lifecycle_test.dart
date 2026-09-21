@@ -153,15 +153,22 @@ void main() {
       profileId: profile.id!,
       definitionId: 'period_$periodNumber',
       periodNumber: periodNumber,
-      baseIncome: 0,
+      baseIncome: 30,
       requiredCheckpoints: const ['savings_decision'],
       createdAt: DateTime.utc(2026, 1, periodNumber),
     );
-    period = await games.confirmBudget(
+    period = await confirmBudgetForTest(
+      games,
       profileId: profile.id!,
       periodId: period.id!,
     );
     final db = await database.database;
+    await db.update(
+      'game_states',
+      {'wallet_balance': wallet},
+      where: 'profile_id = ?',
+      whereArgs: [profile.id],
+    );
     await db.update(
       'game_periods',
       {'day_progress': dayProgress},
@@ -539,7 +546,8 @@ void main() {
       );
       expect((await games.getPet(player.profileId))?.satiety, 40);
 
-      day2 = await games.confirmBudget(
+      day2 = await confirmBudgetForTest(
+        games,
         profileId: player.profileId,
         periodId: day2.id!,
       );
@@ -642,14 +650,21 @@ void main() {
         profileId: profile.id!,
         definitionId: 'period_1',
         periodNumber: 1,
-        baseIncome: 0,
+        baseIncome: 30,
         requiredCheckpoints: const ['savings_decision'],
         createdAt: DateTime.utc(2026),
       );
       expect((await firstGames.getPet(profile.id!))?.satiety, 80);
-      day1 = await firstGames.confirmBudget(
+      day1 = await confirmBudgetForTest(
+        firstGames,
         profileId: profile.id!,
         periodId: day1.id!,
+      );
+      await (await firstDatabase.database).update(
+        'game_states',
+        {'wallet_balance': 0},
+        where: 'profile_id = ?',
+        whereArgs: [profile.id],
       );
       day1 = await resolveCheckpointForTest(
         firstDatabase,

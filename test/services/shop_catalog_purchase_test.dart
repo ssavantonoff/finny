@@ -60,7 +60,7 @@ void main() {
       createdAt: DateTime.utc(2026),
     );
     periodId = period.id!;
-    await games.confirmBudget(profileId: profileId, periodId: periodId);
+    await confirmBudgetForTest(games, profileId: profileId, periodId: periodId);
   });
   tearDown(() => database.close());
 

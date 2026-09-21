@@ -99,14 +99,26 @@ void main() {
       profileId: profile.id!,
       definitionId: 'period_$day',
       periodNumber: day,
-      baseIncome: income,
+      baseIncome: income == 0 ? 30 : income,
       requiredCheckpoints: [
         if (day == 3) 'changed_circumstance',
         if (day == 4) 'discount_decision',
       ],
       createdAt: DateTime.utc(2026),
     );
-    await games.confirmBudget(profileId: profile.id!, periodId: period.id!);
+    await confirmBudgetForTest(
+      games,
+      profileId: profile.id!,
+      periodId: period.id!,
+    );
+    if (income == 0) {
+      await (await database.database).update(
+        'game_states',
+        {'wallet_balance': 0},
+        where: 'profile_id = ?',
+        whereArgs: [profile.id],
+      );
+    }
     return (profileId: profile.id!, periodId: period.id!);
   }
 
@@ -408,7 +420,8 @@ void main() {
         requiredCheckpoints: const ['discount_decision'],
         createdAt: DateTime.utc(2026, 1, 2),
       );
-      await games.confirmBudget(
+      await confirmBudgetForTest(
+        games,
         profileId: player.profileId,
         periodId: next.id!,
       );
