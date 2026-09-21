@@ -4,7 +4,7 @@
 
 **Дата проверки:** 21 сентября 2026 года
 
-**Base commit SHA:** `0d445edfe95ae7ea07508b2dfa9ee29b4a4b8937`
+**Base commit SHA:** `e94d4861215dceed0f91e2232eb7c59cc49decea`
 
 Официальные требования определяют критерии проверки. Актуальный `origin/main`
 является источником истины для статуса реализации. Матрица построена по
@@ -32,6 +32,33 @@ tests не заменяют физическое устройство; сбор�
 ко всем строкам этой таблицы; внутри технических разделов номер также повторён в
 тексте требования.
 
+### Классификация источника и этапа
+
+Строки этой матрицы — атомизированные audit checks. Они включают буквальные
+требования, способы их реализации, внутренние проверки качества и артефакты
+сдачи. Для спорных пунктов и remaining work используются компактные метки:
+
+| Метка | Source / origin |
+|---|---|
+| `[O]` | Official ТЗ / Q&A — прямо следует из официального требования или официального уточнения. |
+| `[D]` | Accepted product decision — выбранный командой способ реализации, который не выдаётся за буквальную формулировку ТЗ. |
+| `[Q]` | Internal quality / recommendation — QA, UX improvement, engineering recommendation или polish. |
+| `[A]` | Final release / submission artifact — артефакт конкретного этапа сдачи или релиза. |
+
+| Метка | Stage remaining work |
+|---|---|
+| `[I29]` | Interim 29 Sep — блокирует подтверждённый промежуточный пакет 29 сентября 2026 года. |
+| `[F]` | Final — относится к финальной сдаче или RuStore. |
+| `[Opt]` | Optional / polish — улучшение, не объявленное обязательным требованием. |
+| `[Clarify]` | Needs customer clarification — источник, буквальная граница или этап не подтверждены. |
+
+Чтобы не повторять метки во всех 318 строках, действуют defaults: разделы
+1–20 и Appendix A используют `[O][I29]`; спорные способы реализации в них имеют
+явный override `[D]`, `[Q]` или `[Clarify]`. Разделы 21–22 используют
+`[Q][Opt]`, если строка не является прямой проверкой official criterion.
+Разделы 24–26 используют `[A][F]`. Эти defaults классифицируют audit work, но
+не превращают его в дополнительные официальные требования.
+
 ## Реестр доказательств
 
 Чтобы не повторять длинные пути в каждой строке, названия экранов, сервисов и
@@ -50,7 +77,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Savings / goals | `lib/features/savings/savings_screen.dart`, `lib/services/savings_service.dart`, `assets/content/goals.json` | `test/features/savings/savings_core_test.dart`, `test/features/savings/savings_screen_test.dart`, `test/features/savings/savings_controller_test.dart` |
 | Tasks / rewards | `lib/features/tasks/tasks_screen.dart`, `lib/features/tasks/budget_priority_task_screen.dart`, `lib/services/task_service.dart` и `assets/content/tasks.json` | `test/features/tasks/day2_budget_priority_task_test.dart`, `test/services/task_categorization_test.dart`, `test/services/task_completion_test.dart` |
 | Period / day lifecycle / Pet state | `lib/services/period_service.dart`, `lib/services/day_lifecycle_service.dart`, `lib/models/pet_state_rules.dart` | `test/services/day_lifecycle_test.dart`, `test/services/pet_state_test.dart`, `test/services/final_campaign_integration_test.dart` |
-| Summary / progress / Adult | `lib/features/period_summary/period_summary_screen.dart`, `lib/features/progress/progress_screen.dart`, `lib/features/adult/adult_screen.dart` | `test/features/period_summary_screen_test.dart`, `test/features/adult/adult_screen_test.dart` |
+| Summary / progress / Adult | `lib/features/period_summary/period_summary_screen.dart`, `lib/features/progress/progress_screen.dart`, `lib/features/adult/adult_screen.dart`, `lib/repositories/profile_data_management_repository.dart` | `test/features/period_summary_screen_test.dart`, `test/features/adult/adult_screen_test.dart`, `test/repositories/profile_data_management_test.dart` |
 | Persistence / migrations | `lib/core/database/app_database.dart`, `lib/repositories/game_repository.dart`, `lib/repositories/profile_repository.dart` | `test/repositories/game_repository_test.dart`, `test/core/database_migration_test.dart`, `test/core/database_v9_migration_test.dart` |
 | Android / release configuration | `android/app/build.gradle.kts`, `android/app/src/main/AndroidManifest.xml`, `pubspec.yaml` | Статическая проверка конфигурации; физический install/smoke отмечен отдельно и не подменяется тестами. |
 
@@ -58,11 +85,16 @@ production-кода, данных и тестов; более узкая ссы�
 
 | Статус | Количество |
 |---|---:|
-| ✅ | 191 |
-| 🟡 | 63 |
-| ❌ | 58 |
-| ➖ | 6 |
-| **Всего требований** | **318** |
+| ✅ | 196 |
+| 🟡 | 66 |
+| ❌ | 48 |
+| ➖ | 8 |
+| **Всего атомизированных audit checks** | **318** |
+
+**Предупреждение:** 318 — это не 318 независимых официальных требований.
+Матрица атомизирует составные требования, технические доказательства,
+QA-проверки и submission artifacts. Поэтому числа ✅ / 🟡 / ❌ / ➖ нужны для
+tracking и не являются процентом выполнения официального ТЗ.
 
 ## 1. Аудитория и образовательная цель
 
@@ -86,7 +118,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Не запрашивать реальное имя, телефон или email | ✅ Реализовано | Единственный ввод — игровое имя; полей телефона/email и сетевой регистрации нет. | — |
 | Игровое имя | ✅ Реализовано | `ProfileName` валидирует имя; onboarding сохраняет его локально. | — |
 | Выбор персонажа | ✅ Реализовано | После onboarding обязательна Pet Creation; bootstrap направляет профиль без питомца на `/pet-creation`. | — |
-| Возможность вернуться к первоначальной подсказке | ❌ Не реализовано | Settings открывает глоссарий, но повторного просмотра трёх шагов onboarding или эквивалентной полной подсказки нет. | Добавить доступный из Settings повтор onboarding/«Как играть» с исходными правилами. |
+| Возврат к справке после первого запуска | 🟡 Частично | Settings открывает глоссарий, но граница официального требования к повторной справке не подтверждена; полного replay onboarding нет. | `[O][Clarify]` Уточнить требуемый объём help. `[Q][Opt]` Replay полного onboarding — один из возможных способов, а не самостоятельное official requirement. |
 | Ошибка сохранения не теряет введённое имя | ✅ Реализовано | Retry сохраняет текст; покрыто `test/app/bootstrap_test.dart`. | — |
 
 ## 3. Создание питомца — 2.5.2
@@ -97,7 +129,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Настройка внешности | ✅ Реализовано | Выбираются цвет и узор, preview обновляется до сохранения. | — |
 | Не менее 9 визуально различимых комбинаций | ✅ Реализовано | 3 цвета × 3 узора в `PetCreationDraft`; `FinnyPreview` визуально различает их; тест проверяет списки вариантов. | — |
 | Сохранение питомца и внешности после перезапуска | ✅ Реализовано | Pet хранится в SQLite; `test/pet_creation_persistence_test.dart` проверяет восстановление. | — |
-| Повторная настройка внешности после создания | ❌ Не реализовано | Production-маршрута редактирования питомца после создания нет. | Добавить безопасный экран повторной настройки, если это ожидается заказчиком. |
+| Повторная настройка внешности после создания | ➖ Не требуется / вне scope | Production-маршрута редактирования питомца после создания нет; прямой official source обязательности этой функции не подтверждён. | `[Q][Opt]` Добавить повторную customization только как согласованный polish. |
 
 ## 4. Главный экран — 2.5.3
 
@@ -107,11 +139,11 @@ production-кода, данных и тестов; более узкая ссы�
 | Доступный баланс виден на Home | ✅ Реализовано | `home-wallet` показывает persisted `walletBalance`. | — |
 | Накопления и текущая цель видны на Home | ✅ Реализовано | Карточка `home-savings-goal` показывает имя цели и saved/price. | — |
 | Показатели питомца видны и понятны | ✅ Реализовано | Сытость, уход и настроение имеют подписи, progress bars и semantic values. | — |
-| Активное финансовое задание | 🟡 Частично | Home показывает checkpoint «Задание» и его выполнение, но не название/содержание текущего задания и не прямую CTA на него. | Показать конкретное активное задание и действие «Открыть задание». |
-| Все обязательные Home-данные видны одновременно без сложной навигации | 🟡 Частично | `HomeScreen` одновременно показывает Pet, wallet, stats и при active goal — savings/goal; task представлен только общим checkpoint, а не конкретным активным заданием. | Показать название/состояние активного задания и проверить полный Home state на 360dp. |
+| Активное финансовое задание видно на Home | 🟡 Частично | Home показывает checkpoint «Задание» и его выполнение, но не идентифицирует конкретное активное задание. | `[O][I29]` Обеспечить видимость активного задания. `[D][Clarify]` Название и отдельная CTA — предложенный способ закрытия, а не единственно допустимая official implementation. |
+| Обязательные Home-данные доступны без сложной навигации | 🟡 Частично | `HomeScreen` одновременно показывает Pet, wallet, stats и при active goal — savings/goal; task представлен только общим checkpoint. | `[O][I29]` Подтвердить буквальный Home outcome. `[Q][Opt]` Проверить полный state на 360dp и улучшить компоновку при необходимости. |
 | Доступ к бюджету | ✅ Реализовано | Планирование и просмотр plan доступны с Home через `/budget`. | — |
 | Доступ к задачам, магазину и накоплениям | ✅ Реализовано | Постоянная нижняя навигация содержит «Магазин», «Задания», «Накопления». | — |
-| Доступ к прогрессу и разделу взрослого | 🟡 Частично | Adult доступен через Settings; Progress открывается только после Day 2/5 и не имеет постоянной точки входа. | Добавить постоянный экран/пункт истории и прогресса из основного интерфейса. |
+| Доступ к прогрессу и разделу взрослого | 🟡 Частично | Adult доступен через Settings; Progress открывается после Day 2/5 и не имеет постоянной точки входа. | `[O][I29]` Обеспечить требуемый доступ к progress/Adult. `[D][Clarify]` Постоянный отдельный пункт навигации — выбранный способ, если его подтвердит команда. |
 | Главная показывает следующий понятный шаг | ✅ Реализовано | Состояния planning/active/ready показывают CTA и карточку статуса дня; блокирующие диалоги предлагают вернуться, открыть вещи/магазин или завершить допустимым fallback. | — |
 
 ## 5. Игровая валюта и доход — 2.5.4
@@ -122,7 +154,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Базовый доход в каждом периоде | ✅ Реализовано | Все 5 definitions имеют `baseIncome: 500`; старт периода атомарно начисляет доход. | — |
 | Награды за задания | ✅ Реализовано | 6 заданий имеют rewards; Task completion атомарно пишет reward transaction. | — |
 | Пользователь видит сумму начисления | 🟡 Частично | Task success показывает `+N монет`, а Day 1 явно показывает базовый доход; при старте Day 2–5 сумма нового базового дохода отдельно не объясняется. | Показывать сумму базового дохода при старте каждого периода. |
-| Пользователь видит источник каждого начисления | 🟡 Частично | Источник хранится в transactions, а task/day UI объясняет текущие начисления; общей доступной пользователю истории операций с источниками нет. | Добавить журнал операций или иной доступный просмотр всех начислений и источников. |
+| Пользователь видит источник каждого начисления | 🟡 Частично | Источник хранится в transactions, а task/day UI объясняет текущие начисления; полнота объяснения всех начислений пользовательским flow не подтверждена. | `[O][I29]` Закрыть буквальный outcome объяснимости источника. `[Q][Opt]` Полный transaction journal — рекомендуемый способ, а не отдельное official requirement. |
 | Каждое изменение wallet имеет persisted transaction/source | ✅ Реализовано | SQLite transactions и service boundaries покрыты repository/service tests; plan не меняет деньги. | — |
 | Нет необъяснимого изменения баланса | ✅ Реализовано | Денежные mutations атомарны, canonical и идемпотентны; `test/services/core_game_loop_test.dart` и purchase/savings tests проверяют журнал. | — |
 
@@ -154,7 +186,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Отрицательный баланс невозможен | ✅ Реализовано | Core проверка и SQLite `CHECK >= 0`; insufficient purchase не мутирует состояние. | — |
 | Недостаточно средств: покупка заблокирована | ✅ Реализовано | Authoritative Core возвращает typed error; UI не завершает покупку. | — |
 | Сообщение показывает цену, баланс и дефицит | ✅ Реализовано | UI: «Цена / У тебя / Не хватает»; widget test проверяет canonical amounts. | — |
-| Сообщение предлагает следующий вариант действия | 🟡 Частично | Дефицит посчитан, но сообщение не предлагает заработать, выбрать дешевле или отложить покупку. | Добавить понятный recovery CTA/совет без давления. |
+| Сообщение предлагает следующий вариант действия | 🟡 Частично | Дефицит посчитан, но сообщение не предлагает вариант восстановления. | `[O][I29]` Дать понятный следующий шаг, если это буквальный feedback outcome. `[Q][Opt]` Конкретная recovery CTA/формулировка — UX-рекомендация. |
 | Покупка и использование разделены | ✅ Реализовано | Purchase кладёт в inventory; `ItemUseService` отдельно применяет effect. | — |
 
 ## 8. Накопления и цели — 2.5.7
@@ -193,7 +225,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Награда идемпотентна | ✅ Реализовано | Durable `task_progress`; retry/concurrency/reopen tests исключают повторное начисление. | — |
 | Завершение задания сохраняется | ✅ Реализовано | `task_progress` keyed by profile/task; UI перечитывает completed IDs. | — |
 | Нет ожидания реального календарного времени | ✅ Реализовано | Периоды и day progress двигаются только игровыми действиями. | — |
-| Перемешивание Day 1 | 🟡 Частично | Day 2 явно shuffle-ит карточки; Day 1 отображает canonical порядок из JSON, backlog признаёт отсутствие shuffle. | Перемешивать Day 1 без изменения identities и проверки ответа. |
+| Перемешивание Day 1 | ➖ Не требуется / вне scope | Day 1 отображает canonical порядок из JSON; прямой official source обязательного shuffle не подтверждён. | `[Q][Opt]` Перемешивать карточки без изменения identities и проверки ответа как polish. |
 
 Фактические task types на проверенном commit:
 
@@ -210,12 +242,12 @@ production-кода, данных и тестов; более узкая ссы�
 
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
-| Объяснять изменение баланса | 🟡 Частично | Текущая покупка/награда/доход объяснены, но пользовательской истории всех операций нет. | Добавить доступный журнал с source и amount. |
+| Объяснять изменение баланса | 🟡 Частично | Текущая покупка/награда/доход объяснены в момент действия; постоянная история всех операций отсутствует. | `[O][I29]` Проверить объяснение каждого обязательного изменения. `[Q][Opt]` Полный журнал с source/amount — улучшение explainability. |
 | Объяснять изменение накоплений | ✅ Реализовано | Deposit/claim UI показывает суммы, отдельные balances и остаток. | — |
 | Объяснять состояние питомца | 🟡 Частично | Подписанные показатели, expected item effects и bedtime blockers есть; нет единой текстовой причины текущего эмоционального состояния. | Добавить краткое «почему Финни так себя чувствует» по canonical причинам. |
 | Показывать причинно-следственную связь решения | ✅ Реализовано | Task explanations, item effects, plan/fact и специальные события связывают выбор с результатом. | — |
 | Ошибка не уничтожает прогресс | ✅ Реализовано | Mutations transactional; UI ошибки имеют retry; неправильные task answers inert. | — |
-| Путь восстановления из нехватки/ошибки | 🟡 Частично | Есть retry, переход к вещам/магазину и fallback bedtime; insufficient shop не даёт конкретной CTA. | Добавить единый recovery action для недостатка денег и проверить отсутствие dead ends вручную. |
+| Путь восстановления из нехватки/ошибки | 🟡 Частично | Есть retry, переход к вещам/магазину и fallback bedtime; insufficient shop объясняет дефицит, но следующий шаг не формализован. | `[O][I29]` Исключить dead end. `[Q][Opt]` Единая recovery CTA — рекомендуемый UX-способ. |
 | Нет необратимого наказания | ✅ Реализовано | Нет смерти/болезни/потери профиля; период можно завершить fallback только после расчёта недостижимости зелёной зоны. | — |
 
 ## 11. Развитие питомца — 2.5.10
@@ -226,7 +258,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Переход Stage 1 → 2 → 3 | ✅ Реализовано | Day 2 completion переводит в Stage 2, Day 5 — Stage 3; integration test проходит 5 периодов. | — |
 | Стадия сохраняется | ✅ Реализовано | Pet хранится в SQLite; migrations и persistence tests. | — |
 | Развитие происходит по нескольким периодам | ✅ Реализовано | Пороговые переходы после 2-го и 5-го завершённого периода. | — |
-| Развитие зависит от совокупности финансовых решений | 🟡 Частично | Для завершения дня обязательны task/savings checkpoints и уход, но сама стадия привязана к номеру завершённого дня и не оценивает качество plan/fact, регулярность накоплений или структуру трат. | Согласовать scoring/правила и связать развитие с агрегированными финансовыми решениями. |
+| Развитие связано с финансовыми решениями/прогрессом | 🟡 Частично | Для завершения дня обязательны task/savings checkpoints и уход, но Stage 2/3 непосредственно привязаны к Day 2/5. Буквальная достаточность этой связи не подтверждена. | `[O][Clarify]` Подтвердить требуемую силу связи. `[D][Clarify]` Конкретная формула plan/fact + savings + mandatory expenses является product decision, а не текстом official requirement. |
 | Пользователь понимает причину роста | 🟡 Частично | Progress screen сообщает «Финни вырос», но не объясняет, какие решения привели к росту. | Добавить evidence-based explanation роста. |
 | Эмоциональное состояние имеет объяснимую причину | 🟡 Частично | Stats детерминированы действиями/decay, но UI не выводит причинный текст. | Добавить текстовую причину на Home/summary. |
 
@@ -234,13 +266,13 @@ production-кода, данных и тестов; более узкая ссы�
 
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
-| Список выполненных заданий | ❌ Не реализовано | Completion хранится, но отдельного пользовательского списка истории нет. | Добавить экран истории заданий. |
+| Список выполненных заданий | ❌ Не реализовано | Completion хранится, но отдельного пользовательского списка, если он требуется буквально, нет. | `[O][Clarify]` Подтвердить буквальный объём history; затем реализовать минимально достаточное отображение. |
 | Текущая цель накоплений | ✅ Реализовано | Видна на Home и Savings. | — |
-| Результат последнего периода | 🟡 Частично | Summary показывается сразу после сна, но постоянного пути открыть последний завершённый период нет. | Сохранить доступ к последнему и предыдущим summaries. |
-| История plan/fact по периодам | ❌ Не реализовано | Данные periods сохранены, но normal user flow списка периодов отсутствует. | Добавить список периодов и открытие каждого plan/fact. |
+| Результат последнего периода | 🟡 Частично | Summary показывается сразу после сна; постоянного пути открыть его позднее нет. | `[O][Clarify]` Уточнить, требуется ли повторный доступ. `[Q][Opt]` Архив всех summaries — расширенная history. |
+| История plan/fact по периодам | ❌ Не реализовано | Данные periods сохранены, но normal user flow списка периодов отсутствует. | `[O][Clarify]` Подтвердить буквальную глубину истории. `[Q][Opt]` Полный архив всех plan/fact — расширенный вариант. |
 | Общий прогресс кампании | 🟡 Частично | Adult показывает completed days; milestone Progress показывается после Day 2/5, но детского постоянного overview нет. | Добавить доступный ребёнку экран общего прогресса. |
 | Глоссарий и термины | ✅ Реализовано | 9 JSON entries, Settings → «Финансовые термины», 360dp widget test. | — |
-| История доступна обычным пользовательским путём | ❌ Не реализовано | Нет постоянного History/Progress route в навигации. | Добавить точку входа и end-to-end smoke. |
+| История доступна обычным пользовательским путём | ❌ Не реализовано | Нет постоянного History/Progress route в навигации. | `[O][Clarify]` Подтвердить требуемую доступность. `[D][Clarify]` Отдельный постоянный route — один из способов реализации. |
 
 ## 13. Раздел «Для взрослого» — 2.5.12 и Appendix A
 
@@ -253,10 +285,10 @@ production-кода, данных и тестов; более узкая ссы�
 | Общий прогресс | ✅ Реализовано | Completed days 0..5 и progress indicator. | — |
 | Прогресс питомца и накоплений | ✅ Реализовано | Stage и saved amount читаются по active profile. | — |
 | Нейтральная, неосуждающая подача | ✅ Реализовано | Экран показывает факты без оценок ребёнка; negative labels отсутствуют. | — |
-| Read-only до destructive actions | ✅ Реализовано | Текущий Adult не выполняет mutations. | — |
-| Reset тестового/demo-профиля | ❌ Не реализовано | Core имеет `clearDemoRuntimeData`, но DEMO-профиль не создаётся/не выбирается в UI, кнопки reset нет. | Реализовать пользовательский DEMO flow и reset только DEMO с confirmation. |
-| Удаление локального NORMAL-профиля | ❌ Не реализовано | Profile delete action и UI отсутствуют. | Добавить удаление локальных данных с защитным подтверждением. |
-| Подтверждение destructive actions | ❌ Не реализовано | Самих reset/delete actions в UI нет. | Добавить отдельные явные confirmations и тесты изоляции. |
+| Управление данными доступно только после Adult barrier | ✅ Реализовано | Актуальный `origin/main`: reset/delete находятся внутри разблокированного `AdultScreen`; до barrier mutations недоступны. | — |
+| Reset игрового прогресса NORMAL | ✅ Реализовано | `[D]` Принятый командой slice реализован в `SqliteProfileDataManagement.resetNormalProfile`: профиль, имя и внешность Finny сохраняются, runtime progress очищается и восстанавливается canonical start; repository/UI/bootstrap tests это проверяют. | — |
+| Полное удаление локального NORMAL-профиля | ✅ Реализовано | `[D]` `deleteNormalProfile` удаляет NORMAL profile с cascade данных; Adult UI очищает active profile и возвращает к startup. | — |
+| Подтверждение destructive actions | ✅ Реализовано | `AdultScreen` использует отдельные dialogs: reset перечисляет удаляемые данные и сохраняемую identity/Finny; delete предупреждает о необратимости. | — |
 | Возврат назад | ✅ Реализовано | AppBar Back возвращает pop либо Settings; widget tests покрывают reopen/barrier. | — |
 
 ## 14. Сохранение и демонстрационный режим — 2.5.13
@@ -271,10 +303,10 @@ production-кода, данных и тестов; более узкая ссы�
 | Периоды и plan/fact сохраняются | ✅ Реализовано | `game_periods` snapshots и transactions; migration tests v1–v9. | — |
 | Питомец и стадия сохраняются | ✅ Реализовано | SQLite pets; persistence/migration tests. | — |
 | Периоды последовательны и не зависят от календаря | ✅ Реализовано | `PeriodService` выбирает следующий definition; virtual progress меняется только actions. | — |
-| Техническая изоляция NORMAL/DEMO | ✅ Реализовано | Все runtime rows keyed by profile; tests проверяют isolation; reset Core запрещён для NORMAL. | — |
-| Готовый тестовый/demo-профиль в приложении | ❌ Не реализовано | Bootstrap намеренно выбирает только NORMAL; UI для DEMO отсутствует. | Добавить создание/выбор преднастроенного DEMO-профиля. |
-| Resettable demo без влияния на NORMAL | 🟡 Частично | Безопасная repository-операция и tests есть, но нет UI и полного re-seed сценария. | Подключить reset в Adult, заново заполнить demo state и проверить NORMAL end-to-end. |
-| Последовательный экспертный demo-сценарий | 🟡 Частично | Core integration проходит Day 1–5 без ожидания; README описывает 13 шагов, но готового resettable demo и ручного полного прогона нет. | Реализовать demo entry/reset и зафиксировать ручной прогон Appendix A. |
+| Техническая изоляция NORMAL/DEMO | ✅ Реализовано | Все runtime rows keyed by profile; tests проверяют isolation. Отдельные repositories ограничивают NORMAL data management и DEMO cleanup соответствующим profile type. | — |
+| Готовый пользовательский DEMO-профиль | ❌ Не реализовано | Технический `ProfileType.demo` существует, но bootstrap выбирает NORMAL и пользовательского DEMO entry нет. Прямой source обязательности именно такого UI не подтверждён. | `[D][Clarify]` Решить, нужен ли преднастроенный DEMO profile как командный способ показа. Не считать Interim blocker без подтверждения. |
+| UI reset/reseed отдельного DEMO | 🟡 Частично | Безопасная DEMO repository-операция и isolation tests есть, но UI/reseed flow отсутствует. | `[D][Clarify]` Подтвердить необходимость конкретного UI/reseed. Это отдельный вопрос от уже реализованного NORMAL reset/delete. |
+| Последовательный экспертный demo-сценарий | 🟡 Частично | Core integration проходит Day 1–5 без ожидания; ручной полный прогон на target device не подтверждён. | `[O][I29]` Пройти требуемый сценарий. `[D][Clarify]` Отдельный DEMO entry/reset нужен только после подтверждения выбранного способа. |
 
 ## 15. Управление контентом — 2.5.14
 
@@ -302,13 +334,16 @@ production-кода, данных и тестов; более узкая ссы�
 
 ## 17. Технические и аппаратные требования — 3.1–3.4
 
+Здесь app behavior остаётся `[O][I29]`; доказательства на final physical build
+помечаются `[O][F]` и не считаются blocker промежуточного пакета автоматически.
+
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
-| 3.1 — Android 8.0+ compatibility | 🟡 Частично | `android/app/build.gradle.kts`: `minSdk = flutter.minSdkVersion`; resolved API level и установка на Android 8 не подтверждены. | Зафиксировать resolved minSdk и проверить final APK на Android 8+. |
+| 3.1 — Android 8.0+ compatibility | 🟡 Частично | `android/app/build.gradle.kts`: `minSdk = flutter.minSdkVersion`; resolved API level и установка на Android 8 не подтверждены. | `[O][F]` Зафиксировать resolved minSdk и проверить final APK на Android 8+. |
 | 3.1 — Портретная ориентация | ❌ Не реализовано | `android/app/src/main/AndroidManifest.xml` не задаёт `screenOrientation`; в `lib/main.dart` нет orientation lock. | Заблокировать portrait и проверить rotation на устройстве. |
 | 3.1 — Корректность от 360dp | 🟡 Частично | 360×800 tests есть для Home/Budget, Pet Creation, Shop, Day 1/2, Glossary и Adult; полного прогона всех состояний нет. | Провести полный 360dp smoke, включая dialogs, errors, keyboard и scaling. |
-| 3.1 — Проверка на физическом Android-устройстве | ❌ Не реализовано | Нет подтверждения в текущем репозитории; emulator/widget evidence не заменяет physical device. | Предоставить протокол final APK с явной пометкой physical device. |
-| 3.1 — RAM физического устройства ≥3GB | ❌ Не реализовано | Нет подтверждения модели устройства и объёма RAM в текущем репозитории. | Зафиксировать модель, Android version и RAM в отчёте. |
+| 3.1 — Проверка на физическом Android-устройстве | ❌ Не реализовано | Нет подтверждения в текущем репозитории; emulator/widget evidence не заменяет physical device. | `[O][F]` Предоставить протокол final APK с явной пометкой physical device. |
+| 3.1 — RAM физического устройства ≥3GB | ❌ Не реализовано | Нет подтверждения модели устройства и объёма RAM в текущем репозитории. | `[O][F]` Зафиксировать модель, Android version и RAM в отчёте. |
 | 3.1 — Камера не требуется | ✅ Реализовано | Main manifest не содержит CAMERA; camera package/API отсутствуют в `pubspec.yaml` и `lib/`. | — |
 | 3.1 — Микрофон не требуется | ✅ Реализовано | Main manifest не содержит RECORD_AUDIO; audio-record API отсутствует. | — |
 | 3.1 — Геолокация не требуется | ✅ Реализовано | Main manifest не содержит location permissions; location package/API отсутствуют. | — |
@@ -323,6 +358,10 @@ production-кода, данных и тестов; более узкая ссы�
 | 3.2 — AI не требуется | ➖ Не требуется / вне scope | AI не является частью обязательного Core и в приложении отсутствует. | — |
 
 ## 18. Сборка и готовность к RuStore — 3.3
+
+Все незакрытые строки этого раздела имеют classification `[A][F]`. Это
+final/RuStore artifacts, а не blockers Interim 29 Sep, если отдельный официальный
+interim package прямо не потребует конкретный артефакт.
 
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
@@ -347,18 +386,21 @@ production-кода, данных и тестов; более узкая ссы�
 
 ## 19. Надёжность, архитектура и производительность — 3.4
 
+Architecture/code checks относятся к `[O][I29]`; release-build и physical-device
+evidence относятся к `[A][F]`.
+
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
 | 3.4 — Разделение UI / controllers / services / repositories / storage | ✅ Реализовано | `lib/features/`; `lib/services/`; `lib/repositories/`; `lib/core/database/`; `test/services/service_boundary_test.dart`. | — |
 | 3.4 — Фактический код соответствует архитектурной документации | ✅ Реализовано | `docs/ARCHITECTURE.md`; providers связывают UI → services → narrow ports → SQLite/content. | — |
 | 3.4 — Код и документация находятся в repository | ✅ Реализовано | Versioned production, tests, `README.md` и `docs/`. | — |
-| 3.4 — Воспроизводимая сборка | 🟡 Частично | `README.md` даёт debug run/check commands, но не фиксирует tested toolchain и release signing/build procedure. | Зафиксировать Flutter/Java/Android versions и пошаговую release build. |
+| 3.4 — Воспроизводимая сборка | 🟡 Частично | `README.md` даёт debug run/check commands, но не фиксирует tested toolchain и release signing/build procedure. | `[A][F]` Зафиксировать Flutter/Java/Android versions и пошаговую release build. |
 | 3.4 — Нет secrets/tokens/private signing keys | ✅ Реализовано | Tracked API keys/keystores/private-key files не обнаружены; release key пока не настроен. | — |
 | 3.4 — Только необходимые Android permissions | ✅ Реализовано | Main manifest не содержит runtime permissions; INTERNET находится только в debug manifest. | — |
-| 3.4 — Каждое permission обосновано | 🟡 Частично | Опасных permissions нет, но отдельной таблицы manifest/query/debug INTERNET rationale нет. | Добавить permissions rationale в release documentation. |
-| 3.4 — Startup ≤5 секунд на physical device | ❌ Не реализовано | Нет подтверждения measurement/report в текущем репозитории. | Измерить cold start несколькими повторами на указанном physical device. |
-| 3.4 — Visual response local action ≤1 секунды | ❌ Не реализовано | Нет подтверждения device measurements для budget/task/purchase/savings/navigation. | Замерить и приложить методику, значения и устройство. |
-| 3.4 — Mandatory demo без crash/blocker/progress loss/dead end | 🟡 Частично | `test/services/final_campaign_integration_test.dart` проходит Core Day 1–5 по структуре, но reset/delete и physical final-APK smoke не подтверждены. | Пройти Appendix A на final APK и сохранить протокол. |
+| 3.4 — Каждое permission обосновано | 🟡 Частично | Опасных permissions нет, но отдельной таблицы manifest/query/debug INTERNET rationale нет. | `[A][F]` Добавить permissions rationale в release documentation. |
+| 3.4 — Startup ≤5 секунд на physical device | ❌ Не реализовано | Нет подтверждения measurement/report в текущем репозитории. | `[A][F]` Измерить cold start несколькими повторами на указанном physical device. |
+| 3.4 — Visual response local action ≤1 секунды | ❌ Не реализовано | Нет подтверждения device measurements для budget/task/purchase/savings/navigation. | `[A][F]` Замерить и приложить методику, значения и устройство. |
+| 3.4 — Mandatory demo без crash/blocker/progress loss/dead end | 🟡 Частично | `test/services/final_campaign_integration_test.dart` проходит Core Day 1–5; NORMAL reset/delete реализованы, но physical final-build smoke не подтверждён, а DEMO scope шага 14 требует уточнения. | `[O][I29]` Пройти обязательную interim часть сценария. `[A][F]` Повторить на final APK. `[O][Clarify]` Уточнить test-profile scope. |
 | 3.4 — Automated coverage Core logic | ✅ Реализовано | `test/services/`, `test/repositories/`, migration tests покрывают economy, periods, persistence и idempotency. | — |
 | 3.4 — Миграции сохраняют runtime data | ✅ Реализовано | `test/core/database_migration_test.dart` и v3–v9 migration tests. | — |
 
@@ -384,17 +426,21 @@ production-кода, данных и тестов; более узкая ссы�
 | 3.5 — Минимальные Android permissions | ✅ Реализовано | `android/app/src/main/AndroidManifest.xml` не содержит dangerous permissions. | — |
 | 3.5 — Нет secrets в repository | ✅ Реализовано | Tracked secret/key patterns и private signing files не обнаружены. | — |
 | 3.5 — Нет индивидуальных рекомендаций по реальным обстоятельствам | ✅ Реализовано | `assets/content/tasks.json` использует только вымышленные игровые ситуации и монеты. | — |
-| 3.5 — Пользовательское удаление локальных данных | ❌ Не реализовано | Delete NORMAL action отсутствует в `AdultScreen`, Settings и `ProfileRepository`. | Добавить deletion procedure, confirmation и проверку полного удаления. |
+| 3.5 — Пользовательское удаление локальных данных | ✅ Реализовано | Актуальный `origin/main`: Adult confirmation → `deleteNormalProfile`; cascade deletion, navigation to startup и bootstrap behavior покрыты tests. | — |
 
 ## 21. Доступность и UX — official UX/accessibility criteria
 
+Прямые accessibility outcomes имеют `[O][I29]`; расширенный аудит всех edge
+states и дополнительные UX-паттерны имеют `[Q][Opt]`, если не нужны для
+подтверждения конкретного official outcome.
+
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
-| Portrait UX | 🟡 Частично | Layouts ориентированы на узкий экран, но ориентация не заблокирована. | Зафиксировать portrait и выполнить device QA. |
-| Работа на 360dp | 🟡 Частично | Есть существенное widget coverage 360dp, но не все состояния/экраны. | Закрыть ручной матрицей все routes, dialogs и errors. |
+| Portrait UX | 🟡 Частично | Layouts ориентированы на узкий экран, но ориентация не заблокирована. | `[O][I29]` Зафиксировать portrait behavior. `[A][F]` Повторить device QA на final build. |
+| Работа на 360dp | 🟡 Частично | Есть существенное widget coverage 360dp, но не все состояния/экраны. | `[O][I29]` Проверить обязательные flows. `[Q][Opt]` Расширить ручную матрицу на все edge states. |
 | Короткие понятные тексты | ✅ Реализовано | Основные CTA и child-facing explanations короткие и конкретные. | — |
 | Термины объяснены | ✅ Реализовано | Onboarding + 9-entry glossary. | — |
-| Следующее действие понятно | 🟡 Частично | Home и errors обычно дают CTA; insufficient shop и постоянная history/progress navigation неполны. | Добавить recovery CTA и постоянные точки входа. |
+| Следующее действие понятно | 🟡 Частично | Home и errors обычно дают следующий шаг; insufficient shop и history/progress access требуют проверки буквального outcome. | `[O][I29]` Закрыть outcome понятного следующего шага. `[Q][Opt]` Конкретная единая CTA/постоянный route — рекомендуемый способ. |
 | Touch targets около 48dp | 🟡 Частично | Filled buttons имеют min 48; Adult unlock 48; Material defaults помогают остальным, но системной проверки всех custom/tap targets нет. | Провести accessibility audit размеров всех интерактивных элементов. |
 | Основной текст около 16sp | 🟡 Частично | Ряд child-facing текстов явно 16/18sp, но глобальный `bodyMedium` размер не задан и зависит от Material defaults. | Зафиксировать типографическую шкалу и проверить все экраны. |
 | Поддержка font scaling | 🟡 Частично | Home/Budget тестируются с reasonable text scaling; нет полной проверки всех экранов и больших масштабов. | Прогнать 1.3–2.0× на целевых экранах и устранить overflow. |
@@ -402,10 +448,13 @@ production-кода, данных и тестов; более узкая ссы�
 | Ошибки, успех, категории и состояния имеют non-color cues | 🟡 Частично | Task feedback использует текст, checkpoints — icon+label, но нет полного аудита Shop/Savings/Pet status и TalkBack. | Проверить каждый status/error/success/category элемент и документировать результат. |
 | Semantics для ключевых элементов | 🟡 Частично | Finny image, stats, task zones и adult unlock имеют Semantics; coverage не полный. | Проверить TalkBack и добавить labels/hints для custom controls. |
 | Назад работает предсказуемо | ✅ Реализовано | Router/AppBars/PopScope обрабатывают back; Adult fallback ведёт в Settings. | — |
-| Destructive actions подтверждаются | ❌ Не реализовано | Reset/delete отсутствуют, поэтому подтвердить UX невозможно. | Реализовать actions с отдельным confirmation и безопасным default. |
+| Destructive actions подтверждаются | ✅ Реализовано | Adult reset/delete имеют разные dialogs, cancel по умолчанию и отключение повторного запуска во время операции; widget tests проверяют cancel/confirm/failure. | — |
 | Scroll/overflow | 🟡 Частично | Основные длинные экраны scrollable; 360dp tests существуют, но полного набора состояний нет. | Ручной QA всех dialogs/error/keyboard/text-scale states. |
 
 ## 22. Testing evidence
+
+Автоматизированные и расширенные QA-проверки по умолчанию имеют `[Q][Opt]`.
+Release/physical evidence имеет `[A][F]` и не считается Interim blocker.
 
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
@@ -415,7 +464,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Transactions tests | ✅ Реализовано | `test/repositories/game_repository_test.dart`: traceable wallet transaction; Core tests. | — |
 | Period transitions tests | ✅ Реализовано | `test/services/day_lifecycle_test.dart`; `test/services/day_one_virtual_day_integration_test.dart`. | — |
 | Task retry/idempotency tests | ✅ Реализовано | `test/services/task_completion_test.dart`; `test/services/idempotent_retry_after_completion_test.dart`. | — |
-| Profile isolation tests | ✅ Реализовано | NORMAL/DEMO cases in Core, repository, task, item-use and special-purchase tests. | — |
+| Profile isolation tests | ✅ Реализовано | NORMAL/DEMO cases покрыты Core tests; актуальный `origin/main` также проверяет NORMAL reset/delete и неизменность другого профиля в `profile_data_management_test.dart`. | — |
 | Persistence tests | ✅ Реализовано | SQLite reopen tests для Pet, Shop, Savings, Tasks и Core state. | — |
 | Pet progression tests | ✅ Реализовано | `test/services/pet_state_test.dart`; `test/services/day_lifecycle_test.dart`. | — |
 | Day 1 interactive widget/core tests | ✅ Реализовано | `test/features/tasks/day1_categorization_task_test.dart`; `test/services/task_categorization_test.dart`. | — |
@@ -425,30 +474,37 @@ production-кода, данных и тестов; более узкая ссы�
 | Glossary tests | ✅ Реализовано | `test/repositories/glossary_content_test.dart`; `test/features/help/help_screen_test.dart`. | — |
 | Navigation tests | ✅ Реализовано | `test/features/navigation_test.dart`; route behavior also exercised by feature widget tests. | — |
 | 5-period campaign integration test | ✅ Реализовано | `test/services/final_campaign_integration_test.dart` reaches five completed periods and Stage 3. | — |
-| 360dp regression tests | 🟡 Частично | Several key screens set 360×800, but not every route/dialog/error state in Appendix A. | Add a complete UI matrix or manual 360dp report. |
-| Full automated suite result on audited SHA | 🟡 Частично | Tests exist, but the task explicitly excludes running full `flutter test`; no current CI status is attached to the audited commit. | Run the full suite in CI/release validation and link the result. |
-| Physical-device verification | ❌ Не реализовано | No confirmation in the current repository. | Execute Appendix A on the final signed APK and provide the device report. |
+| 360dp regression tests | 🟡 Частично | Several key screens set 360×800, but not every route/dialog/error state in Appendix A. | `[Q][Opt]` Add a complete UI matrix or manual 360dp report beyond the mandatory flows. |
+| Full automated suite result on audited SHA | 🟡 Частично | Tests exist, but the task explicitly excludes running full `flutter test`; no current CI status is attached to the audited commit. | `[A][F]` Run the full suite in release validation and link the result. |
+| Physical-device verification | ❌ Не реализовано | No confirmation in the current repository. | `[A][F]` Execute Appendix A on the final signed APK and provide the device report. |
 
 ## 23. Appendix A — обязательный демонстрационный сценарий
 
+Основной сценарий имеет `[O][I29]`. Шаги, которые требуют final signed APK или
+имеют спорный profile scope, получают явный override.
+
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
-| 1. Установка и запуск с intro | 🟡 Частично | Первый запуск и intro покрыты widget test; установка final APK не подтверждена. | Проверить на чистом физическом устройстве. |
+| 1. Установка и запуск с intro | 🟡 Частично | Первый запуск и intro покрыты widget test; установка standalone/final APK не подтверждена. | `[O][Clarify]` Подтвердить формат build для Interim. `[A][F]` Проверить final APK на чистом физическом устройстве. |
 | 2. Создание локального профиля | ✅ Реализовано | Onboarding создаёт NORMAL без регистрации. | — |
 | 3. Настройка питомца | ✅ Реализовано | Имя + 9 appearance combinations. | — |
 | 4. Стартовый бюджет, цель и задания | ✅ Реализовано | Day start, Savings goal selection и task list доступны. | — |
 | 5. Составление бюджета | ✅ Реализовано | Draft/confirm flow. | — |
 | 6. Задание, награда и explanation | ✅ Реализовано | Day 1/2 и choice tasks показывают result/reward. | — |
 | 7. Покупка need и want | ✅ Реализовано | Каталог содержит оба типа; purchase flow общий и проверен. | — |
-| 8. Сценарий недостатка средств | 🟡 Частично | Ошибка показывает цену/баланс/дефицит, но не предлагает следующий шаг. | Добавить recovery CTA и включить в ручной smoke. |
+| 8. Сценарий недостатка средств | 🟡 Частично | Ошибка показывает цену/баланс/дефицит, но следующий шаг не формализован. | `[O][I29]` Подтвердить recovery outcome в ручном smoke. `[Q][Opt]` Конкретная CTA — один из UX-способов. |
 | 9. Выбор цели и deposit | ✅ Реализовано | Полный Savings flow реализован. | — |
 | 10. Feedback о последствиях | 🟡 Частично | Task, plan/fact и stat feedback есть; причинное объяснение эмоции/роста неполно. | Улучшить explanation и проверить понятность с ребёнком/экспертом. |
 | 11. Следующий период и новая стадия | ✅ Реализовано | Sequential Day 1–5, Stage 2/3; integration test. | — |
 | 12. Перезапуск и сохранение | ✅ Реализовано | Reopen/persistence tests для ключевых domains. | — |
 | 13. Раздел взрослого | ✅ Реализовано | Long-press barrier и read-only overview. | — |
-| 14. Reset/delete test profile | ❌ Не реализовано | UI reset/delete и готовый DEMO отсутствуют. | Реализовать и показать изоляцию NORMAL. |
+| 14. Reset/delete test profile | 🟡 Частично | NORMAL reset/delete через Adult реализованы и проверены; отдельного пользовательского DEMO reset/reseed нет. | `[O][Clarify]` Уточнить, означает ли «test profile» NORMAL либо обязательный DEMO. `[D][Clarify]` DEMO UI/reseed не считать P0 без прямого source. |
 
 ## 24. Submission documentation
+
+Незакрытые строки раздела классифицируются как `[A][F]`, если рядом не указан
+более ранний этап. Они отслеживают пакет сдачи и не являются дополнительными
+функциональными требованиями приложения.
 
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
@@ -474,7 +530,7 @@ production-кода, данных и тестов; более узкая ссы�
 | Accessibility settings/rationale | ❌ Не реализовано | Код содержит отдельные Semantics/360dp tests, но в текущем репозитории нет подтверждения фактического accessibility document. | Предоставить документ с targets, scaling, non-color cues и TalkBack checks. |
 | Android permissions description | ❌ Не реализовано | Manifest можно проверить, но в текущем репозитории нет подтверждения submission-ready permission table. | Предоставить описание main/debug permissions и queries rationale. |
 | Data collected description | ❌ Не реализовано | Local data видны из schema, но в текущем репозитории нет подтверждения фактического privacy/data inventory artifact. | Предоставить описание game name, local state, отсутствия network collection и retention. |
-| Profile deletion procedure | ❌ Не реализовано | Delete UI/operation отсутствует, поэтому procedure документировать пока нельзя. | Реализовать delete и описать путь/последствия. |
+| Profile deletion procedure | 🟡 Частично | Delete NORMAL реализован и UI объясняет последствия, но отдельного submission-ready описания процедуры нет. | `[A][F]` Документировать путь Adult → delete, последствия и локальный scope. |
 | Test cases | 🟡 Частично | Automated tests присутствуют, но в текущем репозитории нет подтверждения фактического expert checklist с expected results. | Предоставить acceptance test cases, включая Appendix A. |
 | Physical-device report | ❌ Не реализовано | Нет подтверждения в текущем репозитории. | Предоставить device/OS/RAM/build/timing/result report. |
 | Known limitations | ✅ Реализовано | `README.md` backlog и Known gaps этой матрицы. | — |
@@ -483,6 +539,9 @@ production-кода, данных и тестов; более узкая ссы�
 | Fonts/images/sounds licenses | ❌ Не реализовано | Custom fonts/sounds отсутствуют, но provenance launcher/visual assets и consolidated rights statement не подтверждены. | Подготовить rights statement с N/A для отсутствующих типов. |
 
 ## 25. Presentation and demo materials
+
+Незакрытые строки раздела имеют `[A][F]`: это presentation/final-demo
+artifacts, а не функциональные P0 для Interim 29 Sep.
 
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
@@ -498,11 +557,14 @@ production-кода, данных и тестов; более узкая ссы�
 | Architecture/stack/storage/content updates | 🟡 Частично | `docs/ARCHITECTURE.md` готов, но presentation slide не подтверждён. | Сделать 1–2 слайда без лишней внутренней детализации. |
 | Testing results | ❌ Не реализовано | Tests существуют, но presentation-ready results и physical evidence не подтверждены. | Добавить автоматизированные и device results с датой/SHA. |
 | Limitations | 🟡 Частично | Ограничения зафиксированы в README и matrix, но не в deck. | Добавить честный limitations slide. |
-| Next steps | 🟡 Частично | P0/P1/P2 сформированы, presentation roadmap не подтверждён. | Добавить приоритетный next-steps slide. |
+| Next steps | 🟡 Частично | Stage-based Interim/Final/Clarify/Optional plan сформирован в matrix, но presentation roadmap не подтверждён. | Добавить stage-based next-steps slide без спорных P0. |
 | Links to repo/build/docs | ❌ Не реализовано | В текущем репозитории нет подтверждения фактической presentation с проверенными ссылками; deck мог быть подготовлен отдельно. | Добавить ссылки/QR в финальный deck и предоставить доступ. |
 | Backup demo video ≤3 min | ❌ Не реализовано | Нет подтверждения video/link в текущем репозитории. | Записать final APK flow, уложиться в 3 минуты и проверить доступ. |
 
 ## 26. Final submission artifacts
+
+Весь раздел имеет classification `[A][F]`. Ни одна его незакрытая строка не
+считается blocker Interim 29 Sep без отдельного прямого требования.
 
 | Требование | Статус | Реализация / доказательство | Что осталось |
 |---|---|---|---|
@@ -511,8 +573,8 @@ production-кода, данных и тестов; более узкая ссы�
 | Complete unobfuscated source | ✅ Реализовано | Repository содержит Flutter/Dart source, content, tests и docs; source-obfuscation artifact не используется. | — |
 | Signed release APK | ❌ Не реализовано | Нет подтверждения artifact; release config использует debug key. | Собрать, подписать release key, проверить certificate/hash/install. |
 | Install/run instructions | 🟡 Частично | Debug quick start есть в README; final APK install steps отсутствуют. | Добавить final artifact URL/hash и пошаговую установку. |
-| Demo-mode instructions | ❌ Не реализовано | Полноценного UI DEMO mode нет. | Реализовать demo flow и документировать вход/прохождение. |
-| Profile/test-data reset instructions | ❌ Не реализовано | UI reset/delete отсутствуют. | Реализовать и документировать безопасный reset/delete. |
+| Demo-mode instructions | ❌ Не реализовано | Отдельного пользовательского DEMO mode нет; NORMAL reset/delete доступны, а необходимость DEMO UI/reseed требует решения. | `[A][F]` Документировать фактически выбранный demo flow. `[D][Clarify]` Не требовать новый DEMO UI без подтверждения. |
+| Profile/test-data reset instructions | 🟡 Частично | NORMAL reset/delete реализованы, но финальные инструкции не подготовлены; DEMO UI/reseed не подтверждён как выбранный flow. | `[A][F]` Документировать NORMAL actions; DEMO instructions добавлять только после product/customer decision. |
 | Complete submission documentation | 🟡 Частично | Architecture/Core/Product Spec/matrix есть; обязательные release/privacy/accessibility/license/device документы неполны. | Закрыть строки раздела 24. |
 | Final presentation | ❌ Не реализовано | Нет подтверждения artifact в текущем репозитории. | Предоставить проверенный PPTX/PDF/link. |
 | Backup video ≤3 min | ❌ Не реализовано | Нет подтверждения artifact/link. | Записать final APK и проверить доступ экспертов. |
@@ -525,80 +587,99 @@ production-кода, данных и тестов; более узкая ссы�
 
 ## Known gaps
 
-1. Day 3–5 используют `choice`; только Day 1 (`categorization`) и Day 2
+1. `[O]` Day 3–5 используют `choice`; только Day 1 (`categorization`) и Day 2
    (`budget_priority`) имеют отдельные интерактивные task-механики.
-2. В Adult нет reset/delete, а технический `clearDemoRuntimeData` недоступен
-   пользователю.
-3. DEMO type и изоляция существуют в Core, но нет готового demo-профиля,
-   входа, reset/re-seed и полного экспертного сценария в UI.
-4. Карточки Day 1 не перемешиваются.
-5. Игрушки применяют прямой stat-effect при отдельном use; самостоятельных
-   игровых взаимодействий/minigames нет.
-6. Нет постоянной истории заданий и периодов; последний Period Summary нельзя
-   штатно открыть позднее.
-7. Рост Stage 2/3 привязан к Day 2/5, а не к оценке совокупных финансовых
-   решений.
-8. Нет пользовательской истории transactions и полного объяснения причин
-   эмоционального состояния/роста питомца.
-9. Portrait lock и явное подтверждение Android 8+ отсутствуют.
-10. Release подписывается debug key; в текущем репозитории не подтверждены
-    signed APK, install evidence, RuStore metadata/screenshots/rating, лицензии,
-    финальный deck и demo-video.
-11. В текущем репозитории не подтверждены измерения cold start/response time и
-    полный ручной прогон на физическом Android-устройстве.
+2. `[D][Clarify]` Технические DEMO type/cleanup/isolation существуют, но нет
+   готового пользовательского DEMO entry/reset/reseed. Необходимость именно
+   такого UI не подтверждена как буквальное official requirement.
+3. `[Q][Opt]` Карточки Day 1 не перемешиваются.
+4. `[Q][Opt]` Игрушки применяют прямой stat-effect при отдельном use;
+   самостоятельных игровых взаимодействий/minigames нет.
+5. `[O][Clarify]` Нет постоянного UI истории заданий и периодов; буквальная
+   глубина history, требуемая официальным источником, нуждается в уточнении.
+6. `[O][Clarify]` Рост Stage 2/3 привязан к Day 2/5. Связь с прохождением есть,
+   но достаточность этой связи и конкретная scoring formula не подтверждены.
+7. `[Q][Opt]` Нет полного пользовательского transaction journal. Это полезный
+   способ повысить explainability, но не отдельное подтверждённое требование.
+8. `[O]` Причины эмоционального состояния/роста питомца объяснены неполно.
+9. `[O]` Portrait lock отсутствует; Android 8+ не подтверждён на target device.
+10. `[A][F]` Release использует debug signing; в текущем репозитории не
+    подтверждены signed APK, install evidence, RuStore package, лицензии,
+    финальный deck и backup video.
+11. `[A][F]` Не подтверждены cold start/response-time measurements и полный
+    ручной прогон final build на физическом Android-устройстве.
+
+Актуальный `origin/main` уже содержит принятый командой NORMAL data-management
+slice: reset прогресса с сохранением profile identity/Finny и полное delete
+NORMAL через Adult с отдельными подтверждениями. Это current implementation,
+а не только planned work. DEMO flow классифицируется отдельно.
 
 ## Remaining blockers before submission
 
-### P0 — обязательно до сдачи
+`Blocker` ниже означает только прямо подтверждённую обязательную работу для
+указанного этапа. Спорные трактовки вынесены в clarification и не называются P0.
 
-1. Закрыть буквальное требование Home: показать конкретное активное задание и
-   обеспечить понятный постоянный доступ к progress/adult flow.
-2. Доработать обязательную feedback-механику: объяснить pet impact до покупки,
-   дать следующий шаг при insufficient funds и причину изменения состояния Pet.
-3. Связать развитие Stage 1→2→3 с совокупностью финансовых решений —
-   обязательными расходами, plan/fact и регулярностью накоплений — либо получить
-   документированное решение заказчика о допустимой трактовке.
-4. Реализовать доступный из Adult reset DEMO и delete NORMAL с отдельными
-   подтверждениями; гарантировать и проверить изоляцию NORMAL.
-5. Добавить готовый resettable DEMO-профиль и пройти все 14 шагов Appendix A.
-6. Зафиксировать portrait и проверить совместимость Android 8+ на реальном
-   устройстве.
-7. Настроить production release signing, собрать signed APK, проверить чистую
-   установку и зафиксировать hash.
-8. Провести физический smoke/performance: cold start ≤5 секунд, локальные
-   действия ≤1 секунды, без crash/blocker/data loss/dead end.
-9. Предоставить обязательный submission package: expert access, final tag,
-   release/install/demo/reset documentation, RuStore card, ≥3 screenshots,
-   512×512 icon, age-rating rationale, licenses, presentation и backup video.
+### Interim 29 Sep — blockers
 
-### P1 — желательно до сдачи
+1. `[O][I29]` Закрыть буквальный Home outcome: active task должен быть виден,
+   а требуемые progress/Adult данные — доступны. Матрица не предписывает
+   название + отдельную CTA как единственный способ.
+2. `[O][I29]` Закрыть буквальную feedback/explainability часть обязательного
+   сценария: изменения balance/Pet и выход из ошибок не должны оставаться
+   необъяснимыми или приводить в dead end. Полный transaction journal не нужен,
+   если outcome закрывается более узким способом.
+3. `[O][I29]` Пройти подтверждённую часть Appendix A и зафиксировать результат
+   на актуальном build. Граница шага 14 про «test profile» требует уточнения и
+   не превращает DEMO UI/reseed в автоматический blocker.
 
-1. Заменить Day 3–5 `choice` на более разнообразные интерактивные механики.
-2. Добавить историю заданий/периодов/plan-fact и журнал объяснимых операций.
-3. Закрыть accessibility QA: 360dp, font scaling, TalkBack, touch targets,
-   non-color cues и все error/dialog states.
-4. Довести data dictionaries, educational content map, privacy/permissions и
-   formal test cases до submission-ready вида.
+### Final — blockers
 
-### P2 — polish / bonus
+1. `[A][F]` Настроить production signing, собрать signed APK, проверить
+   certificate/hash и чистую установку.
+2. `[A][F]` Подтвердить Android 8+, portrait, cold start, response time и
+   обязательный сценарий на согласованном физическом устройстве.
+3. `[A][F]` Подготовить final/RuStore package: repository access, release tag,
+   install documentation, store metadata, ≥3 screenshots, 512×512 icon,
+   age-rating rationale, licenses/rights package, presentation и backup video.
+4. `[A][F]` Завершить submission documentation, включая data dictionaries,
+   educational content map, privacy/permissions, accessibility и test report.
 
-1. Перемешивать карточки Day 1.
-2. Добавить повторный просмотр первоначального обучения и повторную настройку
-   внешности питомца.
-3. Заменить прямой эффект игрушек на игровые взаимодействия/minigames.
+### Needs customer clarification
+
+1. `[D][Clarify]` Нужны ли готовый DEMO-профиль, отдельный UI reset и reseed,
+   или обязательный demo может проходить на NORMAL с уже реализованным reset?
+2. `[O][Clarify]` Какой буквальный результат означает Appendix A «reset/delete
+   test profile» и к какому этапу он относится?
+3. `[O][Clarify]` Достаточна ли связь Stage с обязательным прохождением Day 2/5?
+   Если нет, команда должна отдельно принять scoring formula; сама формула не
+   является official requirement без подтверждения.
+4. `[O][Clarify]` Какова минимальная требуемая глубина history/progress и
+   повторного доступа к Period Summary?
+5. `[O][Clarify]` Какой объём help после onboarding обязателен и достаточно ли
+   текущего glossary/help без полного replay?
+
+### Optional / polish
+
+1. `[Q][Opt]` Добавить полный transaction journal поверх минимального
+   объяснения обязательных операций.
+2. `[Q][Opt]` Добавить расширенную постоянную history сверх подтверждённой
+   буквальной глубины.
+3. `[Q][Opt]` Перемешивать карточки Day 1.
+4. `[Q][Opt]` Добавить replay полного onboarding и повторную customization Pet.
+5. `[Q][Opt]` Добавить игрушкам отдельные interactions/minigames.
+6. `[Q][Opt]` Использовать отдельную CTA/название active task, если команда
+   выберет этот UX-способ закрытия Home outcome.
 
 ## Questions requiring captain/customer decision
 
-1. Должен ли NORMAL-профиль удаляться целиком, либо достаточно очищать только
-   игровой прогресс? Для DEMO в ТЗ требуется отдельный безопасный reset.
-2. Какой конкретно DEMO state нужен после reset: новый профиль до onboarding,
-   профиль перед Day 1 или набор контрольных точек для быстрого показа?
-3. Какая формула связывает рост Финни с качеством финансовых решений: доля
-   обязательных расходов, соблюдение plan/fact, регулярность накоплений, reserve
-   или их взвешенная комбинация?
-4. Считает ли заказчик текущий Home соответствующим буквальному требованию об
-   одновременном отображении active task и доступе к progress, либо нужны новые
-   элементы Home?
+1. Нужен ли отдельный пользовательский DEMO flow и какой state должен
+   восстанавливаться при reseed? NORMAL reset/delete уже реализованы отдельно.
+2. Что означает «test profile» в Appendix A: NORMAL, DEMO или любой профиль,
+   созданный для показа?
+3. Достаточна ли текущая связь развития Pet с обязательным прохождением Day 2/5;
+   если нет, какую scoring formula команда принимает как product decision?
+4. Какой минимальный Home outcome, history depth и объём повторной help считаются
+   достаточными без навязывания конкретной UI-реализации?
 5. Кто владеет release keystore, package ID `ru.codexteam.finny`, RuStore
    кабинетом, возрастной анкетой и доказательствами прав на контент?
 6. Какое физическое устройство является приёмочным (модель, Android, RAM), и
@@ -611,23 +692,32 @@ production-кода, данных и тестов; более узкая ссы�
 
 - Day 1 учтён как `categorization`, Day 2 как `budget_priority`, Day 3–5 как
   `choice`; наличие специальных purchase dialogs не меняет тип задания.
-- Core-метод очистки DEMO не означает реализованный reset, пока нет UI,
-  подтверждения и повторного заполнения demo state.
+- NORMAL reset/delete в актуальном `origin/main` считаются реализованными по
+  production-коду и tests. Они не доказывают наличие отдельного DEMO flow.
+- Core-метод очистки DEMO не означает пользовательский DEMO reset/reseed, пока
+  нет UI и повторного заполнения state; необходимость такого UI ещё не является
+  подтверждённым P0.
 - Возможность пройти периоды подряд без ожидания не означает готовый demo mode.
 - 360dp widget tests и эмулятор не подтверждают физическое устройство.
 - `signingConfig = debug` не является release signing.
 - README использован только как указатель на ограничения и инструкции; статусы
   реализации подтверждены кодом, контентом и тестами.
-- Каждый частичный или отсутствующий пункт содержит конкретную оставшуюся работу;
-  P0 ограничен тем, что действительно блокирует обязательный demo или release.
+- Конкретная formula роста, полный journal/history, replay onboarding,
+  re-customization и отдельная Home CTA не повышаются до official requirement
+  без прямого источника.
+- Interim 29 Sep и Final/RuStore разделены; final-only artifacts не считаются
+  blockers промежуточного этапа.
 
 ## Status counts
 
 Считаются только строки основных matrix-таблиц со статусом, без headings,
 легенды, task inventory и этого блока.
 
-- ✅ 191
-- 🟡 63
-- ❌ 58
-- ➖ 6
+- ✅ 196
+- 🟡 66
+- ❌ 48
+- ➖ 8
 - **Всего:** 318
+
+Это количество атомизированных audit checks, а не процент выполнения и не
+количество независимых официальных требований.
