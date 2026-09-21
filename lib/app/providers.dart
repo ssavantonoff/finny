@@ -4,6 +4,7 @@ import 'package:finny/core/database/app_database.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
+import 'package:finny/repositories/profile_data_management_repository.dart';
 import 'package:finny/services/budget_service.dart';
 import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/item_use_service.dart';
@@ -41,6 +42,10 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
 
 final profileRepositoryProvider = Provider<ProfileRepository>(
   (ref) => SqliteProfileRepository(ref.watch(appDatabaseProvider)),
+);
+
+final profileDataManagementPortProvider = Provider<ProfileDataManagementPort>(
+  (ref) => SqliteProfileDataManagement(ref.watch(appDatabaseProvider)),
 );
 
 final gameRepositoryProvider = Provider<GameRepository>(
