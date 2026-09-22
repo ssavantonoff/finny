@@ -2,9 +2,9 @@
 
 ## Область и метод проверки
 
-**Дата проверки:** 21 сентября 2026 года
+**Дата проверки:** 22 сентября 2026 года
 
-**Base commit SHA:** `e94d4861215dceed0f91e2232eb7c59cc49decea`
+**Base commit SHA:** `dc2e62981560bccf876b40ff0775f919aa6461ab`
 
 Официальные требования определяют критерии проверки. Актуальный `origin/main`
 является источником истины для статуса реализации. Матрица построена по
@@ -72,12 +72,13 @@ production-кода, данных и тестов; более узкая ссы�
 | Bootstrap / onboarding / профиль | `lib/app/bootstrap.dart`, `lib/features/onboarding/onboarding_screen.dart`, `lib/repositories/profile_repository.dart` | `test/app/bootstrap_test.dart`, `test/app/active_profile_provider_test.dart` |
 | Pet Creation / preview | `lib/features/pet_creation/pet_creation_screen.dart`, `lib/features/pet_creation/pet_creation_draft.dart`, `lib/features/pet_creation/finny_preview.dart` | `test/pet_creation_screen_test.dart`, `test/pet_creation_draft_test.dart`, `test/pet_creation_persistence_test.dart` |
 | Home / navigation | `lib/features/home/home_screen.dart`, `lib/app/router.dart`, `lib/app/scaffold_with_nested_navigation.dart` | `test/features/home/home_screen_atmosphere_test.dart`, `test/features/navigation_test.dart`, `test/home_budget_planning_test.dart` |
-| Budget / plan-fact | `lib/features/budget/budget_screen.dart`, `lib/services/budget_service.dart`, `lib/repositories/game_repository.dart` | `test/home_budget_planning_test.dart`, `test/services/core_game_loop_test.dart`, `test/features/period_summary_screen_test.dart` |
+| Budget / plan-fact | `lib/features/budget/budget_screen.dart`, `lib/features/budget/budget_controller.dart`, `lib/services/budget_service.dart`, `lib/repositories/game_repository.dart` | `test/home_budget_planning_test.dart`, `test/services/core_game_loop_test.dart`, `test/features/period_summary_screen_test.dart` |
 | Shop / inventory / item effects | `lib/features/shop/shop_screen.dart`, `lib/services/purchase_service.dart`, `lib/services/item_use_service.dart` | `test/features/shop/shop_screen_test.dart`, `test/services/shop_catalog_purchase_test.dart`, `test/services/item_use_test.dart` |
 | Savings / goals | `lib/features/savings/savings_screen.dart`, `lib/services/savings_service.dart`, `assets/content/goals.json` | `test/features/savings/savings_core_test.dart`, `test/features/savings/savings_screen_test.dart`, `test/features/savings/savings_controller_test.dart` |
-| Tasks / rewards | `lib/features/tasks/tasks_screen.dart`, `lib/features/tasks/budget_priority_task_screen.dart`, `lib/services/task_service.dart` и `assets/content/tasks.json` | `test/features/tasks/day2_budget_priority_task_test.dart`, `test/services/task_categorization_test.dart`, `test/services/task_completion_test.dart` |
+| Tasks / rewards | `lib/features/tasks/tasks_screen.dart`, `lib/features/tasks/budget_priority_task_screen.dart`, `lib/features/tasks/plan_adaptation_task_screen.dart`, `lib/services/task_service.dart` и `assets/content/tasks.json` | `test/features/tasks/day1_categorization_task_test.dart`, `test/features/tasks/day2_budget_priority_task_test.dart`, `test/features/tasks/day3_plan_adaptation_task_test.dart`, `test/services/task_categorization_test.dart`, `test/services/task_plan_adaptation_test.dart` |
 | Period / day lifecycle / Pet state | `lib/services/period_service.dart`, `lib/services/day_lifecycle_service.dart`, `lib/models/pet_state_rules.dart` | `test/services/day_lifecycle_test.dart`, `test/services/pet_state_test.dart`, `test/services/final_campaign_integration_test.dart` |
-| Summary / progress / Adult | `lib/features/period_summary/period_summary_screen.dart`, `lib/features/progress/progress_screen.dart`, `lib/features/adult/adult_screen.dart`, `lib/repositories/profile_data_management_repository.dart` | `test/features/period_summary_screen_test.dart`, `test/features/adult/adult_screen_test.dart`, `test/repositories/profile_data_management_test.dart` |
+| Story events | `assets/content/story_purchases.json`, `lib/features/home/campaign_event_controller.dart`, `lib/services/story_event_service.dart`, `lib/repositories/game_repository.dart` | `test/services/story_event_test.dart`, `test/features/home/campaign_event_controller_test.dart`, `test/features/home/campaign_event_dialog_test.dart` |
+| Summary / progress / Adult | `lib/features/period_summary/period_summary_screen.dart`, `lib/features/progress/progress_screen.dart`, `lib/features/adult/adult_screen.dart`, `lib/repositories/profile_data_management_repository.dart` | `test/features/period_summary_screen_test.dart`, `test/features/adult/adult_screen_test.dart`, `test/repositories/profile_data_management_test.dart`, `test/app/adult_data_management_bootstrap_test.dart` |
 | Persistence / migrations | `lib/core/database/app_database.dart`, `lib/repositories/game_repository.dart`, `lib/repositories/profile_repository.dart` | `test/repositories/game_repository_test.dart`, `test/core/database_migration_test.dart`, `test/core/database_v9_migration_test.dart` |
 | Android / release configuration | `android/app/build.gradle.kts`, `android/app/src/main/AndroidManifest.xml`, `pubspec.yaml` | Статическая проверка конфигурации; физический install/smoke отмечен отдельно и не подменяется тестами. |
 
@@ -85,10 +86,10 @@ production-кода, данных и тестов; более узкая ссы�
 
 | Статус | Количество |
 |---|---:|
-| ✅ | 196 |
+| ✅ | 197 |
 | 🟡 | 66 |
 | ❌ | 48 |
-| ➖ | 8 |
+| ➖ | 7 |
 | **Всего атомизированных audit checks** | **318** |
 
 **Предупреждение:** 318 — это не 318 независимых официальных требований.
@@ -166,7 +167,7 @@ tracking и не являются процентом выполнения офи
 | Сумма распределения не превышает бюджет | ✅ Реализовано | UI ограничивает maximum; Core отклоняет отрицательные значения и превышение. | — |
 | Остаток показан до подтверждения | ✅ Реализовано | `budget-remainder` пересчитывается от `startingBudget`. | — |
 | План можно менять до подтверждения | ✅ Реализовано | Draft сохраняется и редактируется в planning. | — |
-| Подтверждение плана требует явного действия | ✅ Реализовано | Перед confirm показывается bottom sheet с тремя суммами и остатком. | — |
+| Подтверждение плана требует явного действия | ✅ Реализовано | Перед confirm показывается bottom sheet с тремя суммами и остатком; UI и repository требуют минимум 10 в каждой категории, но допускают положительный remainder. Это `[D]` game-validation rule, а не финансовый совет. | — |
 | Подтверждённый plan неизменяем | ✅ Реализовано | После перехода в active UI read-only, repository запрещает изменение; есть Core test. | — |
 | Факт не переписывает план | ✅ Реализовано | Actual fields/transactions отделены от planned fields. | — |
 | Дополнительный доход не переписывает plan | ✅ Реализовано | Проверено `additional income changes Home wallet but not confirmed plan` в `test/home_budget_planning_test.dart`. | — |
@@ -211,21 +212,21 @@ tracking и не являются процентом выполнения офи
 |---|---|---|---|
 | Не менее 6 заданий | ✅ Реализовано | `tasks.json` содержит 6 уникальных заданий. | — |
 | Не менее 3 образовательных тем | ✅ Реализовано | Темы: needs/wants, priorities, adapting plan, discounts, planning, reserve. | — |
-| Смысловое покрытие планирования бюджета | ✅ Реализовано | Day 2 `budget_priority` и Day 5 `planning` в `assets/content/tasks.json`. | — |
+| Смысловое покрытие планирования бюджета | ✅ Реализовано | Day 2 `budget_priority`, Day 3 `plan_adaptation` и Day 5 `planning` в `assets/content/tasks.json`. | — |
 | Смысловое покрытие сбережений | ✅ Реализовано | Day 5 bonus `reserve`; обязательный savings decision встроен в каждый period. | — |
 | Смысловое покрытие платежей/покупок | ✅ Реализовано | Day 1 needs/wants, Day 2 purchases, Day 3 unexpected NEED и Day 4 discount. | — |
 | Day 1 — categorization | ✅ Реализовано | Typed `categorization`, 6 карточек, drag и tap fallback, исправление и item feedback. | — |
 | Day 2 — budget_priority | ✅ Реализовано | Typed budget 150, buy now/later, over-budget feedback и canonical validation. | — |
-| Day 3–5 — разнообразные интерактивные механики | 🟡 Частично | Day 3, Day 4 и два задания Day 5 используют один простой тип `choice`; специальные Day 3/4 покупки добавляют ситуации, но не заменяют разнообразие task mechanics. | Перевести Day 3–5 в самостоятельные интерактивные механики, сохранив Core guarantees. |
+| Day 3–5 — разнообразные интерактивные механики | 🟡 Частично | Day 3 реализован отдельным `plan_adaptation` с drag/tap assignment и canonical validation; Day 4 и два задания Day 5 остаются `choice`. Day 3 bowl event усиливает changed-circumstance flow, но не заменяет task mechanics Day 4–5. | При необходимости развить Day 4–5 за пределы `choice`, сохранив Core guarantees. |
 | Возрастная понятность | ✅ Реализовано | Короткие формулировки о корме, уходе, скидке, резерве и цели; реальные финансовые продукты не используются. | — |
-| Правильный ответ и успешный flow | ✅ Реализовано | Все типы имеют canonical correct answer/state и success explanation. | — |
-| Ошибка с объясняющим feedback | ✅ Реализовано | Day 1/2 показывают feedback по ошибочным item; choice показывает explanation. | — |
+| Правильный ответ и успешный flow | ✅ Реализовано | Все типы, включая Day 3 `plan_adaptation`, имеют canonical correct answer/state и success explanation. | — |
+| Ошибка с объясняющим feedback | ✅ Реализовано | Day 1/2 и Day 3 показывают feedback по ошибочным item; `choice` показывает explanation. | — |
 | Безопасная повторная попытка | ✅ Реализовано | Ошибка не награждает и не меняет progress; ответы можно исправить. | — |
 | Игровая награда | ✅ Реализовано | Reward виден в UI и начисляется через transaction. | — |
 | Награда идемпотентна | ✅ Реализовано | Durable `task_progress`; retry/concurrency/reopen tests исключают повторное начисление. | — |
 | Завершение задания сохраняется | ✅ Реализовано | `task_progress` keyed by profile/task; UI перечитывает completed IDs. | — |
 | Нет ожидания реального календарного времени | ✅ Реализовано | Периоды и day progress двигаются только игровыми действиями. | — |
-| Перемешивание Day 1 | ➖ Не требуется / вне scope | Day 1 отображает canonical порядок из JSON; прямой official source обязательного shuffle не подтверждён. | `[Q][Opt]` Перемешивать карточки без изменения identities и проверки ответа как polish. |
+| Перемешивание Day 1 | ✅ Реализовано | `[Q][Opt]` Каждый новый `CategorizationTaskScreen` создаёт shuffled display order и поворачивает совпавший canonical order; порядок стабилен в instance, а canonical validation использует item identity. | — |
 
 Фактические task types на проверенном commit:
 
@@ -233,7 +234,7 @@ tracking и не являются процентом выполнения офи
 |---:|---|---|---|
 | Day 1 | `task_need_or_want_01` | `categorization` | `needs_and_wants` |
 | Day 2 | `task_priority_02` | `budget_priority` | `priorities` |
-| Day 3 | `task_changed_plan_03` | `choice` | `adapting_plan` |
+| Day 3 | `task_changed_plan_03` | `plan_adaptation` | `adapting_plan` |
 | Day 4 | `task_discount_04` | `choice` | `discounts` |
 | Day 5 | `task_final_choice_05` | `choice` | `planning` |
 | Day 5 bonus | `task_bonus_reserve_05` | `choice` | `reserve` |
@@ -300,7 +301,7 @@ tracking и не являются процентом выполнения офи
 | Inventory сохраняется | ✅ Реализовано | SQLite inventory; purchase/use/restart tests. | — |
 | Savings, active и completed goals сохраняются | ✅ Реализовано | `game_states` + `completed_goals`; reopen test. | — |
 | Задания сохраняются | ✅ Реализовано | `task_progress`; retry after SQLite reopen test. | — |
-| Периоды и plan/fact сохраняются | ✅ Реализовано | `game_periods` snapshots и transactions; migration tests v1–v9. | — |
+| Периоды и plan/fact сохраняются | ✅ Реализовано | `game_periods` snapshots и transactions; migration tests v1–v10. | — |
 | Питомец и стадия сохраняются | ✅ Реализовано | SQLite pets; persistence/migration tests. | — |
 | Периоды последовательны и не зависят от календаря | ✅ Реализовано | `PeriodService` выбирает следующий definition; virtual progress меняется только actions. | — |
 | Техническая изоляция NORMAL/DEMO | ✅ Реализовано | Все runtime rows keyed by profile; tests проверяют isolation. Отдельные repositories ограничивают NORMAL data management и DEMO cleanup соответствующим profile type. | — |
@@ -315,7 +316,7 @@ tracking и не являются процентом выполнения офи
 | Задания отделены от UI | ✅ Реализовано | `assets/content/tasks.json` загружается `AssetContentRepository`. | — |
 | Товары, цели, периоды и словарь отделены от UI | ✅ Реализовано | Отдельные JSON assets и typed models. | — |
 | Typed parsing и validation | ✅ Реализовано | Models отклоняют malformed/duplicate content; `content_repository_test.dart`. | — |
-| Новый экземпляр поддержанного типа без переписывания Core | ✅ Реализовано | Repository загружает list, screens рендерят supported `choice/categorization/budget_priority`. | — |
+| Новый экземпляр поддержанного типа без переписывания Core | ✅ Реализовано | Repository загружает list, screens рендерят supported `choice/categorization/budget_priority/plan_adaptation`. | — |
 | Новый тип механики без изменения Core | 🟡 Частично | Новые данные поддержанных schemas добавляются без Core rewrite; новый task type требует model/service/UI code. | Уточнить, требует ли ТЗ плагинную механику; при необходимости ввести registry/handler contract. |
 | Ошибка контента имеет безопасное состояние | ✅ Реализовано | Content errors отделены от empty/runtime states; UI предлагает retry и Core не мутирует данные. | — |
 
@@ -469,7 +470,7 @@ Release/physical evidence имеет `[A][F]` и не считается Interim
 | Pet progression tests | ✅ Реализовано | `test/services/pet_state_test.dart`; `test/services/day_lifecycle_test.dart`. | — |
 | Day 1 interactive widget/core tests | ✅ Реализовано | `test/features/tasks/day1_categorization_task_test.dart`; `test/services/task_categorization_test.dart`. | — |
 | Day 2 interactive widget/core tests | ✅ Реализовано | `test/features/tasks/day2_budget_priority_task_test.dart`; `test/services/task_budget_priority_test.dart`. | — |
-| Day 3–5 current choice tests | ✅ Реализовано | Choice validation/completion in `task_completion_test.dart`; full sequence in `final_campaign_integration_test.dart`. | — |
+| Day 3 plan-adaptation и Day 4–5 choice tests | ✅ Реализовано | Day 3: `test/features/tasks/day3_plan_adaptation_task_test.dart` и `test/services/task_plan_adaptation_test.dart`; Day 4–5 choice validation/completion: `test/services/task_completion_test.dart`; full sequence: `test/services/final_campaign_integration_test.dart`. | — |
 | Adult tests | ✅ Реализовано | `test/features/adult/adult_screen_test.dart`: barrier, tap, long press, progress, stale reads, 360dp. | — |
 | Glossary tests | ✅ Реализовано | `test/repositories/glossary_content_test.dart`; `test/features/help/help_screen_test.dart`. | — |
 | Navigation tests | ✅ Реализовано | `test/features/navigation_test.dart`; route behavior also exercised by feature widget tests. | — |
@@ -490,7 +491,7 @@ Release/physical evidence имеет `[A][F]` и не считается Interim
 | 3. Настройка питомца | ✅ Реализовано | Имя + 9 appearance combinations. | — |
 | 4. Стартовый бюджет, цель и задания | ✅ Реализовано | Day start, Savings goal selection и task list доступны. | — |
 | 5. Составление бюджета | ✅ Реализовано | Draft/confirm flow. | — |
-| 6. Задание, награда и explanation | ✅ Реализовано | Day 1/2 и choice tasks показывают result/reward. | — |
+| 6. Задание, награда и explanation | ✅ Реализовано | Day 1/2, Day 3 `plan_adaptation` и choice tasks показывают result/reward. | — |
 | 7. Покупка need и want | ✅ Реализовано | Каталог содержит оба типа; purchase flow общий и проверен. | — |
 | 8. Сценарий недостатка средств | 🟡 Частично | Ошибка показывает цену/баланс/дефицит, но следующий шаг не формализован. | `[O][I29]` Подтвердить recovery outcome в ручном smoke. `[Q][Opt]` Конкретная CTA — один из UX-способов. |
 | 9. Выбор цели и deposit | ✅ Реализовано | Полный Savings flow реализован. | — |
@@ -587,26 +588,26 @@ artifacts, а не функциональные P0 для Interim 29 Sep.
 
 ## Known gaps
 
-1. `[O]` Day 3–5 используют `choice`; только Day 1 (`categorization`) и Day 2
-   (`budget_priority`) имеют отдельные интерактивные task-механики.
+1. `[O]` Day 4 и два задания Day 5 используют `choice`; Day 1
+   (`categorization`), Day 2 (`budget_priority`) и Day 3 (`plan_adaptation`)
+   имеют отдельные интерактивные task-механики.
 2. `[D][Clarify]` Технические DEMO type/cleanup/isolation существуют, но нет
    готового пользовательского DEMO entry/reset/reseed. Необходимость именно
    такого UI не подтверждена как буквальное official requirement.
-3. `[Q][Opt]` Карточки Day 1 не перемешиваются.
-4. `[Q][Opt]` Игрушки применяют прямой stat-effect при отдельном use;
+3. `[Q][Opt]` Игрушки применяют прямой stat-effect при отдельном use;
    самостоятельных игровых взаимодействий/minigames нет.
-5. `[O][Clarify]` Нет постоянного UI истории заданий и периодов; буквальная
+4. `[O][Clarify]` Нет постоянного UI истории заданий и периодов; буквальная
    глубина history, требуемая официальным источником, нуждается в уточнении.
-6. `[O][Clarify]` Рост Stage 2/3 привязан к Day 2/5. Связь с прохождением есть,
+5. `[O][Clarify]` Рост Stage 2/3 привязан к Day 2/5. Связь с прохождением есть,
    но достаточность этой связи и конкретная scoring formula не подтверждены.
-7. `[Q][Opt]` Нет полного пользовательского transaction journal. Это полезный
+6. `[Q][Opt]` Нет полного пользовательского transaction journal. Это полезный
    способ повысить explainability, но не отдельное подтверждённое требование.
-8. `[O]` Причины эмоционального состояния/роста питомца объяснены неполно.
-9. `[O]` Portrait lock отсутствует; Android 8+ не подтверждён на target device.
-10. `[A][F]` Release использует debug signing; в текущем репозитории не
+7. `[O]` Причины эмоционального состояния/роста питомца объяснены неполно.
+8. `[O]` Portrait lock отсутствует; Android 8+ не подтверждён на target device.
+9. `[A][F]` Release использует debug signing; в текущем репозитории не
     подтверждены signed APK, install evidence, RuStore package, лицензии,
     финальный deck и backup video.
-11. `[A][F]` Не подтверждены cold start/response-time measurements и полный
+10. `[A][F]` Не подтверждены cold start/response-time measurements и полный
     ручной прогон final build на физическом Android-устройстве.
 
 Актуальный `origin/main` уже содержит принятый командой NORMAL data-management
@@ -664,10 +665,9 @@ NORMAL через Adult с отдельными подтверждениями. 
    объяснения обязательных операций.
 2. `[Q][Opt]` Добавить расширенную постоянную history сверх подтверждённой
    буквальной глубины.
-3. `[Q][Opt]` Перемешивать карточки Day 1.
-4. `[Q][Opt]` Добавить replay полного onboarding и повторную customization Pet.
-5. `[Q][Opt]` Добавить игрушкам отдельные interactions/minigames.
-6. `[Q][Opt]` Использовать отдельную CTA/название active task, если команда
+3. `[Q][Opt]` Добавить replay полного onboarding и повторную customization Pet.
+4. `[Q][Opt]` Добавить игрушкам отдельные interactions/minigames.
+5. `[Q][Opt]` Использовать отдельную CTA/название active task, если команда
    выберет этот UX-способ закрытия Home outcome.
 
 ## Questions requiring captain/customer decision
@@ -690,8 +690,9 @@ NORMAL через Adult с отдельными подтверждениями. 
 
 ## Контрольные замечания по трактовке статусов
 
-- Day 1 учтён как `categorization`, Day 2 как `budget_priority`, Day 3–5 как
-  `choice`; наличие специальных purchase dialogs не меняет тип задания.
+- Day 1 учтён как `categorization`, Day 2 как `budget_priority`, Day 3 как
+  `plan_adaptation`, Day 4–5 как `choice`; наличие story/purchase dialogs не
+  меняет тип задания.
 - NORMAL reset/delete в актуальном `origin/main` считаются реализованными по
   production-коду и tests. Они не доказывают наличие отдельного DEMO flow.
 - Core-метод очистки DEMO не означает пользовательский DEMO reset/reseed, пока
@@ -713,10 +714,10 @@ NORMAL через Adult с отдельными подтверждениями. 
 Считаются только строки основных matrix-таблиц со статусом, без headings,
 легенды, task inventory и этого блока.
 
-- ✅ 196
+- ✅ 197
 - 🟡 66
 - ❌ 48
-- ➖ 8
+- ➖ 7
 - **Всего:** 318
 
 Это количество атомизированных audit checks, а не процент выполнения и не

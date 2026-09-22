@@ -16,8 +16,8 @@ Final-only artifact не становится автоматически blocker
 | Item | Status | Evidence / next check |
 |---|---|---|
 | Доступ эксперта к текущему репозиторию и branch/PR | VERIFY | После push проверить remote branch и PR URL; доступ внешнего эксперта не подтверждается локальным commit |
-| Документационный пакет submission/demo | READY | Четыре файла этого follow-up: outline, demo script, shotlist, checklist |
-| README и краткий способ запуска | VERIFY | README существует, но содержит устаревшее утверждение о read-only Adult; discrepancy не исправляется в рамках этого package |
+| Документационный пакет submission/demo | READY | Outline, demo script, shotlist и checklist синхронизированы с README и current-state documentation |
+| README и краткий способ запуска | READY | README синхронизирован с Adult NORMAL reset/delete, Day 1–5 task types, Day 3 story event, shuffle, overnight state и minimum budget allocation |
 | Architecture evidence | READY | `docs/ARCHITECTURE.md`, текущая Flutter/Riverpod/GoRouter/SQLite/JSON схема |
 | Current Requirements Matrix | READY | `docs/REQUIREMENTS_MATRIX.md` на актуальном `main`; atomic checks и классификация уже разделены |
 | Core loop/content evidence | READY | `docs/CORE_GAME_LOOP.md`, `docs/PRODUCT_SPEC.md`, `assets/content/*.json` |
@@ -29,10 +29,15 @@ Final-only artifact не становится автоматически blocker
 | Day 1 categorization evidence | READY | Код, assets и tests подтверждают 6 карточек, две зоны и исправляемый feedback |
 | Day 2 budget-priority evidence | READY | Код и test подтверждают лимит 150, цены 90/60/80, overflow guard и feedback |
 | Day 3 plan adaptation evidence | READY | Current main содержит typed `plan_adaptation`, потерю 80 монет, новый бюджет 220 и widget/core tests |
+| Day 3 bowl story event evidence | READY | `story_purchases.json`, Home event flow, canonical NEED 120, postpone/savings-deficit route и service/controller tests подтверждены в audit base |
 | Day 4–5 choice flow | VERIFY | Контент и choice validation есть; полный пятидневный manual smoke и внешний Interim artifact нужно проверить |
+| Active task visibility / Home outcome | VERIFY | Home показывает checkpoint `Задание`, но literal outcome видимости конкретной active task остаётся частичным по Matrix |
+| Feedback / explainability | VERIFY | Task, plan/fact и story-event feedback есть; целостный manual Appendix A outcome и выходы из всех ошибок нужно подтвердить |
+| Full Appendix A / 5-day manual smoke | VERIFY | Core integration есть, но ручной прогон на согласованном build не приложен |
+| Interpretation of test/demo profile | VERIFY | NORMAL reset/delete реализованы; отдельный пользовательский DEMO flow и буквальная граница Appendix A требуют решения |
 | Offline Core / no mandatory account | READY | README/spec/architecture и локальные repositories описывают offline scope |
 | Safety/privacy scope | READY | Нет real money, bank, ads, subscription, mandatory account, public child chat или cloud sync в заявленном Core |
-| Known README discrepancy записана для эксперта | READY | См. раздел `Риски и расхождения` ниже; README намеренно не меняется этим follow-up |
+| Документационная синхронизация audit base | READY | README и Requirements Matrix сверены с `dc2e629`; см. раздел `Риски и расхождения` ниже |
 
 В Interim не считаются автоматическими blockers следующие Final-only items:
 production signing, final signed APK, final RuStore package, store icon 512×512,
@@ -70,7 +75,7 @@ final store metadata, final presentation и backup final video — если от
 
 | Area | Status | Evidence |
 |---|---|---|
-| Documentation-only scope defined | READY | Изменяются только четыре файла из этого пакета |
+| Documentation-only scope defined | READY | Изменяются только `README.md` и файлы в `docs/`; production code, tests и assets не затронуты |
 | Presentation structure | READY | 9-slide `PRESENTATION_OUTLINE.md` с тезисами, visual и speech notes |
 | Demo procedure | READY | Main route, backup route, risks и timeboxes в `DEMO_SCRIPT.md` |
 | Screenshot inventory | READY | Concrete states, priorities и readiness statuses в `SCREENSHOT_SHOTLIST.md` |
@@ -96,14 +101,6 @@ final store metadata, final presentation и backup final video — если от
 
 ## Риски и расхождения
 
-### README против current main
-
-Текущий `README.md` всё ещё говорит, что Adult работает как read-only и reset/delete
-не реализованы. В актуальном `main` код, tests и Requirements Matrix уже содержат
-accepted NORMAL reset/delete slice с подтверждениями. Это зафиксировано как риск
-документационной согласованности; README намеренно не изменяется этим
-documentation-only package.
-
 ### Реализация против намерения
 
 Статус `READY` для Adult reset/delete относится к фактическому current main. Он не
@@ -111,13 +108,13 @@ documentation-only package.
 уже проведён. Planned work, внешний artifact и captain decision остаются
 `VERIFY`/`MISSING` по таблицам выше.
 
-### Requirements Matrix против current main
+### Документационные расхождения audit base
 
-После создания этой ветки `origin/main` продвинулся до
-`cab87fb35334bb5c222011393bd8951004e8990b` с Day 3 `plan_adaptation` и
-связанными tests. `docs/REQUIREMENTS_MATRIX.md` на этом SHA всё ещё описывает
-Day 3–5 как `choice`. В этом package используется фактический current code как
-source of truth, расхождение отмечено для капитана, а matrix не изменяется.
+README и Requirements Matrix синхронизированы с audit base
+`dc2e62981560bccf876b40ff0775f919aa6461ab`: Adult NORMAL data management,
+Day 3 `plan_adaptation`, Day 3 bowl story event, Day 1 shuffle, overnight rule
+и minimum budget allocation больше не описываются как future work. Внешние
+artifact/device risks остаются `VERIFY`/`MISSING` и не закрываются документацией.
 
 ### Метрики матрицы
 
@@ -136,5 +133,7 @@ Requirements Matrix атомизирует составные requirements в au
   `lib/repositories/profile_data_management_repository.dart`
 - `lib/features/tasks/plan_adaptation_task_screen.dart`,
   `test/features/tasks/day3_plan_adaptation_task_test.dart`
+- `lib/features/home/campaign_event_controller.dart`,
+  `lib/services/story_event_service.dart`, `test/services/story_event_test.dart`
 - `test/features/adult/adult_screen_test.dart`,
   `test/repositories/profile_data_management_test.dart`
