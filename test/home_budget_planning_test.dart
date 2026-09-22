@@ -366,7 +366,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('План готов'), findsOneWidget);
-    expect(find.text('Посмотреть план'), findsOneWidget);
+    expect(find.text('Выполнить задание'), findsOneWidget);
 
     final periods = PeriodService(games, content);
     period = (await tester.runAsync(
@@ -1120,7 +1120,7 @@ void main() {
       expect(gameState?.savedAmount, 17);
       expect(find.byType(HomeScreen), findsOneWidget);
 
-      await tester.tap(find.text('Посмотреть план'));
+      harness.router.go('/budget');
       await _settleFeature(tester, harness.container);
       expect(find.text('Твой план'), findsOneWidget);
       expect(find.byType(Slider), findsNothing);
@@ -1221,7 +1221,7 @@ void main() {
       database: database,
     );
     expect(find.text('550 🪙'), findsOneWidget);
-    await tester.tap(find.text('Посмотреть план'));
+    harness.router.go('/budget');
     await _settleFeature(tester, harness.container);
     expect(find.text('200 🪙'), findsOneWidget);
     expect(find.text('100 🪙'), findsNWidgets(3));
