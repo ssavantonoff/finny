@@ -169,7 +169,12 @@ void main() {
 
   Future<void> openTreat(WidgetTester tester) async {
     final item = find.byKey(const Key('shop-item-food_treat'));
-    await tester.ensureVisible(item);
+    await tester.scrollUntilVisible(
+      item,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     await tester.tap(item);
     await tester.pumpAndSettle();
   }
@@ -178,6 +183,17 @@ void main() {
     'Day 4 planning shows 60 → 35, then active purchase uses 35 and reverts to 60',
     (tester) async {
       await mount(tester);
+      expect(find.byKey(const Key('shop-promo-banner')), findsOneWidget);
+      expect(find.text('Акция дня'), findsWidgets);
+      expect(find.text('Лакомство · 60 → 35 монет'), findsOneWidget);
+      expect(
+        find.byKey(const Key('shop-promo-card-food_treat')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('shop-promo-marker-food_treat')),
+        findsOneWidget,
+      );
       expect(
         container
             .read(shopControllerProvider)
@@ -258,6 +274,13 @@ void main() {
       expect(state.promotionPurchased, isTrue);
       expect(state.effectivePriceFor(state.itemById('food_treat')!), 60);
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('shop-promo-banner')), findsNothing);
+      expect(find.byKey(const Key('shop-promo-card-food_treat')), findsNothing);
+      expect(
+        find.byKey(const Key('shop-promo-marker-food_treat')),
+        findsNothing,
+      );
+      expect(find.text('60 монет • Еда'), findsOneWidget);
       await openTreat(tester);
       await tester.tap(find.byKey(const Key('shop-buy')));
       await tester.pump();
@@ -398,6 +421,54 @@ void main() {
       );
       expect(state.isPromotionActiveFor(treat), isFalse);
       expect(state.effectivePriceFor(treat), 60);
+    }
+  });
+
+  testWidgets('promo banner and card marker stay absent on other days', (
+    tester,
+  ) async {
+    await tester.runAsync(
+      () async => (await database.database).update(
+        'game_periods',
+        {'period_number': 1},
+        where: 'id = ?',
+        whereArgs: [periodId],
+      ),
+    );
+    await mount(tester);
+    for (final day in [1, 2, 3, 5]) {
+      if (day != 1) {
+        await tester.runAsync(
+          () async => (await database.database).update(
+            'game_periods',
+            {'period_number': day},
+            where: 'id = ?',
+            whereArgs: [periodId],
+          ),
+        );
+        final reload = container.read(shopControllerProvider.notifier).load();
+        for (
+          var attempt = 0;
+          attempt < 100 &&
+              container.read(shopControllerProvider).load != ShopLoad.ready;
+          attempt++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 2)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        await reload;
+        await tester.pump();
+      }
+      expect(container.read(shopControllerProvider).period?.periodNumber, day);
+      expect(find.byKey(const Key('shop-promo-banner')), findsNothing);
+      expect(find.byKey(const Key('shop-promo-card-food_treat')), findsNothing);
+      expect(
+        find.byKey(const Key('shop-promo-marker-food_treat')),
+        findsNothing,
+      );
+      expect(find.text('60 монет • Еда'), findsOneWidget);
     }
   });
 }

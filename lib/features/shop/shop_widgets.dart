@@ -33,28 +33,57 @@ class ShopPriceLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (!state.isPromotionActiveFor(item)) {
       return Text(
         '${item.price} монет • ${shopCategory(item)}',
-        style: TextStyle(fontSize: fontSize),
+        style: theme.textTheme.bodyLarge?.copyWith(fontSize: fontSize),
       );
     }
     return Wrap(
       key: Key('shop-promo-price-${item.id}'),
       spacing: 8,
+      runSpacing: 4,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Text('Акция'),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.tertiaryContainer,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            child: Text(
+              'Акция',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onTertiaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
         Text(
           '${item.price}',
-          style: TextStyle(
+          style: theme.textTheme.bodyLarge?.copyWith(
             fontSize: fontSize,
             decoration: TextDecoration.lineThrough,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         Text(
           '${state.effectivePriceFor(item)} монет',
-          style: TextStyle(fontSize: fontSize),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: fontSize + 2,
+            fontWeight: FontWeight.w800,
+            color: theme.colorScheme.tertiary,
+          ),
+        ),
+        Text(
+          '• ${shopCategory(item)}',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontSize: fontSize,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );

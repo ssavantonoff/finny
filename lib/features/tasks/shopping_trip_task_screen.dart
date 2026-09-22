@@ -50,6 +50,16 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
 
   int get _total => _scenario.evaluate(_selections).totalCost;
 
+  TextStyle _type(
+    TextStyle? base, {
+    required double size,
+    FontWeight weight = FontWeight.w500,
+  }) => (base ?? const TextStyle()).copyWith(
+    fontSize: size,
+    fontWeight: weight,
+    height: 1.35,
+  );
+
   @override
   void initState() {
     super.initState();
@@ -180,26 +190,19 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
       bottomNavigationBar: _stage == _ShoppingStage.shelf
           ? SafeArea(
               top: false,
-              child: Material(
-                elevation: 8,
-                color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                child: InkWell(
-                  key: const Key('shopping-cart-bar'),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.medium,
+                  0,
+                  AppSpacing.medium,
+                  AppSpacing.small,
+                ),
+                child: _ShoppingCartDock(
+                  packageCount: _packageCount,
+                  packageCountLabel: _packageCountLabel,
+                  total: _total,
+                  budget: _scenario.budget,
                   onTap: _showCart,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.medium,
-                      vertical: AppSpacing.small,
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.shopping_cart_outlined),
-                        const SizedBox(width: AppSpacing.small),
-                        Expanded(child: Text('Корзина · $_packageCountLabel')),
-                        Text('$_total / ${_scenario.budget} 🪙'),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             )
@@ -215,18 +218,31 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
         style: Theme.of(context).textTheme.headlineMedium,
       ),
       const SizedBox(height: AppSpacing.medium),
-      Text(_scenario.prompt, style: Theme.of(context).textTheme.titleMedium),
+      Text(
+        _scenario.prompt,
+        style: _type(
+          Theme.of(context).textTheme.titleMedium,
+          size: 18,
+          weight: FontWeight.w600,
+        ),
+      ),
       const SizedBox(height: AppSpacing.medium),
       for (final item in _scenario.items)
         Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.small),
-          child: Text('${item.label} — не меньше ${item.requirementLabel}'),
+          child: Text(
+            '${item.label} — не меньше ${item.requirementLabel}',
+            style: _type(Theme.of(context).textTheme.bodyLarge, size: 18),
+          ),
         ),
       const SizedBox(height: AppSpacing.large),
       FilledButton(
         key: const Key('shopping-enter'),
         onPressed: () => setState(() => _stage = _ShoppingStage.shelf),
-        child: const Text('В магазин'),
+        child: Text(
+          'В магазин',
+          style: _type(null, size: 16, weight: FontWeight.w700),
+        ),
       ),
     ],
   );
@@ -244,11 +260,32 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
             children: [
               Text(
                 '${_shelf + 1} из ${_scenario.items.length} · ${item.label}',
-                style: Theme.of(context).textTheme.headlineSmall,
+                key: const Key('shopping-shelf-header'),
+                style: _type(
+                  Theme.of(context).textTheme.headlineSmall,
+                  size: 23,
+                  weight: FontWeight.w700,
+                ),
               ),
-              Text('Нужно: не меньше ${item.requirementLabel}'),
               const SizedBox(height: AppSpacing.small),
-              Text('Бюджет: ${_scenario.budget} 🪙'),
+              Text(
+                'Нужно: не меньше ${item.requirementLabel}',
+                key: const Key('shopping-requirement'),
+                style: _type(
+                  Theme.of(context).textTheme.titleMedium,
+                  size: 18,
+                  weight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.small),
+              Text(
+                'Бюджет: ${_scenario.budget} 🪙',
+                style: _type(
+                  Theme.of(context).textTheme.titleMedium,
+                  size: 18,
+                  weight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: AppSpacing.large),
               Stack(
                 alignment: Alignment.bottomCenter,
@@ -291,7 +328,10 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => setState(() => _shelf--),
-                        child: const Text('← Назад'),
+                        child: Text(
+                          '← Назад',
+                          style: _type(null, size: 16, weight: FontWeight.w600),
+                        ),
                       ),
                     ),
                   if (_shelf > 0) const SizedBox(width: AppSpacing.small),
@@ -309,6 +349,7 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
                         _shelf < _scenario.items.length - 1
                             ? 'Следующая полка →'
                             : 'К кассе',
+                        style: _type(null, size: 16, weight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -350,8 +391,23 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
               ),
             ),
           ),
-          Text(package.label, style: Theme.of(context).textTheme.titleMedium),
-          Text('$price 🪙'),
+          Text(
+            package.label,
+            style: _type(
+              Theme.of(context).textTheme.titleMedium,
+              size: 18,
+              weight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            '$price 🪙',
+            key: Key('shopping-product-price-${item.id}-${package.id}'),
+            style: _type(
+              Theme.of(context).textTheme.titleMedium,
+              size: 20,
+              weight: FontWeight.w700,
+            ),
+          ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -359,6 +415,7 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
                 key: Key('shopping-minus-${item.id}-${package.id}'),
                 tooltip: 'Убрать ${package.label}',
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                iconSize: 28,
                 onPressed: quantity == 0
                     ? null
                     : () => _quantity(item, small, -1),
@@ -367,11 +424,17 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
               Text(
                 '$quantity',
                 key: Key('shopping-quantity-${item.id}-${package.id}'),
+                style: _type(
+                  Theme.of(context).textTheme.titleMedium,
+                  size: 20,
+                  weight: FontWeight.w700,
+                ),
               ),
               IconButton(
                 key: Key('shopping-plus-${item.id}-${package.id}'),
                 tooltip: 'Добавить ${package.label}',
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                iconSize: 28,
                 onPressed: quantity == package.maxQuantity
                     ? null
                     : () => _quantity(item, small, 1),
@@ -397,14 +460,32 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Корзина', style: Theme.of(context).textTheme.titleLarge),
-                if (_packageCount == 0) const Text('Корзина пока пуста.'),
+                Text(
+                  'Корзина',
+                  style: _type(
+                    Theme.of(context).textTheme.titleLarge,
+                    size: 22,
+                    weight: FontWeight.w700,
+                  ),
+                ),
+                if (_packageCount == 0)
+                  Text(
+                    'Корзина пока пуста.',
+                    style: _type(
+                      Theme.of(context).textTheme.bodyLarge,
+                      size: 17,
+                    ),
+                  ),
                 for (final item in _scenario.items) ...[
                   if (_selections[item.id]!.smallQuantity > 0 ||
                       _selections[item.id]!.largeQuantity > 0)
                     Text(
                       item.label,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: _type(
+                        Theme.of(context).textTheme.titleMedium,
+                        size: 18,
+                        weight: FontWeight.w600,
+                      ),
                     ),
                   for (final small in [true, false])
                     if ((small
@@ -414,7 +495,14 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
                       _cartLine(item, small, updateSheet),
                 ],
                 const Divider(),
-                Text('Итого: $_total / ${_scenario.budget} 🪙'),
+                Text(
+                  'Итого: $_total / ${_scenario.budget} 🪙',
+                  style: _type(
+                    Theme.of(context).textTheme.titleLarge,
+                    size: 20,
+                    weight: FontWeight.w700,
+                  ),
+                ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Закрыть'),
@@ -435,10 +523,16 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
     final linePrice = quantity * (small ? price.smallPrice : price.largePrice);
     return Row(
       children: [
-        Expanded(child: Text('${package.label} ×$quantity — $linePrice 🪙')),
+        Expanded(
+          child: Text(
+            '${package.label} ×$quantity — $linePrice 🪙',
+            style: _type(Theme.of(context).textTheme.bodyLarge, size: 17),
+          ),
+        ),
         IconButton(
           tooltip: 'Убрать ${item.label} ${package.label}',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          iconSize: 27,
           onPressed: () {
             _quantity(item, small, -1);
             updateSheet(() {});
@@ -448,6 +542,7 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
         IconButton(
           tooltip: 'Добавить ${item.label} ${package.label}',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          iconSize: 27,
           onPressed: quantity >= package.maxQuantity
               ? null
               : () {
@@ -463,16 +558,45 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
   Widget _checkout(BuildContext context) => ListView(
     padding: const EdgeInsets.all(AppSpacing.medium),
     children: [
-      Text('Касса', style: Theme.of(context).textTheme.headlineSmall),
+      Text(
+        'Касса',
+        style: _type(
+          Theme.of(context).textTheme.headlineSmall,
+          size: 23,
+          weight: FontWeight.w700,
+        ),
+      ),
       for (final item in _scenario.items)
         Padding(
           padding: const EdgeInsets.only(top: AppSpacing.medium),
-          child: Text(
-            '${item.label}\n${_amount(item, _itemAmount(item))} / нужно ${item.requirementLabel}',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.label,
+                style: _type(
+                  Theme.of(context).textTheme.titleMedium,
+                  size: 18,
+                  weight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '${_amount(item, _itemAmount(item))} / нужно ${item.requirementLabel}',
+                style: _type(Theme.of(context).textTheme.bodyLarge, size: 18),
+              ),
+            ],
           ),
         ),
       const SizedBox(height: AppSpacing.medium),
-      Text('Итого: $_total / ${_scenario.budget} 🪙'),
+      Text(
+        'Итого: $_total / ${_scenario.budget} 🪙',
+        key: const Key('shopping-checkout-total'),
+        style: _type(
+          Theme.of(context).textTheme.titleLarge,
+          size: 20,
+          weight: FontWeight.w700,
+        ),
+      ),
       if (_incorrect case final incorrect?) ...[
         const SizedBox(height: AppSpacing.medium),
         Semantics(
@@ -482,29 +606,43 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
             children: [
               for (final item in _scenario.items)
                 if (incorrect.insufficientItemIds.contains(item.id))
-                  Text(
-                    '${switch (item.id) {
-                      'water' => 'Воды',
-                      'soap' => 'Мыла',
-                      'cookies' => 'Печенья',
-                      _ => item.label,
-                    }} пока не хватает. Нужно не меньше ${item.requirementLabel}, в корзине ${_amount(item, incorrect.purchasedAmounts[item.id] ?? 0)}.',
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.small),
+                    child: Text(
+                      '${switch (item.id) {
+                        'water' => 'Воды',
+                        'soap' => 'Мыла',
+                        'cookies' => 'Печенья',
+                        _ => item.label,
+                      }} пока не хватает. Нужно не меньше ${item.requirementLabel}, в корзине ${_amount(item, incorrect.purchasedAmounts[item.id] ?? 0)}.',
+                      style: _type(
+                        Theme.of(context).textTheme.bodyLarge,
+                        size: 17,
+                      ),
+                    ),
                   ),
               if (incorrect.overBudgetBy > 0)
                 Text(
                   'Корзина дороже бюджета на ${incorrect.overBudgetBy} монет.',
+                  style: _type(Theme.of(context).textTheme.bodyLarge, size: 17),
                 ),
             ],
           ),
         ),
       ],
       if (_runtimeError)
-        const Text('Не получилось проверить корзину. Попробуй ещё раз.'),
+        Text(
+          'Не получилось проверить корзину. Попробуй ещё раз.',
+          style: _type(Theme.of(context).textTheme.bodyLarge, size: 17),
+        ),
       const SizedBox(height: AppSpacing.medium),
       FilledButton(
         key: const Key('shopping-check'),
         onPressed: _submitting ? null : _check,
-        child: Text(_submitting ? 'Проверяем…' : 'Проверить корзину'),
+        child: Text(
+          _submitting ? 'Проверяем…' : 'Проверить корзину',
+          style: _type(null, size: 16, weight: FontWeight.w700),
+        ),
       ),
       OutlinedButton(
         onPressed: _submitting
@@ -513,7 +651,10 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
                 _stage = _ShoppingStage.shelf;
                 _incorrect = null;
               }),
-        child: const Text('← Назад к полкам'),
+        child: Text(
+          '← Назад к полкам',
+          style: _type(null, size: 16, weight: FontWeight.w600),
+        ),
       ),
     ],
   );
@@ -525,20 +666,226 @@ class _ShoppingTripTaskScreenState extends State<ShoppingTripTaskScreen> {
         'Покупки готовы!',
         style: Theme.of(context).textTheme.headlineMedium,
       ),
-      const Text('Всё из списка есть, и ты уложился в бюджет.'),
+      Text(
+        'Всё из списка есть, и ты уложился в бюджет.',
+        style: _type(Theme.of(context).textTheme.bodyLarge, size: 18),
+      ),
       const SizedBox(height: AppSpacing.medium),
-      Text('Потрачено: $_total 🪙'),
-      Text('Осталось: ${_scenario.budget - _total} 🪙'),
-      Text('+${widget.task.reward} монет'),
+      Text(
+        'Потрачено: $_total 🪙',
+        style: _type(Theme.of(context).textTheme.bodyLarge, size: 18),
+      ),
+      Text(
+        'Осталось: ${_scenario.budget - _total} 🪙',
+        style: _type(Theme.of(context).textTheme.bodyLarge, size: 18),
+      ),
+      Text(
+        '+${widget.task.reward} монет',
+        style: _type(
+          Theme.of(context).textTheme.titleLarge,
+          size: 20,
+          weight: FontWeight.w700,
+        ),
+      ),
       const SizedBox(height: AppSpacing.medium),
-      Text(_scenario.successExplanation),
+      Text(
+        _scenario.successExplanation,
+        style: _type(Theme.of(context).textTheme.bodyLarge, size: 17),
+      ),
       const SizedBox(height: AppSpacing.medium),
       FilledButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Готово'),
+        child: Text(
+          'Готово',
+          style: _type(null, size: 16, weight: FontWeight.w700),
+        ),
       ),
     ],
   );
+}
+
+class _ShoppingCartDock extends StatelessWidget {
+  const _ShoppingCartDock({
+    required this.packageCount,
+    required this.packageCountLabel,
+    required this.total,
+    required this.budget,
+    required this.onTap,
+  });
+
+  final int packageCount;
+  final String packageCountLabel;
+  final int total;
+  final int budget;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      label: 'Корзина. $packageCountLabel. Потрачено $total из $budget монет.',
+      child: ExcludeSemantics(
+        child: Material(
+          elevation: 4,
+          shadowColor: theme.colorScheme.shadow.withValues(alpha: .18),
+          color: theme.colorScheme.surfaceContainerLowest,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: const Key('shopping-cart-bar'),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 72),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.medium,
+                  vertical: AppSpacing.small,
+                ),
+                child: Row(
+                  children: [
+                    _ShoppingCartIcon(
+                      packageCount: packageCount,
+                      disableAnimations: MediaQuery.of(context)
+                          .disableAnimations,
+                    ),
+                    const SizedBox(width: AppSpacing.medium),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Корзина',
+                            key: const Key('shopping-cart-title'),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            '$packageCountLabel · $total / $budget 🪙',
+                            key: const Key('shopping-cart-summary'),
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.small),
+                    const Icon(Icons.keyboard_arrow_up),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShoppingCartIcon extends StatefulWidget {
+  const _ShoppingCartIcon({
+    required this.packageCount,
+    required this.disableAnimations,
+  });
+
+  final int packageCount;
+  final bool disableAnimations;
+
+  @override
+  State<_ShoppingCartIcon> createState() => _ShoppingCartIconState();
+}
+
+class _ShoppingCartIconState extends State<_ShoppingCartIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+  );
+  late final Animation<double> _scale = TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 1, end: 1.06), weight: 1),
+    TweenSequenceItem(tween: Tween(begin: 1.06, end: 1), weight: 1),
+  ]).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeOut));
+
+  @override
+  void didUpdateWidget(covariant _ShoppingCartIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.packageCount != oldWidget.packageCount &&
+        !widget.disableAnimations) {
+      _pulse.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(
+            child: ScaleTransition(
+              scale: widget.disableAnimations
+                  ? const AlwaysStoppedAnimation<double>(1)
+                  : _scale,
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.shopping_cart_rounded,
+                  key: const Key('shopping-cart-icon'),
+                  size: 30,
+                  color: colors.onPrimaryContainer,
+                ),
+              ),
+            ),
+          ),
+          if (widget.packageCount > 0)
+            Positioned(
+              top: -3,
+              right: -3,
+              child: Container(
+                key: const Key('shopping-cart-count-badge'),
+                constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: colors.tertiary,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${widget.packageCount}',
+                  style: TextStyle(
+                    color: colors.onTertiary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ProductPainter extends CustomPainter {

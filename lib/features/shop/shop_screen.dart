@@ -29,6 +29,8 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
   ShopDisplaySection _activeSection = ShopDisplaySection.food;
   ShopDisplaySection? _programmaticSection;
   bool _activeUpdateScheduled = false;
+  bool _promoEntranceScheduled = false;
+  bool _promoVisible = false;
 
   @override
   void initState() {
@@ -157,6 +159,14 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     final controller = ref.read(shopControllerProvider.notifier);
     final readyWithItems =
         state.load == ShopLoad.ready && state.items.isNotEmpty;
+    final promoItem = state.items.where(state.isPromotionActiveFor).firstOrNull;
+    if (promoItem != null && !_promoEntranceScheduled) {
+      _promoEntranceScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _promoVisible = true);
+      });
+    }
+    final disableAnimations = MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
       appBar: AppBar(
@@ -185,6 +195,25 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     top: AppSpacing.medium,
+                  ),
+                if (promoItem != null)
+                  _padded(
+                    AnimatedOpacity(
+                      opacity: _promoVisible || disableAnimations ? 1 : 0,
+                      duration: disableAnimations
+                          ? Duration.zero
+                          : const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                      child: AnimatedScale(
+                        scale: _promoVisible || disableAnimations ? 1 : .96,
+                        duration: disableAnimations
+                            ? Duration.zero
+                            : const Duration(milliseconds: 350),
+                        curve: Curves.easeOutCubic,
+                        child: _PromotionBanner(item: promoItem, state: state),
+                      ),
+                    ),
+                    top: AppSpacing.small,
                   ),
                 if (state.purchasing ||
                     (state.result != null &&
@@ -268,6 +297,61 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     padding: EdgeInsets.fromLTRB(AppSpacing.medium, top, AppSpacing.medium, 0),
     sliver: SliverToBoxAdapter(child: child),
   );
+}
+
+class _PromotionBanner extends StatelessWidget {
+  const _PromotionBanner({required this.item, required this.state});
+
+  final ShopItem item;
+  final ShopState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      label:
+          'Акция дня. ${item.name}: было ${item.price} монет, сейчас ${state.effectivePriceFor(item)}.',
+      child: ExcludeSemantics(
+        child: Container(
+          key: const Key('shop-promo-banner'),
+          padding: const EdgeInsets.all(AppSpacing.medium),
+          decoration: BoxDecoration(
+            color: colors.tertiaryContainer,
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            border: Border.all(color: colors.tertiary),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.local_offer_outlined,
+                color: colors.onTertiaryContainer,
+              ),
+              const SizedBox(width: AppSpacing.medium),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Акция дня',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colors.onTertiaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '${item.name} · ${item.price} → ${state.effectivePriceFor(item)} монет',
+                      style: Theme.of(context).textTheme.bodyLarge
+                          ?.copyWith(color: colors.onTertiaryContainer),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _CategoryHeaderDelegate extends SliverPersistentHeaderDelegate {
@@ -360,6 +444,22 @@ class _ShopSection extends StatelessWidget {
         ),
         for (final item in items)
           Card(
+            key: state.isPromotionActiveFor(item)
+                ? Key('shop-promo-card-${item.id}')
+                : null,
+            color: state.isPromotionActiveFor(item)
+                ? Theme.of(context).colorScheme.tertiaryContainer
+                      .withValues(alpha: .4)
+                : null,
+            shape: state.isPromotionActiveFor(item)
+                ? RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.tertiary,
+                      width: 1.5,
+                    ),
+                  )
+                : null,
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               key: Key('shop-item-${item.id}'),
@@ -384,6 +484,35 @@ class _ShopSection extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.small),
+                    if (state.isPromotionActiveFor(item)) ...[
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          key: Key('shop-promo-marker-${item.id}'),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.small,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .tertiaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Акция дня',
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onTertiaryContainer,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.small),
+                    ],
                     ShopPriceLabel(item: item, state: state, fontSize: 16),
                     if (shopEffect(item) case final effect?)
                       Text(effect, style: const TextStyle(fontSize: 16)),

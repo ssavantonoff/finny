@@ -179,10 +179,54 @@ void main() {
       expect(find.text('Вода — не меньше 1 л'), findsOneWidget);
       expect(find.text('Мыло — не меньше 3 шт.'), findsOneWidget);
       expect(find.text('Печенье — не меньше 300 г'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(
+              find.text('Купи всё из списка и уложись в 190 монет.'),
+            )
+            .style
+            ?.fontSize,
+        greaterThanOrEqualTo(18),
+      );
       expect(random.calls, 6);
       await tapKey(tester, 'shopping-enter');
       expect(find.text('1 из 3 · Вода'), findsOneWidget);
       expect(find.text('25 🪙'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('shopping-shelf-header')))
+            .style
+            ?.fontSize,
+        greaterThanOrEqualTo(22),
+      );
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('shopping-requirement')))
+            .style
+            ?.fontSize,
+        greaterThanOrEqualTo(18),
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('shopping-product-price-water-small')),
+            )
+            .style
+            ?.fontSize,
+        greaterThanOrEqualTo(19),
+      );
+      expect(find.byKey(const Key('shopping-cart-bar')), findsOneWidget);
+      expect(find.byKey(const Key('shopping-cart-icon')), findsOneWidget);
+      expect(find.byKey(const Key('shopping-cart-count-badge')), findsNothing);
+      expect(find.text('Корзина'), findsOneWidget);
+      expect(find.text('0 товаров · 0 / 190 🪙'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('shopping-cart-title')))
+            .style
+            ?.fontSize,
+        greaterThanOrEqualTo(18),
+      );
       final smallX = tester
           .getTopLeft(find.byKey(const Key('shopping-product-water-small')))
           .dx;
@@ -196,8 +240,14 @@ void main() {
         find.byKey(const Key('shopping-plus-water-small')),
       );
       expect(plus.onPressed, isNull);
-      expect(find.text('Корзина · 2 товара'), findsOneWidget);
-      expect(find.text('50 / 190 🪙'), findsOneWidget);
+      expect(find.text('2 товара · 50 / 190 🪙'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('shopping-cart-count-badge')),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+      );
       await tapKey(tester, 'shopping-cart-bar');
       expect(find.text('0,5 л ×2 — 50 🪙'), findsOneWidget);
       await tester.tap(find.byTooltip('Убрать Вода 0,5 л'));
@@ -237,9 +287,16 @@ void main() {
       await tapKey(tester, 'shopping-plus-soap-small');
       await tapKey(tester, 'shopping-next');
       await tapKey(tester, 'shopping-plus-cookies-large');
-      expect(find.text('210 / 190 🪙'), findsOneWidget);
+      expect(find.textContaining('210 / 190 🪙'), findsOneWidget);
       await tapKey(tester, 'shopping-next');
       expect(find.text('Касса'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('shopping-checkout-total')))
+            .style
+            ?.fontSize,
+        greaterThanOrEqualTo(20),
+      );
       expect(find.text('Корзина дороже бюджета на 20 монет.'), findsNothing);
       await tapKey(tester, 'shopping-check');
       await waitForText(tester, 'Корзина дороже бюджета на 20 монет.');
@@ -256,7 +313,7 @@ void main() {
       await tapKey(tester, 'shopping-minus-soap-small');
       await tapKey(tester, 'shopping-plus-soap-large');
       await tapKey(tester, 'shopping-next');
-      expect(find.text('190 / 190 🪙'), findsOneWidget);
+      expect(find.textContaining('190 / 190 🪙'), findsOneWidget);
       await tapKey(tester, 'shopping-next');
       await tapKey(tester, 'shopping-check');
       await waitForText(tester, 'Покупки готовы!');
@@ -291,7 +348,7 @@ void main() {
       expect(find.text('Корзина очистится.'), findsOneWidget);
       await tester.tap(find.text('Остаться'));
       await tester.pumpAndSettle();
-      expect(find.text('Корзина · 1 товар'), findsOneWidget);
+      expect(find.text('1 товар · 25 / 190 🪙'), findsOneWidget);
       await tester.tap(find.byTooltip('Закрыть'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Выйти'));
@@ -299,7 +356,7 @@ void main() {
       await tester.tap(find.text('Открыть задание'));
       await tester.pumpAndSettle();
       await tapKey(tester, 'shopping-enter');
-      expect(find.text('Корзина · 0 товаров'), findsOneWidget);
+      expect(find.text('0 товаров · 0 / 190 🪙'), findsOneWidget);
     },
   );
 }
