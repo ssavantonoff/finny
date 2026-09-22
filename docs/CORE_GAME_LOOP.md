@@ -27,9 +27,15 @@ wallet. Повторный старт не может создать второ�
 от `startingBudget`. Подтверждение не перемещает деньги и переводит период в
 `active`; после этого исходный plan неизменяем.
 
+Draft можно сохранить с нулём в категориях, но подтверждение требует не менее
+10 игровых монет в каждом из Need, Want и Savings. Это game-validation rule
+экрана планирования: полный `startingBudget` распределять не требуется, а
+положительный remainder допустим.
+
 Purchase, explicit income и wallet → savings разрешены только в
 `active`/`readyToFinish`. Новая task reward выдаётся только после canonical
-successful completion choice-, categorization- или budget-priority-задания в `active`: reward,
+successful completion choice-, categorization-, budget-priority- или
+plan-adaptation-задания в `active`: reward,
 `task_progress` и checkpoint `financial_task` записываются одной SQLite
 transaction. Consistent replay
 завершённого задания допустим и в `readyToFinish`/`completed`, но не выдаёт
@@ -86,8 +92,9 @@ Natural decay вычисляется cumulative target от progress: к `100` �
 `60` сытости, `20` ухода и `12` настроения. Каждая атомарная операция применяет
 только разницу target между старым и новым progress, затем canonical effect и
 clamp `0..100`. Поэтому дробление действий и restart не меняют результат.
-Новый Финни начинает Day 1 с `55/80/80`; формула следующего утра Day 2–5
-сохраняет прежнюю базовую семантику `40`.
+Новый Финни начинает Day 1 с `55/80/80`. Формула следующего утра Day 2–5
+детерминированно ограничивает каждую характеристику значением не выше вечернего:
+ночь не восстанавливает низкий stat автоматически.
 
 ## Использование вещей и взаимодействия
 
@@ -122,3 +129,8 @@ virtual progress, уменьшает quantity расходника и фикси
 
 Savings не входит в `totalExpenses`, а данные разных профилей всегда фильтруются
 по `profileId`.
+
+Day 3 bowl story event — отдельная canonical NEED-операция: миска стоит 120,
+может быть отложена или оплачена wallet с покрытием только точного дефицита из
+savings. Она не меняет immutable plan; при покупке фактическая NEED-трата и
+возможное снятие из savings относятся к периоду действия.
