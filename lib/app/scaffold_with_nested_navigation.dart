@@ -139,19 +139,19 @@ class _ShopNavigationIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    width: 58,
-    height: 42,
+    width: 24,
+    height: 32,
     child: Stack(
       clipBehavior: Clip.none,
-      alignment: Alignment.bottomCenter,
+      alignment: Alignment.center,
       children: [
-        Positioned(
-          bottom: 0,
+        Transform.translate(
+          offset: const Offset(0, 8),
           child: Icon(selected ? Icons.storefront : Icons.storefront_outlined),
         ),
         if (showPromotion)
           Positioned(
-            top: 0,
+            top: -12,
             child: Semantics(
               label: 'В магазине действует акция',
               child: ExcludeSemantics(

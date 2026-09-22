@@ -182,6 +182,7 @@ void main() {
     expect(find.byKey(const Key('nav-shop')), findsOneWidget);
     expect(fixture.container.read(shopControllerProvider).load, ShopLoad.ready);
     expect(fixture.container.read(homeControllerProvider), isA<HomeReady>());
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   }
 
@@ -200,6 +201,30 @@ void main() {
       expect(
         find.bySemanticsLabel(RegExp('В магазине действует акция')),
         findsOneWidget,
+      );
+      final shopIcon = find.descendant(
+        of: find.byKey(const Key('nav-shop')),
+        matching: find.byIcon(Icons.storefront_outlined),
+      );
+      final thingsIcon = find.descendant(
+        of: find.byKey(const Key('nav-things')),
+        matching: find.byIcon(Icons.backpack_outlined),
+      );
+      final shopLabel = find.descendant(
+        of: find.byKey(const Key('nav-shop')),
+        matching: find.text('Магазин'),
+      );
+      final thingsLabel = find.descendant(
+        of: find.byKey(const Key('nav-things')),
+        matching: find.text('Вещи'),
+      );
+      expect(
+        tester.getCenter(shopIcon).dy,
+        closeTo(tester.getCenter(thingsIcon).dy, 1),
+      );
+      expect(
+        tester.getCenter(shopLabel).dy,
+        closeTo(tester.getCenter(thingsLabel).dy, 1),
       );
       await tester.tap(find.byKey(const Key('nav-shop')));
       for (var attempt = 0; attempt < 300; attempt++) {
@@ -224,6 +249,18 @@ void main() {
         2,
       );
       expect(find.byKey(const Key('nav-shop-promo-badge')), findsOneWidget);
+      final selectedShopIcon = find.descendant(
+        of: find.byKey(const Key('nav-shop')),
+        matching: find.byIcon(Icons.storefront),
+      );
+      expect(
+        tester.getCenter(selectedShopIcon).dy,
+        closeTo(tester.getCenter(thingsIcon).dy, 1),
+      );
+      expect(
+        tester.getCenter(shopLabel).dy,
+        closeTo(tester.getCenter(thingsLabel).dy, 1),
+      );
       final periodId =
           (nav.container.read(homeControllerProvider) as HomeReady).period!.id!;
       await tester.runAsync(() async {
