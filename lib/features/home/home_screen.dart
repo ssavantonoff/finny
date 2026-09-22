@@ -235,50 +235,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _showCampaignEvent(int walletBalance) async {
     if (_eventDialogOpen || !_isHomeVisible) return;
     final event = ref.read(campaignEventControllerProvider);
-    if (event is! CampaignEventReady ||
-        (event.kind == CampaignEventKind.day3Bowl &&
-            event.storyEvent == null)) {
+    if (event is! CampaignEventReady || event.storyEvent == null) {
       return;
     }
     _eventDialogOpen = true;
-    if (event.kind == CampaignEventKind.day3Bowl) {
-      final isNewEvent = event.storyEvent?.status == StoryEventStatus.armed;
-      await showGeneralDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        barrierColor: Colors.black54,
-        transitionDuration:
-            !isNewEvent || MediaQuery.of(context).disableAnimations
-            ? Duration.zero
-            : const Duration(milliseconds: 350),
-        pageBuilder: (_, _, _) => CampaignEventDialog(
-          initialState: event,
-          walletBalance: walletBalance,
-        ),
-        transitionBuilder: (_, animation, _, child) {
-          final entrance = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          );
-          return FadeTransition(
-            opacity: entrance,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.9, end: 1).animate(entrance),
-              child: child,
-            ),
-          );
-        },
-      );
-    } else {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => CampaignEventDialog(
-          initialState: event,
-          walletBalance: walletBalance,
-        ),
-      );
-    }
+    final isNewEvent = event.storyEvent?.status == StoryEventStatus.armed;
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black54,
+      transitionDuration:
+          !isNewEvent || MediaQuery.of(context).disableAnimations
+          ? Duration.zero
+          : const Duration(milliseconds: 350),
+      pageBuilder: (_, _, _) => CampaignEventDialog(
+        initialState: event,
+        walletBalance: walletBalance,
+      ),
+      transitionBuilder: (_, animation, _, child) {
+        final entrance = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        );
+        return FadeTransition(
+          opacity: entrance,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.9, end: 1).animate(entrance),
+            child: child,
+          ),
+        );
+      },
+    );
     _eventDialogOpen = false;
     if (mounted) {
       await ref.read(homeControllerProvider.notifier).load();
@@ -308,8 +295,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     'savings_decision' =>
       'Осталось решить, будешь ли ты сегодня откладывать монеты.',
     'changed_circumstance' => 'Проведи ещё немного времени с Финни.',
-    'discount_decision' =>
-      'Осталось принять решение о сегодняшнем предложении.',
     _ => 'Осталось завершить одно важное дело этого дня.',
   };
 
@@ -740,7 +725,6 @@ class _TodayCard extends StatelessWidget {
                       'financial_task' => 'Задание',
                       'savings_decision' => 'Накопления',
                       'changed_circumstance' => 'Событие',
-                      'discount_decision' => 'Скидка',
                       _ => cp,
                     },
                     resolved: period.resolvedCheckpoints.contains(cp),
@@ -976,7 +960,7 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
   bool _isMatchingReady(CampaignEventState next) =>
       next is CampaignEventReady &&
       next.kind == _lastReady.kind &&
-      (next.kind != CampaignEventKind.day3Bowl || next.storyEvent != null);
+      next.storyEvent != null;
 
   @override
   Widget build(BuildContext context) {
@@ -987,33 +971,29 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
     });
     final state = _lastReady;
     final controller = ref.read(campaignEventControllerProvider.notifier);
-    final isBowl = state.kind == CampaignEventKind.day3Bowl;
     final bowl = state.storyEvent;
-    if (isBowl && bowl == null) {
+    if (bowl == null) {
       return const PopScope(
         canPop: false,
         child: AlertDialog(content: Text('Не удалось загрузить событие.')),
       );
     }
-    final bowlPrice = bowl?.price ?? 0;
+    final bowlPrice = bowl.price;
     final bowlDecisionShown =
-        isBowl &&
         state.message != null &&
         state.pending == null &&
-        (bowl?.status == StoryEventStatus.postponed ||
-            bowl?.status == StoryEventStatus.purchased);
-    final bowlWallet = bowl?.walletBalance ?? widget.walletBalance;
-    final bowlCanUseSavings = bowl?.canUseSavings == true;
-    final bowlDeficit = bowl?.walletDeficit ?? 0;
+        (bowl.status == StoryEventStatus.postponed ||
+            bowl.status == StoryEventStatus.purchased);
+    final bowlWallet = bowl.walletBalance;
+    final bowlCanUseSavings = bowl.canUseSavings;
+    final bowlDeficit = bowl.walletDeficit;
     return PopScope(
       canPop: false,
       child: AlertDialog(
         title: Text(
-          isBowl
-              ? bowl?.status == StoryEventStatus.postponed
-                    ? 'Новая миска'
-                    : 'Ой! Миска Финни сломалась'
-              : 'Сегодня акция!',
+          bowl.status == StoryEventStatus.postponed
+              ? 'Новая миска'
+              : 'Ой! Миска Финни сломалась',
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -1021,24 +1001,20 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                isBowl
-                    ? bowlDecisionShown
-                          ? bowl?.status == StoryEventStatus.purchased
-                                ? 'Новая миска куплена.'
-                                : 'Пока Финни будет пользоваться временной миской.'
-                          : bowl?.status == StoryEventStatus.postponed
-                          ? 'Новая миска всё ещё нужна. Пока Финни пользуется временной миской.'
-                          : 'Финни нужна новая миска. Этой покупки не было в плане.'
-                    : 'Лакомство обычно стоит 60 монет, а сейчас одну штуку '
-                          'можно купить за 35. Купить по акции?',
+                bowlDecisionShown
+                    ? bowl.status == StoryEventStatus.purchased
+                          ? 'Новая миска куплена.'
+                          : 'Пока Финни будет пользоваться временной миской.'
+                    : bowl.status == StoryEventStatus.postponed
+                    ? 'Новая миска всё ещё нужна. Пока Финни пользуется временной миской.'
+                    : 'Финни нужна новая миска. Этой покупки не было в плане.',
               ),
-              if (isBowl &&
-                  bowlDecisionShown &&
-                  bowl?.status == StoryEventStatus.purchased) ...[
+              if (bowlDecisionShown &&
+                  bowl.status == StoryEventStatus.purchased) ...[
                 const SizedBox(height: AppSpacing.small),
                 Text('Баланс сейчас: $bowlWallet монет'),
               ],
-              if (isBowl && !bowlDecisionShown) ...[
+              if (!bowlDecisionShown) ...[
                 const SizedBox(height: AppSpacing.small),
                 Text('Баланс сейчас: $bowlWallet монет'),
                 Text('Новая миска: -$bowlPrice монет · Нужно'),
@@ -1049,7 +1025,7 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
                 if (bowlWallet < bowlPrice)
                   Text('Не хватает $bowlDeficit монет'),
                 if (bowlCanUseSavings && bowlWallet < bowlPrice)
-                  Text('В копилке: ${bowl?.savedAmount ?? 0} монет'),
+                  Text('В копилке: ${bowl.savedAmount} монет'),
               ],
               if (state.message case final message?) ...[
                 const SizedBox(height: AppSpacing.small),
@@ -1059,16 +1035,13 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
           ),
         ),
         actions: [
-          if (isBowl && bowlDecisionShown)
+          if (bowlDecisionShown)
             FilledButton(
               key: const Key('campaign-bowl-understood'),
               onPressed: () => Navigator.pop(context),
               child: const Text('Понятно'),
             ),
-          if (isBowl &&
-              !bowlDecisionShown &&
-              bowlCanUseSavings &&
-              bowlWallet < bowlPrice)
+          if (!bowlDecisionShown && bowlCanUseSavings && bowlWallet < bowlPrice)
             FilledButton(
               key: const Key('campaign-bowl-savings'),
               onPressed: state.mutating
@@ -1101,13 +1074,13 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
                     },
               child: Text('Взять $bowlDeficit из копилки и купить'),
             ),
-          if (isBowl && !bowlDecisionShown)
+          if (!bowlDecisionShown)
             TextButton(
               key: const Key('campaign-bowl-postpone'),
               onPressed: state.mutating
                   ? null
                   : () async {
-                      if (bowl?.status == StoryEventStatus.postponed) {
+                      if (bowl.status == StoryEventStatus.postponed) {
                         Navigator.pop(context);
                       } else {
                         await controller.postponeBowl();
@@ -1119,35 +1092,15 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
                     : 'Отложить покупку',
               ),
             ),
-          if (!isBowl)
-            TextButton(
-              key: const Key('campaign-promo-skip'),
+          if (!bowlDecisionShown && bowlWallet >= bowlPrice)
+            FilledButton(
+              key: const Key('campaign-buy-bowl'),
               onPressed: state.mutating
                   ? null
                   : () async {
-                      if (await controller.skipPromotion() && context.mounted) {
-                        Navigator.pop(context);
-                      }
+                      await controller.purchaseBowl();
                     },
-              child: const Text('Пропустить'),
-            ),
-          if (!isBowl || (!bowlDecisionShown && bowlWallet >= bowlPrice))
-            FilledButton(
-              key: Key(isBowl ? 'campaign-buy-bowl' : 'campaign-promo-buy'),
-              onPressed:
-                  state.mutating || (!isBowl && widget.walletBalance < 35)
-                  ? null
-                  : () async {
-                      final success = isBowl
-                          ? await controller.purchaseBowl()
-                          : await controller.buyPromotion();
-                      if (success && !isBowl && context.mounted) {
-                        Navigator.pop(context);
-                      }
-                    },
-              child: Text(
-                isBowl ? 'Купить новую миску — $bowlPrice' : 'Купить за 35',
-              ),
+              child: Text('Купить новую миску — $bowlPrice'),
             ),
           if (state.pending != null &&
               state.message != null &&
@@ -1157,11 +1110,7 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
               onPressed: state.mutating
                   ? null
                   : () async {
-                      if (await controller.retry() &&
-                          !isBowl &&
-                          context.mounted) {
-                        Navigator.pop(context);
-                      }
+                      await controller.retry();
                     },
               child: const Text('Проверить ещё раз'),
             ),

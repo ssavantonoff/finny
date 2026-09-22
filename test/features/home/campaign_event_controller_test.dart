@@ -33,7 +33,6 @@ const _promotion = ShopPromotion(
   itemId: 'food_treat',
   promoPrice: 35,
   maxPromoQuantity: 1,
-  checkpoint: 'discount_decision',
 );
 
 const _treat = ShopItem(
@@ -273,59 +272,47 @@ void main() {
     },
   );
 
-  test(
-    'Day 4 promotion appears only after task and BUY is canonical once',
-    () async {
-      final player = await activeDay(4, const [
-        'financial_task',
-        'savings_decision',
-        'discount_decision',
-      ]);
-      final service = SpecialPurchaseService(
-        SqliteSpecialPurchasePort(database),
-        content,
-      );
-      final container = containerFor(player.profileId, service);
-      addTearDown(container.dispose);
-      final controller = container.read(
-        campaignEventControllerProvider.notifier,
-      );
+  test('Day 4 task completion does not create a promotion event', () async {
+    final player = await activeDay(4, const [
+      'financial_task',
+      'savings_decision',
+    ]);
+    final service = SpecialPurchaseService(
+      SqliteSpecialPurchasePort(database),
+      content,
+    );
+    final container = containerFor(player.profileId, service);
+    addTearDown(container.dispose);
+    final controller = container.read(campaignEventControllerProvider.notifier);
 
-      await controller.load();
-      expect(
-        container.read(campaignEventControllerProvider),
-        isA<CampaignEventIdle>(),
-      );
-      await TaskService(
-        games,
-        SqliteTaskCompletionPort(database),
-        content,
-      ).submitAnswer(
-        profileId: player.profileId,
-        periodId: player.period.id!,
-        taskId: 'task_period_4',
-        answerId: 'apple',
-      );
-      await controller.load();
-      expect(
-        (container.read(
-          campaignEventControllerProvider,
-        ) as CampaignEventReady).kind,
-        CampaignEventKind.day4Promotion,
-      );
-      expect(await controller.buyPromotion(), isTrue);
-      expect((await games.getGameState(player.profileId))?.walletBalance, 515);
-      expect(
-        await games.getInventoryQuantity(player.profileId, 'food_treat'),
-        1,
-      );
-      expect(
-        (await games.getPeriodById(
-          player.profileId,
-          player.period.id!,
-        ))?.resolvedCheckpoints,
-        contains('discount_decision'),
-      );
-    },
-  );
+    await controller.load();
+    expect(
+      container.read(campaignEventControllerProvider),
+      isA<CampaignEventIdle>(),
+    );
+    await TaskService(
+      games,
+      SqliteTaskCompletionPort(database),
+      content,
+    ).submitAnswer(
+      profileId: player.profileId,
+      periodId: player.period.id!,
+      taskId: 'task_period_4',
+      answerId: 'apple',
+    );
+    await controller.load();
+    expect(
+      container.read(campaignEventControllerProvider),
+      isA<CampaignEventIdle>(),
+    );
+    expect((await games.getGameState(player.profileId))?.walletBalance, 550);
+    expect(await games.getInventoryQuantity(player.profileId, 'food_treat'), 0);
+    expect(
+      (await games.getPeriodById(
+        player.profileId,
+        player.period.id!,
+      ))?.resolvedCheckpoints,
+      contains('financial_task'),
+    );
+  });
 }

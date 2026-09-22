@@ -34,7 +34,6 @@ const _promotion = ShopPromotion(
   itemId: 'food_treat',
   promoPrice: 35,
   maxPromoQuantity: 1,
-  checkpoint: 'discount_decision',
 );
 
 const _bowlStory = StoryPurchase(
@@ -49,13 +48,9 @@ const _bowlStory = StoryPurchase(
 const _dayFour = PeriodDefinition(
   id: 'period_4',
   number: 4,
-  title: 'День скидок',
+  title: 'Покупки с умом',
   baseIncome: 500,
-  requiredCheckpoints: [
-    'financial_task',
-    'savings_decision',
-    'discount_decision',
-  ],
+  requiredCheckpoints: ['financial_task', 'savings_decision'],
 );
 
 Future<void> _pumpUntil(
@@ -75,7 +70,7 @@ Future<void> _pumpUntil(
 
 void main() {
   testWidgets(
-    'Day 4 task returns through persistent shell and opens promotion',
+    'Day 4 task returns through persistent shell without promotion popup',
     (tester) async {
       final database = createTestDatabase();
       final profiles = SqliteProfileRepository(database);
@@ -162,12 +157,19 @@ void main() {
       await _pumpUntil(tester, find.text('Верно!'));
 
       await tester.tap(find.text('Готово'));
-      await _pumpUntil(tester, find.text('Сегодня акция!'));
+      await _pumpUntil(tester, find.byType(NavigationBar));
 
+      for (var attempt = 0; attempt < 100; attempt++) {
+        if (container.read(homeControllerProvider) is HomeReady) break;
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 2)),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+      }
       final home = container.read(homeControllerProvider) as HomeReady;
       expect(home.period?.resolvedCheckpoints, contains('financial_task'));
-      expect(find.byKey(const Key('campaign-promo-buy')), findsOneWidget);
-      expect(find.byKey(const Key('campaign-promo-skip')), findsOneWidget);
+      expect(find.text('Сегодня акция!'), findsNothing);
+      expect(find.byKey(const Key('campaign-promo-buy')), findsNothing);
     },
   );
 }

@@ -237,9 +237,8 @@ void main() {
         promotions.single.itemId,
         promotions.single.promoPrice,
         promotions.single.maxPromoQuantity,
-        promotions.single.checkpoint,
       ),
-      ('day4_treat_discount', 4, 'food_treat', 35, 1, 'discount_decision'),
+      ('day4_treat_discount', 4, 'food_treat', 35, 1),
     );
     final apple = items.singleWhere((item) => item.id == 'food_apple');
     final ball = items.singleWhere((item) => item.id == 'toy_ball');
@@ -510,7 +509,6 @@ void main() {
         itemId: 'food_apple',
         promoPrice: 35,
         maxPromoQuantity: 1,
-        checkpoint: 'discount_decision',
       );
       final apple = ShopItem.fromJson(_validShopJson());
       validateSpecialContent(const [story], const [promo], [apple]);
@@ -530,7 +528,6 @@ void main() {
               itemId: 'food_apple',
               promoPrice: 35,
               maxPromoQuantity: 1,
-              checkpoint: 'discount_decision',
             ),
           ],
           [apple],
@@ -547,7 +544,6 @@ void main() {
               itemId: 'food_apple',
               promoPrice: 40,
               maxPromoQuantity: 1,
-              checkpoint: 'discount_decision',
             ),
           ],
           [apple],
@@ -564,7 +560,6 @@ void main() {
               itemId: 'missing',
               promoPrice: 35,
               maxPromoQuantity: 1,
-              checkpoint: 'discount_decision',
             ),
           ],
           [apple],
@@ -879,7 +874,8 @@ void main() {
       expect(dayTwoRequired.single.id, 'task_priority_02');
       expect(dayTwoRequired.single.type, 'budget_priority');
       expect(() => validateCampaignTaskContent(tasks), returnsNormally);
-      expect(tasks.where((task) => task.type == 'choice'), hasLength(3));
+      expect(tasks.where((task) => task.type == 'choice'), hasLength(2));
+      expect(tasks.where((task) => task.type == 'shopping_trip'), hasLength(1));
     },
   );
 }

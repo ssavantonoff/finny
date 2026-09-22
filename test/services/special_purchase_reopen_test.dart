@@ -27,7 +27,6 @@ const _promo = ShopPromotion(
   itemId: 'food_treat',
   promoPrice: 35,
   maxPromoQuantity: 1,
-  checkpoint: 'discount_decision',
 );
 const _treat = ShopItem(
   id: 'food_treat',
@@ -45,7 +44,7 @@ const _treat = ShopItem(
 void main() {
   sqfliteFfiInit();
 
-  for (final decision in <String>['story', 'promo-buy', 'promo-skip']) {
+  for (final decision in <String>['story', 'promo-buy']) {
     test(
       '$decision replays from durable proof after DB reopen and completion',
       () async {
@@ -78,15 +77,15 @@ void main() {
         final profileId = profile.id!;
         await games.ensureInitialState(profileId);
         final day = decision == 'story' ? 3 : 4;
-        final checkpoint = decision == 'story'
-            ? _story.checkpoint
-            : _promo.checkpoint;
+        final checkpoints = decision == 'story'
+            ? [_story.checkpoint]
+            : ['financial_task', 'savings_decision'];
         final period = await games.startPeriod(
           profileId: profileId,
           definitionId: 'period_$day',
           periodNumber: day,
           baseIncome: 500,
-          requiredCheckpoints: [checkpoint],
+          requiredCheckpoints: checkpoints,
           createdAt: DateTime.utc(2026),
         );
         final periodId = period.id!;
@@ -110,15 +109,7 @@ void main() {
               );
               break;
             case 'promo-buy':
-              await target.buyPromotion(
-                profileId: profileId,
-                periodId: periodId,
-                promotionId: _promo.id,
-                operationId: 'same-operation',
-              );
-              break;
-            case 'promo-skip':
-              await target.skipPromotion(
+              await target.purchasePromotion(
                 profileId: profileId,
                 periodId: periodId,
                 promotionId: _promo.id,
@@ -129,6 +120,20 @@ void main() {
         }
 
         await perform(service);
+        if (decision == 'promo-buy') {
+          await resolveCheckpointForTest(
+            initial,
+            profileId: profileId,
+            periodId: periodId,
+            checkpointId: 'financial_task',
+          );
+          await resolveCheckpointForTest(
+            initial,
+            profileId: profileId,
+            periodId: periodId,
+            checkpointId: 'savings_decision',
+          );
+        }
         await completePeriodForTest(
           initial,
           profileId: profileId,
@@ -172,7 +177,9 @@ void main() {
             profileId,
             periodId,
           ))!.resolvedCheckpoints,
-          contains(checkpoint),
+          decision == 'story'
+              ? contains(_story.checkpoint)
+              : containsAll(['financial_task', 'savings_decision']),
         );
       },
     );

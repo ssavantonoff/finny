@@ -1,4 +1,5 @@
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/pet_action.dart';
@@ -80,10 +81,7 @@ void main() {
       final goal = (await content.loadGoals()).first;
       await savings.selectGoal(profileId: profileId, goalId: goal.id);
 
-      const answers = {
-        4: ('task_discount_04', 'consider'),
-        5: ('task_final_choice_05', 'balanced'),
-      };
+      const answers = {5: ('task_final_choice_05', 'balanced')};
 
       for (var day = 1; day <= 5; day++) {
         var period = (await periods.startNextPeriod(profileId: profileId))!;
@@ -140,6 +138,29 @@ void main() {
             profileId: profileId,
           );
           expect(bowl?.status.name, 'armed');
+        } else if (day == 4) {
+          taskResult = await tasks.submitShoppingTrip(
+            profileId: profileId,
+            periodId: period.id!,
+            taskId: 'task_shopping_trip_04',
+            selections: const {
+              'water': ShoppingTripSelection(
+                priceScenarioId: 'small_better',
+                smallQuantity: 2,
+                largeQuantity: 0,
+              ),
+              'soap': ShoppingTripSelection(
+                priceScenarioId: 'large_better',
+                smallQuantity: 0,
+                largeQuantity: 1,
+              ),
+              'cookies': ShoppingTripSelection(
+                priceScenarioId: 'large_better',
+                smallQuantity: 0,
+                largeQuantity: 1,
+              ),
+            },
+          );
         } else {
           final answer = answers[day]!;
           taskResult = await tasks.submitAnswer(
@@ -152,7 +173,7 @@ void main() {
         expect(taskResult, isA<TaskAnswerCompleted>());
 
         if (day == 4) {
-          await special.buyPromotion(
+          await special.purchasePromotion(
             profileId: profileId,
             periodId: period.id!,
             promotionId: 'day4_treat_discount',

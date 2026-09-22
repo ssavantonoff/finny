@@ -19,6 +19,48 @@ class ShopItemIcon extends StatelessWidget {
   );
 }
 
+class ShopPriceLabel extends StatelessWidget {
+  const ShopPriceLabel({
+    super.key,
+    required this.item,
+    required this.state,
+    required this.fontSize,
+  });
+
+  final ShopItem item;
+  final ShopState state;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!state.isPromotionActiveFor(item)) {
+      return Text(
+        '${item.price} монет • ${shopCategory(item)}',
+        style: TextStyle(fontSize: fontSize),
+      );
+    }
+    return Wrap(
+      key: Key('shop-promo-price-${item.id}'),
+      spacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const Text('Акция'),
+        Text(
+          '${item.price}',
+          style: TextStyle(
+            fontSize: fontSize,
+            decoration: TextDecoration.lineThrough,
+          ),
+        ),
+        Text(
+          '${state.effectivePriceFor(item)} монет',
+          style: TextStyle(fontSize: fontSize),
+        ),
+      ],
+    );
+  }
+}
+
 class ShopPurchaseNotice extends ConsumerWidget {
   const ShopPurchaseNotice({super.key, required this.state});
   final ShopState state;

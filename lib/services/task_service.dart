@@ -14,6 +14,45 @@ class TaskService {
   final TaskCompletionPort _taskCompletionPort;
   final ContentRepository _contentRepository;
 
+  Future<TaskSubmissionResult> submitShoppingTrip({
+    required int profileId,
+    required int periodId,
+    required String taskId,
+    required Map<String, ShoppingTripSelection> selections,
+  }) async {
+    if (profileId <= 0 || periodId <= 0 || taskId.trim().isEmpty) {
+      throw ArgumentError('Profile, period and task IDs are required.');
+    }
+    final tasks = await _contentRepository.loadTasks();
+    validateTaskContent(tasks);
+    final matches = tasks.where((task) => task.id == taskId);
+    if (matches.length != 1) throw StateError('Task $taskId does not exist.');
+    final task = matches.single;
+    if (task.id != 'task_shopping_trip_04' ||
+        task.type != 'shopping_trip' ||
+        task.period != 4 ||
+        task.reward != 50 ||
+        !task.requiredForCheckpoint ||
+        !task.shoppingTripScenario.isCanonicalDay4) {
+      throw StateError('Task $taskId has invalid canonical Day 4 content.');
+    }
+    if (!task.shoppingTripScenario.isValidSubmission(selections)) {
+      throw ArgumentError('Invalid shopping trip submission.');
+    }
+    final period = await _gameRepository.getPeriodById(profileId, periodId);
+    if (period == null ||
+        period.periodNumber != task.period ||
+        !period.requiredCheckpoints.contains('financial_task')) {
+      throw StateError('Task does not belong to this period.');
+    }
+    return _taskCompletionPort.submitFinancialTaskShoppingTrip(
+      profileId: profileId,
+      periodId: periodId,
+      task: task,
+      selections: Map.unmodifiable(selections),
+    );
+  }
+
   Future<TaskSubmissionResult> submitAnswer({
     required int profileId,
     required int periodId,

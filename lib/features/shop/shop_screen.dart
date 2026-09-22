@@ -384,10 +384,7 @@ class _ShopSection extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.small),
-                    Text(
-                      '${item.price} монет • ${shopCategory(item)}',
-                      style: const TextStyle(fontSize: 16),
-                    ),
+                    ShopPriceLabel(item: item, state: state, fontSize: 16),
                     if (shopEffect(item) case final effect?)
                       Text(effect, style: const TextStyle(fontSize: 16)),
                     if (item.persistent && (state.quantities[item.id] ?? 0) > 0)
