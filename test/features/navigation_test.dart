@@ -186,11 +186,55 @@ void main() {
     expect(tester.takeException(), isNull);
   }
 
+  void useSingleLineNavigationLabels(WidgetTester tester) {
+    // Ahem wraps this Cyrillic label at 360dp; keep the geometry check focused
+    // on the destination icon area rather than fallback test-font metrics.
+    tester.platformDispatcher.textScaleFactorTestValue = .65;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+  }
+
+  testWidgets('Day 1 Shop icon and label align without promotion', (
+    tester,
+  ) async {
+    final nav = (await tester.runAsync(() => fixture(1)))!;
+    addTearDown(nav.close);
+    useSingleLineNavigationLabels(tester);
+    await mountPromoApp(tester, nav);
+
+    final shopIcon = find.descendant(
+      of: find.byKey(const Key('nav-shop')),
+      matching: find.byIcon(Icons.storefront_outlined),
+    );
+    final thingsIcon = find.descendant(
+      of: find.byKey(const Key('nav-things')),
+      matching: find.byIcon(Icons.backpack_outlined),
+    );
+    final shopLabel = find.descendant(
+      of: find.byKey(const Key('nav-shop')),
+      matching: find.text('Магазин'),
+    );
+    final thingsLabel = find.descendant(
+      of: find.byKey(const Key('nav-things')),
+      matching: find.text('Вещи'),
+    );
+    expect(find.byKey(const Key('nav-shop-promo-badge')), findsNothing);
+    expect(
+      tester.getCenter(shopIcon).dy,
+      closeTo(tester.getCenter(thingsIcon).dy, 1),
+    );
+    expect(
+      tester.getCenter(shopLabel).dy,
+      closeTo(tester.getCenter(thingsLabel).dy, 1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'unused Day 4 promo badge appears on Home before Shop and stays selected',
     (tester) async {
       final nav = (await tester.runAsync(() => fixture(4)))!;
       addTearDown(nav.close);
+      useSingleLineNavigationLabels(tester);
       await mountPromoApp(tester, nav);
       expect(
         tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,

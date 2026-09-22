@@ -138,53 +138,48 @@ class _ShopNavigationIcon extends StatelessWidget {
   final bool selected;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 24,
-    height: 32,
-    child: Stack(
+  Widget build(BuildContext context) {
+    final icon = Icon(selected ? Icons.storefront : Icons.storefront_outlined);
+    if (!showPromotion) return icon;
+
+    return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.center,
       children: [
-        Transform.translate(
-          offset: const Offset(0, 8),
-          child: Icon(selected ? Icons.storefront : Icons.storefront_outlined),
-        ),
-        if (showPromotion)
-          Positioned(
-            top: -12,
-            child: Semantics(
-              label: 'В магазине действует акция',
-              child: ExcludeSemantics(
-                child: DecoratedBox(
-                  key: const Key('nav-shop-promo-badge'),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.tertiaryContainer,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.tertiary,
-                    ),
+        icon,
+        Positioned(
+          top: -14,
+          child: Semantics(
+            label: 'В магазине действует акция',
+            child: ExcludeSemantics(
+              child: DecoratedBox(
+                key: const Key('nav-shop-promo-badge'),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.tertiary,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1,
-                    ),
-                    child: Text(
-                      'АКЦИЯ',
-                      style: TextStyle(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onTertiaryContainer,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  child: Text(
+                    'АКЦИЯ',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onTertiaryContainer,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
               ),
             ),
           ),
+        ),
       ],
-    ),
-  );
+    );
+  }
 }
