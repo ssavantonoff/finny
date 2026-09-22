@@ -646,7 +646,12 @@ class _HomeContent extends StatelessWidget {
                           ),
                   if (period != null) ...[
                     const SizedBox(height: AppSpacing.medium),
-                    _TodayCard(period: period),
+                    _TodayCard(
+                      period: period,
+                      actionsEnabled:
+                          period.status == GamePeriodStatus.active ||
+                          period.status == GamePeriodStatus.readyToFinish,
+                    ),
                   ],
                   if (state.bowlEvent?.isOutstanding == true) ...[
                     const SizedBox(height: AppSpacing.medium),
@@ -722,9 +727,10 @@ class _HomeContent extends StatelessWidget {
 }
 
 class _TodayCard extends StatelessWidget {
-  const _TodayCard({required this.period});
+  const _TodayCard({required this.period, required this.actionsEnabled});
 
   final GamePeriod period;
+  final bool actionsEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -765,6 +771,7 @@ class _TodayCard extends StatelessWidget {
                     ),
                     route: cp == 'financial_task' ? '/tasks' : '/savings',
                     resolved: period.resolvedCheckpoints.contains(cp),
+                    actionsEnabled: actionsEnabled,
                   ),
               ],
             ),
@@ -832,6 +839,7 @@ class _RequiredActionRow extends StatelessWidget {
     required this.actionKey,
     required this.route,
     required this.resolved,
+    required this.actionsEnabled,
   });
 
   final String title;
@@ -840,6 +848,7 @@ class _RequiredActionRow extends StatelessWidget {
   final Key actionKey;
   final String route;
   final bool resolved;
+  final bool actionsEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -867,7 +876,7 @@ class _RequiredActionRow extends StatelessWidget {
           const SizedBox(width: AppSpacing.small),
           if (resolved)
             const Text('Готово')
-          else
+          else if (actionsEnabled)
             FilledButton.tonal(
               key: actionKey,
               style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),

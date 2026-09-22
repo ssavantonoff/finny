@@ -50,6 +50,7 @@ void main() {
     WidgetTester tester, {
     List<String> required = const ['financial_task', 'savings_decision'],
     List<String> resolved = const [],
+    bool planning = false,
     bool bedtime = false,
   }) async {
     tester.view.physicalSize = const Size(360, 800);
@@ -94,11 +95,13 @@ void main() {
         requiredCheckpoints: required,
         createdAt: DateTime.utc(2026),
       );
-      await confirmBudgetForTest(
-        games,
-        profileId: profileId,
-        periodId: started.id!,
-      );
+      if (!planning) {
+        await confirmBudgetForTest(
+          games,
+          profileId: profileId,
+          periodId: started.id!,
+        );
+      }
       for (final checkpoint in resolved) {
         await resolveCheckpointForTest(
           database,
@@ -178,6 +181,49 @@ void main() {
     await tester.tap(finder);
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'planning shows statuses without actions, then active enables them',
+    (tester) async {
+      final fixture = await mountHome(tester, planning: true);
+      expect(find.byKey(const Key('home-continue-plan')), findsOneWidget);
+      expect(find.text('Продолжить план'), findsOneWidget);
+      expect(find.byKey(const Key('home-today-card')), findsOneWidget);
+      expect(find.text('Задание дня'), findsOneWidget);
+      expect(find.text('Накопления'), findsOneWidget);
+      for (final key in [
+        'home-today-task-action',
+        'home-today-savings-action',
+        'home-next-task',
+        'home-next-savings',
+      ]) {
+        expect(find.byKey(Key(key)), findsNothing);
+      }
+      expect(tester.takeException(), isNull);
+
+      final home = fixture.container.read(homeControllerProvider) as HomeReady;
+      await tester.runAsync(
+        () => confirmBudgetForTest(
+          fixture.container.read(gameRepositoryProvider),
+          profileId: home.profile.id!,
+          periodId: home.period!.id!,
+        ),
+      );
+      await tester.runAsync(
+        fixture.container.read(homeControllerProvider.notifier).load,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('home-continue-plan')), findsNothing);
+      expect(find.byKey(const Key('home-next-task')), findsOneWidget);
+      expect(find.byKey(const Key('home-today-task-action')), findsOneWidget);
+      expect(
+        find.byKey(const Key('home-today-savings-action')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('unresolved actions are visible and tappable at 360x800', (
     tester,
