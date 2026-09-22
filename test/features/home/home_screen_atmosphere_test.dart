@@ -370,16 +370,17 @@ void main() {
         expect(find.text('День'), findsNothing);
         expect(find.text('Вечер'), findsNothing);
 
-        // Day status card & view plan button (active status)
+        // Day status card and the next unresolved action.
         expect(find.byKey(const Key('home-day-status')), findsOneWidget);
-        expect(find.byKey(const Key('home-view-plan')), findsOneWidget);
-        expect(find.text('Посмотреть план'), findsOneWidget);
+        expect(find.byKey(const Key('home-next-savings')), findsOneWidget);
+        expect(find.text('Решить про накопления'), findsOneWidget);
 
         // Today card with checkpoints
         expect(find.byKey(const Key('home-today-card')), findsOneWidget);
         expect(find.text('Сегодня'), findsOneWidget);
-        expect(find.text('Задание'), findsOneWidget);
+        expect(find.text('Задание дня'), findsOneWidget);
         expect(find.text('Накопления'), findsOneWidget);
+        expect(find.text('Готово'), findsOneWidget);
         expect(find.text('Событие'), findsNothing);
         expect(find.text('Скидка'), findsNothing);
 
@@ -423,6 +424,7 @@ void main() {
         games.period = period.copyWith(
           status: GamePeriodStatus.readyToFinish,
           dayProgress: 60,
+          resolvedCheckpoints: const ['financial_task', 'savings_decision'],
         );
         await container.read(homeControllerProvider.notifier).load();
         await tester.pumpAndSettle();

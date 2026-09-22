@@ -131,7 +131,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
         return;
       case BedtimeDecisionType.blockedByCheckpoints:
-        await showDialog<void>(
+        final action = await showDialog<String>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Перед сном осталось важное дело'),
@@ -141,13 +141,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   .join('\n\n'),
             ),
             actions: [
-              FilledButton(
+              TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Вернуться'),
               ),
+              if (decision.unresolvedCheckpoints.contains('financial_task'))
+                FilledButton(
+                  key: const Key('home-blocker-go-task'),
+                  onPressed: () => Navigator.pop(context, 'tasks'),
+                  child: const Text('К заданию'),
+                ),
+              if (decision.unresolvedCheckpoints.contains('savings_decision'))
+                FilledButton(
+                  key: const Key('home-blocker-go-savings'),
+                  onPressed: () => Navigator.pop(context, 'savings'),
+                  child: const Text('К накоплениям'),
+                ),
             ],
           ),
         );
+        if (!mounted) return;
+        if (action == 'tasks') context.go('/tasks');
+        if (action == 'savings') context.go('/savings');
         return;
       case BedtimeDecisionType.ready:
         final confirmed = await showDialog<bool>(
@@ -389,6 +404,12 @@ class _HomeContent extends StatelessWidget {
         periodAllowsPetAction && state.petUsageCount == 0 && !state.interacting;
 
     final dayProgress = period?.dayProgress ?? 0;
+    final taskUnresolved =
+        period?.requiredCheckpoints.contains('financial_task') == true &&
+        period?.resolvedCheckpoints.contains('financial_task') != true;
+    final savingsUnresolved =
+        period?.requiredCheckpoints.contains('savings_decision') == true &&
+        period?.resolvedCheckpoints.contains('savings_decision') != true;
     final progressFraction = dayProgress / VirtualDayRules.maxProgress;
     final skyTop = Color.lerp(
       const Color(0xFFFFE0B2),
@@ -606,15 +627,31 @@ class _HomeContent extends StatelessWidget {
                     )
                   else if (period.status == GamePeriodStatus.active ||
                       period.status == GamePeriodStatus.readyToFinish)
-                    FilledButton(
-                      key: const Key('home-view-plan'),
-                      onPressed: () => context.go('/budget'),
-                      child: const Text('Посмотреть план'),
-                    ),
-                  // Compact "Today" block
+                    taskUnresolved
+                        ? FilledButton(
+                            key: const Key('home-next-task'),
+                            onPressed: () => context.go('/tasks'),
+                            child: const Text('Выполнить задание'),
+                          )
+                        : savingsUnresolved
+                        ? FilledButton(
+                            key: const Key('home-next-savings'),
+                            onPressed: () => context.go('/savings'),
+                            child: const Text('Решить про накопления'),
+                          )
+                        : FilledButton(
+                            key: const Key('home-view-plan'),
+                            onPressed: () => context.go('/budget'),
+                            child: const Text('Посмотреть план'),
+                          ),
                   if (period != null) ...[
                     const SizedBox(height: AppSpacing.medium),
-                    _TodayCard(period: period),
+                    _TodayCard(
+                      period: period,
+                      actionsEnabled:
+                          period.status == GamePeriodStatus.active ||
+                          period.status == GamePeriodStatus.readyToFinish,
+                    ),
                   ],
                   if (state.bowlEvent?.isOutstanding == true) ...[
                     const SizedBox(height: AppSpacing.medium),
@@ -690,9 +727,10 @@ class _HomeContent extends StatelessWidget {
 }
 
 class _TodayCard extends StatelessWidget {
-  const _TodayCard({required this.period});
+  const _TodayCard({required this.period, required this.actionsEnabled});
 
   final GamePeriod period;
+  final bool actionsEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -715,21 +753,26 @@ class _TodayCard extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: AppSpacing.small),
-            Wrap(
-              spacing: AppSpacing.medium,
-              runSpacing: AppSpacing.small,
+            Column(
               children: [
-                for (final cp in checkpoints) ...[
-                  _CheckpointChip(
-                    label: switch (cp) {
-                      'financial_task' => 'Задание',
-                      'savings_decision' => 'Накопления',
-                      'changed_circumstance' => 'Событие',
-                      _ => cp,
-                    },
+                for (final cp in checkpoints)
+                  _RequiredActionRow(
+                    title: cp == 'financial_task'
+                        ? 'Задание дня'
+                        : 'Накопления',
+                    pendingText: cp == 'financial_task'
+                        ? 'Нужно выполнить'
+                        : 'Нужно решить',
+                    actionText: cp == 'financial_task' ? 'Выполнить' : 'Решить',
+                    actionKey: Key(
+                      cp == 'financial_task'
+                          ? 'home-today-task-action'
+                          : 'home-today-savings-action',
+                    ),
+                    route: cp == 'financial_task' ? '/tasks' : '/savings',
                     resolved: period.resolvedCheckpoints.contains(cp),
+                    actionsEnabled: actionsEnabled,
                   ),
-                ],
               ],
             ),
           ],
@@ -788,36 +831,60 @@ class _BowlObligationCard extends StatelessWidget {
   );
 }
 
-class _CheckpointChip extends StatelessWidget {
-  const _CheckpointChip({required this.label, required this.resolved});
+class _RequiredActionRow extends StatelessWidget {
+  const _RequiredActionRow({
+    required this.title,
+    required this.pendingText,
+    required this.actionText,
+    required this.actionKey,
+    required this.route,
+    required this.resolved,
+    required this.actionsEnabled,
+  });
 
-  final String label;
+  final String title;
+  final String pendingText;
+  final String actionText;
+  final Key actionKey;
+  final String route;
   final bool resolved;
+  final bool actionsEnabled;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          resolved ? Icons.check_circle : Icons.radio_button_unchecked,
-          size: 18,
-          color: resolved
-              ? theme.colorScheme.primary
-              : theme.colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontWeight: resolved ? FontWeight.w600 : FontWeight.normal,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(
+            resolved ? Icons.check_circle : Icons.radio_button_unchecked,
             color: resolved
-                ? theme.colorScheme.onSurface
+                ? theme.colorScheme.primary
                 : theme.colorScheme.onSurfaceVariant,
           ),
-        ),
-      ],
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleSmall),
+                if (!resolved) Text(pendingText),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.small),
+          if (resolved)
+            const Text('Готово')
+          else if (actionsEnabled)
+            FilledButton.tonal(
+              key: actionKey,
+              style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+              onPressed: () => context.go(route),
+              child: Text(actionText),
+            ),
+        ],
+      ),
     );
   }
 }
