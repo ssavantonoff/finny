@@ -50,6 +50,23 @@ final class TaskPlanAdaptationIncorrect extends TaskSubmissionResult {
   bool get rewardAppliedNow => false;
 }
 
+final class TaskShoppingTripIncorrect extends TaskSubmissionResult {
+  const TaskShoppingTripIncorrect({
+    required super.explanation,
+    required this.insufficientItemIds,
+    required this.purchasedAmounts,
+    required this.totalCost,
+    required this.overBudgetBy,
+  });
+
+  final Set<String> insufficientItemIds;
+  final Map<String, int> purchasedAmounts;
+  final int totalCost;
+  final int overBudgetBy;
+
+  bool get rewardAppliedNow => false;
+}
+
 final class TaskAnswerCompleted extends TaskSubmissionResult {
   const TaskAnswerCompleted({
     required super.explanation,

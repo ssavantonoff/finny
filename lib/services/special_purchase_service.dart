@@ -44,38 +44,44 @@ class SpecialPurchaseService {
     );
   }
 
-  Future<GameState> buyPromotion({
+  Future<({ShopPromotion? promotion, bool purchased})> loadPromotionState({
     required int profileId,
     required int periodId,
-    required String promotionId,
-    required String operationId,
-  }) => _decide(
-    profileId: profileId,
-    periodId: periodId,
-    promotionId: promotionId,
-    operationId: operationId,
-    purchase: true,
-  );
+    required int periodNumber,
+  }) async {
+    final promotions = await _content.loadPromotions();
+    final matches = promotions.where(
+      (promotion) => promotion.period == periodNumber,
+    );
+    if (matches.isEmpty) return (promotion: null, purchased: false);
+    if (matches.length != 1) throw StateError('Ambiguous promotion content.');
+    final items = await _content.loadShopItems();
+    validateSpecialContent(
+      await _content.loadStoryPurchases(),
+      promotions,
+      items,
+    );
+    final promotion = matches.single;
+    final matchingItems = items.where((item) => item.id == promotion.itemId);
+    if (matchingItems.length != 1 ||
+        !promotion.isCanonicalDay4For(matchingItems.single)) {
+      throw StateError('Invalid canonical Day 4 promotion.');
+    }
+    return (
+      promotion: promotion,
+      purchased: await _port.hasPurchasedPromotion(
+        profileId: profileId,
+        periodId: periodId,
+        promotionId: promotion.id,
+      ),
+    );
+  }
 
-  Future<GameState> skipPromotion({
+  Future<GameState> purchasePromotion({
     required int profileId,
     required int periodId,
     required String promotionId,
     required String operationId,
-  }) => _decide(
-    profileId: profileId,
-    periodId: periodId,
-    promotionId: promotionId,
-    operationId: operationId,
-    purchase: false,
-  );
-
-  Future<GameState> _decide({
-    required int profileId,
-    required int periodId,
-    required String promotionId,
-    required String operationId,
-    required bool purchase,
   }) async {
     final canonical = await _loadCanonical();
     final matches = canonical.promotions.where(
@@ -89,13 +95,15 @@ class SpecialPurchaseService {
     if (matchingItems.length != 1) {
       throw StateError('Promotion item is missing.');
     }
-    return _port.decidePromotion(
+    if (!promotion.isCanonicalDay4For(matchingItems.single)) {
+      throw StateError('Invalid canonical Day 4 promotion.');
+    }
+    return _port.purchasePromotion(
       profileId: profileId,
       periodId: periodId,
       promotion: promotion,
       item: matchingItems.single,
       operationId: operationId,
-      purchase: purchase,
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/special_purchase.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/services/purchase_service.dart';
@@ -119,6 +120,10 @@ class ShopContent implements ContentRepository {
   List<ShopItem> items = [apple, brush, ball, bow];
   Object? error;
   Completer<void>? gate;
+  @override
+  Future<List<StoryPurchase>> loadStoryPurchases() async => const [];
+  @override
+  Future<List<ShopPromotion>> loadPromotions() async => const [];
   @override
   Future<List<ShopItem>> loadShopItems() async {
     final snapshot = items;

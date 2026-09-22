@@ -7,7 +7,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 10;
+  static const schemaVersion = 11;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -266,6 +266,123 @@ class AppDatabase {
     }
     if (oldVersion < 10) {
       await _createCampaignStoryEventsTable(db);
+    }
+    if (oldVersion < 11) {
+      await _migrateDay4V11(db);
+    }
+  }
+
+  static Future<void> _migrateDay4V11(sqflite.DatabaseExecutor db) async {
+    final periodColumns = await db.rawQuery('PRAGMA table_info(game_periods)');
+    final periodColumnNames = periodColumns
+        .map((column) => column['name'])
+        .whereType<String>()
+        .toSet();
+    if (!periodColumnNames.containsAll({
+      'id',
+      'profile_id',
+      'period_number',
+      'status',
+      'required_checkpoints',
+      'resolved_checkpoints',
+    })) {
+      return;
+    }
+    final periods = await db.query(
+      'game_periods',
+      where: "period_number = 4 AND status != 'completed'",
+    );
+    for (final row in periods) {
+      final required = _decodeCheckpointList(row['required_checkpoints'])
+          .where((id) => id != 'discount_decision')
+          .toList(growable: false);
+      final resolved = _decodeCheckpointList(row['resolved_checkpoints'])
+          .where((id) => id != 'discount_decision')
+          .toList(growable: false);
+      final status = row['status'] as String;
+      await db.update(
+        'game_periods',
+        {
+          'required_checkpoints': jsonEncode(required),
+          'resolved_checkpoints': jsonEncode(resolved),
+          'status': status == 'active' && required.every(resolved.contains)
+              ? 'readyToFinish'
+              : status,
+        },
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+      await db.delete(
+        'period_special_actions',
+        where: "profile_id = ? AND period_id = ? AND action_id = ? AND outcome = 'skipped'",
+        whereArgs: [row['profile_id'], row['id'], 'day4_treat_discount'],
+      );
+    }
+
+    final progressTable = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'task_progress'",
+    );
+    if (progressTable.isEmpty) return;
+    final oldProgress = await db.query(
+      'task_progress',
+      where: 'task_id = ? AND status = ? AND reward_claimed = 1',
+      whereArgs: ['task_discount_04', 'completed'],
+    );
+    for (final progress in oldProgress) {
+      final profileId = progress['profile_id'] as int;
+      final periodRows = await db.query(
+        'game_periods',
+        where: 'profile_id = ? AND period_number = 4',
+        whereArgs: [profileId],
+      );
+      if (periodRows.length != 1) continue;
+      final period = periodRows.single;
+      final periodId = period['id'] as int;
+      final resolved = _decodeCheckpointList(period['resolved_checkpoints']);
+      final oldKey = 'task_reward_${periodId}_task_discount_04';
+      final rewardRows = await db.query(
+        'transactions',
+        where: 'profile_id = ? AND period_id = ? AND source = ? AND deduplication_key = ?',
+        whereArgs: [
+          profileId,
+          periodId,
+          'task_reward_task_discount_04',
+          oldKey,
+        ],
+      );
+      if (!resolved.contains('financial_task') ||
+          rewardRows.length != 1 ||
+          rewardRows.single['type'] != 'task_reward' ||
+          rewardRows.single['amount'] != 50) {
+        continue;
+      }
+      final oldState = jsonDecode(progress['scenario_state'] as String);
+      if (oldState is! Map ||
+          oldState.length != 1 ||
+          oldState['answerId'] != 'consider') {
+        continue;
+      }
+      await db.update(
+        'transactions',
+        {
+          'source': 'task_reward_task_shopping_trip_04',
+          'deduplication_key': 'task_reward_${periodId}_task_shopping_trip_04',
+        },
+        where: 'id = ?',
+        whereArgs: [rewardRows.single['id']],
+      );
+      await db.update(
+        'task_progress',
+        {
+          'task_id': 'task_shopping_trip_04',
+          'scenario_state': jsonEncode({
+            'type': 'legacy_day4_discount',
+            'legacyTaskId': 'task_discount_04',
+          }),
+        },
+        where: 'profile_id = ? AND task_id = ?',
+        whereArgs: [profileId, 'task_discount_04'],
+      );
     }
   }
 

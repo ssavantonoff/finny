@@ -24,6 +24,7 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
   bool _confirming = false;
   bool _closing = false;
   int? _periodId;
+  int? _confirmedPrice;
 
   @override
   void initState() {
@@ -49,6 +50,7 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
       setState(() {
         _confirming = false;
         _periodId = null;
+        _confirmedPrice = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -97,10 +99,7 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
               Center(child: ShopItemIcon(item: item)),
               const SizedBox(height: AppSpacing.medium),
               Text(item.name, style: Theme.of(context).textTheme.headlineSmall),
-              Text(
-                '${item.price} монет • ${shopCategory(item)}',
-                style: const TextStyle(fontSize: 18),
-              ),
+              ShopPriceLabel(item: item, state: state, fontSize: 18),
               if (shopEffect(item) case final effect?) ...[
                 const SizedBox(height: AppSpacing.medium),
                 const Text('Ожидаемый эффект', style: TextStyle(fontSize: 16)),
@@ -115,7 +114,7 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
               const SizedBox(height: AppSpacing.large),
               if (_confirming && !state.purchasing) ...[
                 Text(
-                  'Купить «${item.name}» за ${item.price} монет?',
+                  'Купить «${item.name}» за ${_confirmedPrice ?? state.effectivePriceFor(item)} монет?',
                   key: const Key('shop-confirmation'),
                   style: const TextStyle(fontSize: 18),
                 ),
@@ -137,8 +136,17 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
                             setState(() {
                               _confirming = true;
                               _periodId = latest.period!.id;
+                              _confirmedPrice = latest.effectivePriceFor(item);
                             });
                           } else {
+                            if (_confirmedPrice !=
+                                latest.effectivePriceFor(item)) {
+                              setState(() {
+                                _confirming = false;
+                                _confirmedPrice = null;
+                              });
+                              return;
+                            }
                             setState(() => _confirming = false);
                             unawaited(
                               controller.buy(

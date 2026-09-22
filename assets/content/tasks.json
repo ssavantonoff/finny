@@ -111,8 +111,17 @@
     "scenarioData":{"prompt":"У тебя был план на 300 монет: корм закончился, шампунь нужен для ухода за Финни сегодня, ещё хотелось купить игрушку и отложить 50 монет на цель. По дороге потерялись 80 монет. Теперь доступно 220. Измени план.","originalPlan":300,"lostAmount":80,"availableBudget":220,"keepLabel":"Оставить в плане","keepDescription":"Важное и то, что помогает двигаться к цели.","laterLabel":"Перенести на потом","laterDescription":"Желание, которое можно купить позже.","items":[{"id":"food","label":"Корм","price":90,"category":"need","correctDecision":"keep","feedback":"Корм закончился — это важная покупка на сегодня."},{"id":"shampoo","label":"Шампунь","price":60,"category":"need","correctDecision":"keep","feedback":"Шампунь нужен для ухода за Финни сегодня."},{"id":"toy","label":"Игрушка","price":100,"category":"want","correctDecision":"later","feedback":"Игрушку хочется купить, но её можно перенести на потом."},{"id":"savings","label":"Накопления на цель","price":50,"category":"savings","correctDecision":"keep","feedback":"После того как игрушка отложена, накопления на цель можно сохранить."}],"incorrectExplanation":"Проверь важные покупки и накопления: игрушку можно перенести на потом.","successExplanation":"Ты сохранил важные покупки и накопления, а желание перенёс на потом. Когда обстоятельства меняются, план можно пересмотреть."}
   },
   {
-    "id":"task_discount_04","title":"Скидка — это выгодно?","topic":"discounts","description":"Подумай, как скидка влияет на решение.","type":"choice","reward":50,"period":4,"requiredForCheckpoint":true,
-    "scenarioData":{"prompt":"Лакомство стоило 60 монет, а по акции стоит 35. Что означает скидка?","options":[{"id":"must_buy","label":"Теперь его обязательно нужно купить"},{"id":"need","label":"Из-за скидки лакомство стало необходимостью"},{"id":"consider","label":"Цена стала выгоднее, но покупать всё равно стоит с учётом плана и целей"}],"correctOptionId":"consider","explanation":"Скидка снижает цену, но не делает покупку обязательной. Сначала стоит подумать, нужна ли вещь и подходит ли она твоему плану."}
+    "id":"task_shopping_trip_04","title":"Покупки с умом","topic":"shopping_choices","description":"Собери всё по списку и уложись в бюджет.","type":"shopping_trip","reward":50,"period":4,"requiredForCheckpoint":true,
+    "scenarioData":{
+      "prompt":"Купи всё из списка и уложись в 190 монет.",
+      "budget":190,
+      "successExplanation":"Важно смотреть и на цену, и на количество. Покупки могут быть разными — главное, чтобы всего хватило и бюджет не был превышен.",
+      "items":[
+        {"id":"water","label":"Вода","requiredAmount":1000,"unit":"ml","requirementLabel":"1 л","smallPackage":{"id":"small","label":"0,5 л","amount":500,"maxQuantity":2},"largePackage":{"id":"large","label":"1,5 л","amount":1500,"maxQuantity":1},"priceScenarios":[{"id":"small_better","smallPrice":25,"largePrice":60},{"id":"large_better","smallPrice":30,"largePrice":50}]},
+        {"id":"soap","label":"Мыло","requiredAmount":3,"unit":"pcs","requirementLabel":"3 шт.","smallPackage":{"id":"small","label":"2 шт.","amount":2,"maxQuantity":2},"largePackage":{"id":"large","label":"5 шт.","amount":5,"maxQuantity":1},"priceScenarios":[{"id":"small_better","smallPrice":30,"largePrice":70},{"id":"large_better","smallPrice":35,"largePrice":60}]},
+        {"id":"cookies","label":"Печенье","requiredAmount":300,"unit":"g","requirementLabel":"300 г","smallPackage":{"id":"small","label":"200 г","amount":200,"maxQuantity":2},"largePackage":{"id":"large","label":"500 г","amount":500,"maxQuantity":1},"priceScenarios":[{"id":"small_better","smallPrice":35,"largePrice":80},{"id":"large_better","smallPrice":40,"largePrice":70}]}
+      ]
+    }
   },
   {
     "id":"task_final_choice_05","title":"Самостоятельный выбор","topic":"planning","description":"Сочетай нужную покупку и накопления.","type":"choice","reward":50,"period":5,"requiredForCheckpoint":true,

@@ -28,7 +28,6 @@ const promotion = ShopPromotion(
   itemId: 'food_treat',
   promoPrice: 35,
   maxPromoQuantity: 1,
-  checkpoint: 'discount_decision',
 );
 const treat = ShopItem(
   id: 'food_treat',
@@ -102,7 +101,7 @@ void main() {
       baseIncome: income == 0 ? 30 : income,
       requiredCheckpoints: [
         if (day == 3) 'changed_circumstance',
-        if (day == 4) 'discount_decision',
+        if (day == 4) ...['financial_task', 'savings_decision'],
       ],
       createdAt: DateTime.utc(2026),
     );
@@ -137,32 +136,16 @@ void main() {
     );
   }
 
-  Future<void> decide(
+  Future<void> buyPromotion(
     ({int profileId, int periodId}) player,
-    String operationId, {
-    required bool purchase,
-  }) async {
-    final arguments = (
+    String operationId,
+  ) async {
+    await specials.purchasePromotion(
       profileId: player.profileId,
       periodId: player.periodId,
       promotionId: promotion.id,
       operationId: operationId,
     );
-    if (purchase) {
-      await specials.buyPromotion(
-        profileId: arguments.profileId,
-        periodId: arguments.periodId,
-        promotionId: arguments.promotionId,
-        operationId: arguments.operationId,
-      );
-    } else {
-      await specials.skipPromotion(
-        profileId: arguments.profileId,
-        periodId: arguments.periodId,
-        promotionId: arguments.promotionId,
-        operationId: arguments.operationId,
-      );
-    }
   }
 
   test('Day 3 charges canonical NEED once, closes checkpoint and replays after completion', () async {
@@ -264,15 +247,11 @@ void main() {
 
   test('Day 4 promo buy charges 35 once; normal treat remains 60', () async {
     final player = await active(4);
-    await expectLater(
-      games.resolveCheckpoint(
-        profileId: player.profileId,
-        periodId: player.periodId,
-        checkpointId: promotion.checkpoint,
-      ),
-      throwsStateError,
-    );
-    await decide(player, 'promo-buy', purchase: true);
+    final before = (await games.getPeriodById(
+      player.profileId,
+      player.periodId,
+    ))!;
+    await buyPromotion(player, 'promo-buy');
     expect((await games.getGameState(player.profileId))!.walletBalance, 465);
     expect(await games.getInventoryQuantity(player.profileId, treat.id), 1);
     expect((await games.getPet(player.profileId))!.satiety, 34);
@@ -283,36 +262,52 @@ void main() {
       (GameTransactionType.wantExpense, -35),
     );
     expect((await proofs()).single['outcome'], 'purchased');
+    final after = (await games.getPeriodById(
+      player.profileId,
+      player.periodId,
+    ))!;
+    expect(after.resolvedCheckpoints, before.resolvedCheckpoints);
+    expect(after.dayProgress, before.dayProgress);
     expect(
-      (await games.getPeriodById(
-        player.profileId,
-        player.periodId,
-      ))!.resolvedCheckpoints,
-      [promotion.checkpoint],
+      await games.getTaskProgress(player.profileId, 'task_shopping_trip_04'),
+      isNull,
+    );
+    expect(after.actualWant, 35);
+    expect(
+      await specials.loadPromotionState(
+        profileId: player.profileId,
+        periodId: player.periodId,
+        periodNumber: 4,
+      ),
+      (promotion: promotion, purchased: true),
+    );
+    await resolveCheckpointForTest(
+      database,
+      profileId: player.profileId,
+      periodId: player.periodId,
+      checkpointId: 'financial_task',
+    );
+    await resolveCheckpointForTest(
+      database,
+      profileId: player.profileId,
+      periodId: player.periodId,
+      checkpointId: 'savings_decision',
     );
     await completePeriodForTest(
       database,
       profileId: player.profileId,
       periodId: player.periodId,
     );
-    await decide(player, 'promo-buy', purchase: true);
+    await buyPromotion(player, 'promo-buy');
     expect(await games.getInventoryQuantity(player.profileId, treat.id), 1);
     await expectLater(
-      decide(player, 'promo-again', purchase: true),
-      throwsA(isA<SpecialPurchaseAlreadyDecidedException>()),
-    );
-    await expectLater(
-      decide(player, 'promo-buy', purchase: false),
-      throwsA(isA<SpecialPurchaseConflictException>()),
-    );
-    await expectLater(
-      decide(player, 'promo-skip-new', purchase: false),
+      buyPromotion(player, 'promo-again'),
       throwsA(isA<SpecialPurchaseAlreadyDecidedException>()),
     );
     // Standard Shop purchase remains independent of the one-time promotion.
     // A completed period rejects new purchases, so use a fresh active player.
     final another = await active(4, type: ProfileType.demo);
-    await decide(another, 'demo-promo', purchase: true);
+    await buyPromotion(another, 'demo-promo');
     await standard.purchase(
       profileId: another.profileId,
       periodId: another.periodId,
@@ -324,51 +319,20 @@ void main() {
     expect((await games.getGameState(player.profileId))!.walletBalance, 465);
   });
 
-  test(
-    'Day 4 skip leaves money and inventory, blocks promo, allows normal treat',
-    () async {
-      final player = await active(4);
-      await decide(player, 'promo-skip', purchase: false);
-      expect((await games.getGameState(player.profileId))!.walletBalance, 500);
-      expect(await games.getInventoryQuantity(player.profileId, treat.id), 0);
-      expect((await proofs()).single['outcome'], 'skipped');
-      await decide(player, 'promo-skip', purchase: false);
-      expect(await proofs(), hasLength(1));
-      await expectLater(
-        decide(player, 'promo-skip', purchase: true),
-        throwsA(isA<SpecialPurchaseConflictException>()),
-      );
-      await expectLater(
-        decide(player, 'new-buy', purchase: true),
-        throwsA(isA<SpecialPurchaseAlreadyDecidedException>()),
-      );
-      await standard.purchase(
-        profileId: player.profileId,
-        periodId: player.periodId,
-        itemId: treat.id,
-        operationId: 'normal-after-skip',
-      );
-      expect((await games.getGameState(player.profileId))!.walletBalance, 440);
-      expect(await games.getInventoryQuantity(player.profileId, treat.id), 1);
-    },
-  );
-
-  test('Day 4 checkpoint failure rolls back debit, inventory, proof and transaction', () async {
+  test('Day 4 promotion is available before the financial task', () async {
     final player = await active(4);
-    final db = await database.database;
-    await db.execute('''
-      CREATE TRIGGER fail_day4_checkpoint BEFORE UPDATE ON game_periods
-      WHEN NEW.resolved_checkpoints != OLD.resolved_checkpoints
-      BEGIN SELECT RAISE(ABORT, 'forced checkpoint failure'); END
-    ''');
-    await expectLater(
-      decide(player, 'rollback-promo', purchase: true),
-      throwsException,
+    final state = await specials.loadPromotionState(
+      profileId: player.profileId,
+      periodId: player.periodId,
+      periodNumber: 4,
     );
-    expect((await games.getGameState(player.profileId))!.walletBalance, 500);
-    expect(await games.getTransactions(player.profileId), hasLength(1));
-    expect(await games.getInventoryQuantity(player.profileId, treat.id), 0);
-    expect(await proofs(), isEmpty);
+    expect(state.promotion?.id, promotion.id);
+    expect(state.purchased, isFalse);
+    await buyPromotion(player, 'before-task');
+    expect(
+      await games.getTaskProgress(player.profileId, 'task_shopping_trip_04'),
+      isNull,
+    );
     expect(
       (await games.getPeriodById(
         player.profileId,
@@ -378,23 +342,47 @@ void main() {
     );
   });
 
+  test(
+    'Day 4 proof failure rolls back debit, inventory and transaction',
+    () async {
+      final player = await active(4);
+      final db = await database.database;
+      await db.execute('''
+      CREATE TRIGGER fail_day4_proof BEFORE INSERT ON period_special_actions
+      WHEN NEW.action_id = 'day4_treat_discount'
+      BEGIN SELECT RAISE(ABORT, 'forced proof failure'); END
+    ''');
+      await expectLater(
+        buyPromotion(player, 'rollback-promo'),
+        throwsException,
+      );
+      expect((await games.getGameState(player.profileId))!.walletBalance, 500);
+      expect(await games.getTransactions(player.profileId), hasLength(1));
+      expect(await games.getInventoryQuantity(player.profileId, treat.id), 0);
+      expect(await proofs(), isEmpty);
+      expect(
+        (await games.getPeriodById(
+          player.profileId,
+          player.periodId,
+        ))!.resolvedCheckpoints,
+        isEmpty,
+      );
+    },
+  );
+
   test('Day 4 rejects wrong period, foreign profile and low balance', () async {
     final day3 = await active(3);
-    await expectLater(
-      decide(day3, 'wrong-day', purchase: true),
-      throwsStateError,
-    );
+    await expectLater(buyPromotion(day3, 'wrong-day'), throwsStateError);
     final demo = await active(4, type: ProfileType.demo, income: 0);
     await expectLater(
-      decide(
-        (profileId: day3.profileId, periodId: demo.periodId),
-        'foreign-promo',
-        purchase: true,
-      ),
+      buyPromotion((
+        profileId: day3.profileId,
+        periodId: demo.periodId,
+      ), 'foreign-promo'),
       throwsStateError,
     );
     await expectLater(
-      decide(demo, 'low-promo', purchase: true),
+      buyPromotion(demo, 'low-promo'),
       throwsA(isA<InsufficientFundsException>()),
     );
     expect((await games.getGameState(demo.profileId))!.walletBalance, 0);
@@ -417,7 +405,7 @@ void main() {
         definitionId: 'period_4',
         periodNumber: 4,
         baseIncome: 500,
-        requiredCheckpoints: const ['discount_decision'],
+        requiredCheckpoints: const ['financial_task', 'savings_decision'],
         createdAt: DateTime.utc(2026, 1, 2),
       );
       await confirmBudgetForTest(
@@ -426,11 +414,10 @@ void main() {
         periodId: next.id!,
       );
       await expectLater(
-        decide(
-          (profileId: player.profileId, periodId: next.id!),
-          'shared-special-operation',
-          purchase: false,
-        ),
+        buyPromotion((
+          profileId: player.profileId,
+          periodId: next.id!,
+        ), 'shared-special-operation'),
         throwsA(isA<SpecialPurchaseConflictException>()),
       );
       expect(await proofs(), hasLength(1));
@@ -444,11 +431,11 @@ void main() {
     },
   );
 
-  test('concurrent Day 4 decisions commit only one outcome', () async {
+  test('concurrent Day 4 purchases commit only one promotion', () async {
     final player = await active(4);
-    Future<String> attempt(String operationId, bool purchase) async {
+    Future<String> attempt(String operationId) async {
       try {
-        await decide(player, operationId, purchase: purchase);
+        await buyPromotion(player, operationId);
         return 'success';
       } on SpecialPurchaseAlreadyDecidedException {
         return 'already-decided';
@@ -456,8 +443,8 @@ void main() {
     }
 
     final results = await Future.wait([
-      attempt('concurrent-buy', true),
-      attempt('concurrent-skip', false),
+      attempt('concurrent-buy-one'),
+      attempt('concurrent-buy-two'),
     ]);
     expect(results, containsAll(['success', 'already-decided']));
     expect(await proofs(), hasLength(1));
@@ -467,16 +454,14 @@ void main() {
       player.profileId,
       treat.id,
     );
-    expect((
-      balance,
-      quantity,
-    ), proof['outcome'] == 'purchased' ? (465, 1) : (500, 0));
+    expect(proof['outcome'], 'purchased');
+    expect((balance, quantity), (465, 1));
     expect(
       (await games.getPeriodById(
         player.profileId,
         player.periodId,
       ))!.resolvedCheckpoints,
-      [promotion.checkpoint],
+      isEmpty,
     );
   });
 }

@@ -33,12 +33,11 @@
   {
     "id": "period_4_discount",
     "number": 4,
-    "title": "Скидка или цель?",
+    "title": "Покупки с умом",
     "baseIncome": 500,
     "requiredCheckpoints": [
       "financial_task",
-      "savings_decision",
-      "discount_decision"
+      "savings_decision"
     ]
   },
   {

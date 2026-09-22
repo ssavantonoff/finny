@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:finny/app/providers.dart';
 import 'package:finny/models/game_period.dart';
-import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/story_event.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-enum CampaignEventKind { day3Bowl, day4Promotion }
+enum CampaignEventKind { day3Bowl }
 
 class CampaignEventAttempt {
   const CampaignEventAttempt({
@@ -110,7 +109,8 @@ class CampaignEventController extends Notifier<CampaignEventState> {
       final period = await ref
           .read(gameRepositoryProvider)
           .getCurrentPeriod(profileId);
-      if (generation != _generation ||
+      if (!ref.mounted ||
+          generation != _generation ||
           ref.read(activeProfileIdProvider) != profileId) {
         return;
       }
@@ -126,22 +126,15 @@ class CampaignEventController extends Notifier<CampaignEventState> {
             .read(storyEventServiceProvider)
             .armOrLoadDay3Bowl(profileId: profileId);
       }
-      if (generation != _generation ||
+      if (!ref.mounted ||
+          generation != _generation ||
           ref.read(activeProfileIdProvider) != profileId) {
         return;
       }
       final kind =
           bowl != null && bowl.status == StoryEventStatus.armed && bowl.isDue
           ? CampaignEventKind.day3Bowl
-          : switch (period.periodNumber) {
-              4
-                  when period.resolvedCheckpoints.contains('financial_task') &&
-                      !period.resolvedCheckpoints.contains(
-                        'discount_decision',
-                      ) =>
-                CampaignEventKind.day4Promotion,
-              _ => null,
-            };
+          : null;
       state = kind == null
           ? const CampaignEventIdle()
           : CampaignEventReady(
@@ -151,7 +144,9 @@ class CampaignEventController extends Notifier<CampaignEventState> {
               storyEvent: bowl,
             );
     } catch (_) {
-      if (generation == _generation) state = const CampaignEventFailure();
+      if (ref.mounted && generation == _generation) {
+        state = const CampaignEventFailure();
+      }
     }
   }
 
@@ -199,12 +194,6 @@ class CampaignEventController extends Notifier<CampaignEventState> {
     purchase: false,
     useSavings: false,
   );
-
-  Future<bool> buyPromotion() =>
-      _perform(actionId: 'day4_treat_discount', purchase: true);
-
-  Future<bool> skipPromotion() =>
-      _perform(actionId: 'day4_treat_discount', purchase: false);
 
   Future<bool> retry() async {
     final current = state;
@@ -254,40 +243,20 @@ class CampaignEventController extends Notifier<CampaignEventState> {
     );
     Object? error;
     try {
-      if (current.kind == CampaignEventKind.day3Bowl) {
-        final storyService = ref.read(storyEventServiceProvider);
-        if (attempt.purchase) {
-          await storyService.purchaseDay3Bowl(
-            profileId: attempt.profileId,
-            currentPeriodId: attempt.periodId,
-            operationId: attempt.operationId,
-            useSavings: attempt.useSavings,
-          );
-        } else {
-          await storyService.postponeDay3Bowl(
-            profileId: attempt.profileId,
-            currentPeriodId: attempt.periodId,
-            operationId: attempt.operationId,
-          );
-        }
-      } else if (attempt.purchase) {
-        await ref
-            .read(specialPurchaseServiceProvider)
-            .buyPromotion(
-              profileId: attempt.profileId,
-              periodId: attempt.periodId,
-              promotionId: attempt.actionId,
-              operationId: attempt.operationId,
-            );
+      final storyService = ref.read(storyEventServiceProvider);
+      if (attempt.purchase) {
+        await storyService.purchaseDay3Bowl(
+          profileId: attempt.profileId,
+          currentPeriodId: attempt.periodId,
+          operationId: attempt.operationId,
+          useSavings: attempt.useSavings,
+        );
       } else {
-        await ref
-            .read(specialPurchaseServiceProvider)
-            .skipPromotion(
-              profileId: attempt.profileId,
-              periodId: attempt.periodId,
-              promotionId: attempt.actionId,
-              operationId: attempt.operationId,
-            );
+        await storyService.postponeDay3Bowl(
+          profileId: attempt.profileId,
+          currentPeriodId: attempt.periodId,
+          operationId: attempt.operationId,
+        );
       }
     } catch (caught) {
       error = caught;
@@ -295,9 +264,8 @@ class CampaignEventController extends Notifier<CampaignEventState> {
     _mutating = false;
     if (ref.read(activeProfileIdProvider) != attempt.profileId) return false;
 
-    GamePeriod? refreshed;
     try {
-      refreshed = await ref
+      await ref
           .read(gameRepositoryProvider)
           .getPeriodById(attempt.profileId, attempt.periodId);
     } catch (_) {
@@ -341,19 +309,6 @@ class CampaignEventController extends Notifier<CampaignEventState> {
           )
           .copyWithStoryEvent(bowl);
       return true;
-    }
-    if (current.kind != CampaignEventKind.day3Bowl &&
-        refreshed?.resolvedCheckpoints.contains('discount_decision') == true) {
-      state = const CampaignEventIdle();
-      return true;
-    }
-    if (error is InsufficientFundsException) {
-      state = current.copyWith(
-        mutating: false,
-        clearPending: true,
-        message: 'Не хватает монет. Можно пропустить акцию.',
-      );
-      return false;
     }
     if (error is StoryEventInsufficientFundsException) {
       final message =

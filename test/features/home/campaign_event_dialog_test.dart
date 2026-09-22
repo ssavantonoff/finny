@@ -65,12 +65,6 @@ CampaignEventReady _readyBowl({int wallet = 200, String? message}) =>
       message: message,
     );
 
-CampaignEventReady _readyPromotion() => CampaignEventReady(
-  kind: CampaignEventKind.day4Promotion,
-  profileId: 1,
-  period: _period(4),
-);
-
 Future<({ProviderContainer container, _FakeCampaignEventController controller})>
 _pumpDialog(
   WidgetTester tester, {
@@ -136,15 +130,4 @@ void main() {
       expect(find.text('Баланс сейчас: 50 монет'), findsOneWidget);
     },
   );
-
-  testWidgets('dialog accepts a Ready Day 4 promotion snapshot', (
-    tester,
-  ) async {
-    await _pumpDialog(tester, initialState: _readyPromotion());
-
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-    expect(find.text('Сегодня акция!'), findsOneWidget);
-    expect(find.byKey(const Key('campaign-promo-buy')), findsOneWidget);
-    expect(find.byKey(const Key('campaign-promo-skip')), findsOneWidget);
-  });
 }

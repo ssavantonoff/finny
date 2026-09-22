@@ -34,7 +34,6 @@ class ShopPromotion {
     required this.itemId,
     required this.promoPrice,
     required this.maxPromoQuantity,
-    required this.checkpoint,
   });
 
   final String id;
@@ -42,7 +41,16 @@ class ShopPromotion {
   final String itemId;
   final int promoPrice;
   final int maxPromoQuantity;
-  final String checkpoint;
+
+  bool isCanonicalDay4For(ShopItem item) =>
+      id == 'day4_treat_discount' &&
+      period == 4 &&
+      itemId == 'food_treat' &&
+      item.id == itemId &&
+      item.price == 60 &&
+      item.category == ShopItemCategory.want &&
+      promoPrice == 35 &&
+      maxPromoQuantity == 1;
 
   factory ShopPromotion.fromJson(Map<String, Object?> json) => ShopPromotion(
     id: json['id'] as String,
@@ -50,7 +58,6 @@ class ShopPromotion {
     itemId: json['itemId'] as String,
     promoPrice: json['promoPrice'] as int,
     maxPromoQuantity: json['maxPromoQuantity'] as int,
-    checkpoint: json['checkpoint'] as String,
   );
 }
 
@@ -77,7 +84,6 @@ void validateSpecialContent(
         promo.period <= 0 ||
         promo.promoPrice <= 0 ||
         promo.maxPromoQuantity != 1 ||
-        promo.checkpoint.trim().isEmpty ||
         matching.length != 1 ||
         promo.promoPrice >= matching.single.price) {
       throw FormatException('Invalid promotion ${promo.id}.');

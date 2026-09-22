@@ -606,6 +606,325 @@ class PlanAdaptationTaskScenario {
   }
 }
 
+class ShoppingTripPackage {
+  const ShoppingTripPackage({
+    required this.id,
+    required this.label,
+    required this.amount,
+    required this.maxQuantity,
+  });
+
+  final String id;
+  final String label;
+  final int amount;
+  final int maxQuantity;
+
+  factory ShoppingTripPackage.fromJson(Map<String, Object?> json) =>
+      ShoppingTripPackage(
+        id: _requiredString(json, 'id'),
+        label: _requiredString(json, 'label'),
+        amount: _requiredInt(json, 'amount'),
+        maxQuantity: _requiredInt(json, 'maxQuantity'),
+      );
+
+  void validate() {
+    if (id.trim().isEmpty ||
+        label.trim().isEmpty ||
+        amount <= 0 ||
+        maxQuantity <= 0) {
+      throw const FormatException('Invalid shopping trip package.');
+    }
+  }
+}
+
+class ShoppingTripPriceScenario {
+  const ShoppingTripPriceScenario({
+    required this.id,
+    required this.smallPrice,
+    required this.largePrice,
+  });
+
+  final String id;
+  final int smallPrice;
+  final int largePrice;
+
+  factory ShoppingTripPriceScenario.fromJson(Map<String, Object?> json) =>
+      ShoppingTripPriceScenario(
+        id: _requiredString(json, 'id'),
+        smallPrice: _requiredInt(json, 'smallPrice'),
+        largePrice: _requiredInt(json, 'largePrice'),
+      );
+}
+
+class ShoppingTripItem {
+  const ShoppingTripItem({
+    required this.id,
+    required this.label,
+    required this.requiredAmount,
+    required this.unit,
+    required this.requirementLabel,
+    required this.smallPackage,
+    required this.largePackage,
+    required this.priceScenarios,
+  });
+
+  final String id;
+  final String label;
+  final int requiredAmount;
+  final String unit;
+  final String requirementLabel;
+  final ShoppingTripPackage smallPackage;
+  final ShoppingTripPackage largePackage;
+  final List<ShoppingTripPriceScenario> priceScenarios;
+
+  factory ShoppingTripItem.fromJson(Map<String, Object?> json) {
+    final small = json['smallPackage'];
+    final large = json['largePackage'];
+    final prices = json['priceScenarios'];
+    if (small is! Map || large is! Map || prices is! List) {
+      throw const FormatException('Invalid shopping trip item packages.');
+    }
+    return ShoppingTripItem(
+      id: _requiredString(json, 'id'),
+      label: _requiredString(json, 'label'),
+      requiredAmount: _requiredInt(json, 'requiredAmount'),
+      unit: _requiredString(json, 'unit'),
+      requirementLabel: _requiredString(json, 'requirementLabel'),
+      smallPackage: ShoppingTripPackage.fromJson(
+        Map<String, Object?>.from(small),
+      ),
+      largePackage: ShoppingTripPackage.fromJson(
+        Map<String, Object?>.from(large),
+      ),
+      priceScenarios: prices
+          .map((value) {
+            if (value is! Map) {
+              throw const FormatException(
+                'Invalid shopping trip price scenario.',
+              );
+            }
+            return ShoppingTripPriceScenario.fromJson(
+              Map<String, Object?>.from(value),
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
+  ShoppingTripPriceScenario scenarioById(String id) =>
+      priceScenarios.singleWhere((scenario) => scenario.id == id);
+
+  void validate() {
+    if (id.trim().isEmpty ||
+        label.trim().isEmpty ||
+        unit.trim().isEmpty ||
+        requirementLabel.trim().isEmpty ||
+        requiredAmount <= 0) {
+      throw const FormatException('Invalid shopping trip item.');
+    }
+    smallPackage.validate();
+    largePackage.validate();
+    if (smallPackage.id == largePackage.id ||
+        priceScenarios.isEmpty ||
+        (smallPackage.amount * smallPackage.maxQuantity +
+                largePackage.amount * largePackage.maxQuantity) <
+            requiredAmount) {
+      throw const FormatException('Shopping trip requirement is unreachable.');
+    }
+    final ids = <String>{};
+    for (final scenario in priceScenarios) {
+      if (scenario.id.trim().isEmpty ||
+          !ids.add(scenario.id) ||
+          scenario.smallPrice <= 0 ||
+          scenario.largePrice <= 0) {
+        throw const FormatException('Invalid shopping trip price scenario.');
+      }
+    }
+  }
+}
+
+class ShoppingTripSelection {
+  const ShoppingTripSelection({
+    required this.priceScenarioId,
+    required this.smallQuantity,
+    required this.largeQuantity,
+  });
+
+  final String priceScenarioId;
+  final int smallQuantity;
+  final int largeQuantity;
+
+  Map<String, Object?> toJson() => {
+    'priceScenarioId': priceScenarioId,
+    'smallQuantity': smallQuantity,
+    'largeQuantity': largeQuantity,
+  };
+
+  factory ShoppingTripSelection.fromJson(Map<String, Object?> json) =>
+      ShoppingTripSelection(
+        priceScenarioId: _requiredString(json, 'priceScenarioId'),
+        smallQuantity: _requiredInt(json, 'smallQuantity'),
+        largeQuantity: _requiredInt(json, 'largeQuantity'),
+      );
+}
+
+class ShoppingTripEvaluation {
+  const ShoppingTripEvaluation({
+    required this.purchasedAmounts,
+    required this.insufficientItemIds,
+    required this.totalCost,
+    required this.overBudgetBy,
+  });
+
+  final Map<String, int> purchasedAmounts;
+  final Set<String> insufficientItemIds;
+  final int totalCost;
+  final int overBudgetBy;
+  bool get isSuccess => insufficientItemIds.isEmpty && overBudgetBy == 0;
+}
+
+class ShoppingTripTaskScenario {
+  const ShoppingTripTaskScenario({
+    required this.prompt,
+    required this.budget,
+    required this.items,
+    required this.successExplanation,
+  });
+
+  final String prompt;
+  final int budget;
+  final List<ShoppingTripItem> items;
+  final String successExplanation;
+
+  factory ShoppingTripTaskScenario.fromJson(Map<String, Object?> json) {
+    final rawItems = json['items'];
+    if (rawItems is! List) {
+      throw const FormatException('Shopping trip items must be a list.');
+    }
+    return ShoppingTripTaskScenario(
+      prompt: _requiredString(json, 'prompt'),
+      budget: _requiredInt(json, 'budget'),
+      successExplanation: _requiredString(json, 'successExplanation'),
+      items: rawItems
+          .map((value) {
+            if (value is! Map) {
+              throw const FormatException('Invalid shopping trip item.');
+            }
+            return ShoppingTripItem.fromJson(Map<String, Object?>.from(value));
+          })
+          .toList(growable: false),
+    );
+  }
+
+  void validate() {
+    if (prompt.trim().isEmpty ||
+        successExplanation.trim().isEmpty ||
+        budget <= 0 ||
+        items.isEmpty) {
+      throw const FormatException('Invalid shopping trip scenario.');
+    }
+    final ids = <String>{};
+    for (final item in items) {
+      item.validate();
+      if (!ids.add(item.id)) {
+        throw FormatException('Duplicate shopping trip item ID: ${item.id}');
+      }
+    }
+  }
+
+  bool get isCanonicalDay4 {
+    if (budget != 190 || items.length != 3) return false;
+    const expected = {
+      'water': [1000, 500, 2, 1500, 1, 25, 60, 30, 50],
+      'soap': [3, 2, 2, 5, 1, 30, 70, 35, 60],
+      'cookies': [300, 200, 2, 500, 1, 35, 80, 40, 70],
+    };
+    const units = {'water': 'ml', 'soap': 'pcs', 'cookies': 'g'};
+    const requirementLabels = {
+      'water': '1 л',
+      'soap': '3 шт.',
+      'cookies': '300 г',
+    };
+    for (final item in items) {
+      final values = expected[item.id];
+      if (values == null ||
+          item.unit != units[item.id] ||
+          item.requirementLabel != requirementLabels[item.id] ||
+          item.smallPackage.id != 'small' ||
+          item.largePackage.id != 'large' ||
+          item.priceScenarios.length != 2) {
+        return false;
+      }
+      final prices = {for (final price in item.priceScenarios) price.id: price};
+      final smallBetter = prices['small_better'];
+      final largeBetter = prices['large_better'];
+      if (smallBetter == null ||
+          largeBetter == null ||
+          item.requiredAmount != values[0] ||
+          item.smallPackage.amount != values[1] ||
+          item.smallPackage.maxQuantity != values[2] ||
+          item.largePackage.amount != values[3] ||
+          item.largePackage.maxQuantity != values[4] ||
+          smallBetter.smallPrice != values[5] ||
+          smallBetter.largePrice != values[6] ||
+          largeBetter.smallPrice != values[7] ||
+          largeBetter.largePrice != values[8]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool isValidSubmission(Map<String, ShoppingTripSelection> selections) {
+    if (selections.length != items.length ||
+        !items.every((item) => selections.containsKey(item.id))) {
+      return false;
+    }
+    for (final item in items) {
+      final selected = selections[item.id]!;
+      if (!item.priceScenarios.any(
+            (price) => price.id == selected.priceScenarioId,
+          ) ||
+          selected.smallQuantity < 0 ||
+          selected.largeQuantity < 0 ||
+          selected.smallQuantity > item.smallPackage.maxQuantity ||
+          selected.largeQuantity > item.largePackage.maxQuantity) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  ShoppingTripEvaluation evaluate(
+    Map<String, ShoppingTripSelection> selections,
+  ) {
+    if (!isValidSubmission(selections)) {
+      throw ArgumentError('Invalid shopping trip submission.');
+    }
+    final amounts = <String, int>{};
+    final insufficient = <String>{};
+    var total = 0;
+    for (final item in items) {
+      final selected = selections[item.id]!;
+      final price = item.scenarioById(selected.priceScenarioId);
+      final amount =
+          selected.smallQuantity * item.smallPackage.amount +
+          selected.largeQuantity * item.largePackage.amount;
+      amounts[item.id] = amount;
+      if (amount < item.requiredAmount) insufficient.add(item.id);
+      total +=
+          selected.smallQuantity * price.smallPrice +
+          selected.largeQuantity * price.largePrice;
+    }
+    return ShoppingTripEvaluation(
+      purchasedAmounts: Map.unmodifiable(amounts),
+      insufficientItemIds: Set.unmodifiable(insufficient),
+      totalCost: total,
+      overBudgetBy: total > budget ? total - budget : 0,
+    );
+  }
+}
+
 class FinancialTask {
   const FinancialTask({
     required this.id,
@@ -620,6 +939,7 @@ class FinancialTask {
     CategorizationTaskScenario? categorizationScenario,
     BudgetPriorityTaskScenario? budgetPriorityScenario,
     PlanAdaptationTaskScenario? planAdaptationScenario,
+    ShoppingTripTaskScenario? shoppingTripScenario,
   }) : // The public parameter names preserve the existing choice constructor.
        // ignore: prefer_initializing_formals
        _choiceScenario = choiceScenario,
@@ -628,7 +948,9 @@ class FinancialTask {
        // ignore: prefer_initializing_formals
        _budgetPriorityScenario = budgetPriorityScenario,
        // ignore: prefer_initializing_formals
-       _planAdaptationScenario = planAdaptationScenario;
+       _planAdaptationScenario = planAdaptationScenario,
+       // ignore: prefer_initializing_formals
+       _shoppingTripScenario = shoppingTripScenario;
 
   // Stable identity: a new period, reward, correct answer, or task meaning
   // requires a new ID rather than reusing persisted task progress.
@@ -644,6 +966,7 @@ class FinancialTask {
   final CategorizationTaskScenario? _categorizationScenario;
   final BudgetPriorityTaskScenario? _budgetPriorityScenario;
   final PlanAdaptationTaskScenario? _planAdaptationScenario;
+  final ShoppingTripTaskScenario? _shoppingTripScenario;
 
   ChoiceTaskScenario get choiceScenario =>
       _choiceScenario ?? (throw StateError('Task $id is not a choice task.'));
@@ -659,6 +982,10 @@ class FinancialTask {
   PlanAdaptationTaskScenario get planAdaptationScenario =>
       _planAdaptationScenario ??
       (throw StateError('Task $id is not a plan adaptation task.'));
+
+  ShoppingTripTaskScenario get shoppingTripScenario =>
+      _shoppingTripScenario ??
+      (throw StateError('Task $id is not a shopping trip task.'));
 
   factory FinancialTask.fromJson(Map<String, Object?> json) {
     final scenario = json['scenarioData'];
@@ -693,6 +1020,11 @@ class FinancialTask {
               Map<String, Object?>.from(scenario),
             )
           : null,
+      shoppingTripScenario: type == 'shopping_trip'
+          ? ShoppingTripTaskScenario.fromJson(
+              Map<String, Object?>.from(scenario),
+            )
+          : null,
     );
     task.validate();
     return task;
@@ -710,7 +1042,8 @@ class FinancialTask {
         if (_choiceScenario == null ||
             _categorizationScenario != null ||
             _budgetPriorityScenario != null ||
-            _planAdaptationScenario != null) {
+            _planAdaptationScenario != null ||
+            _shoppingTripScenario != null) {
           throw const FormatException('Choice task scenario is invalid.');
         }
         _choiceScenario.validate();
@@ -719,7 +1052,8 @@ class FinancialTask {
         if (_categorizationScenario == null ||
             _choiceScenario != null ||
             _budgetPriorityScenario != null ||
-            _planAdaptationScenario != null) {
+            _planAdaptationScenario != null ||
+            _shoppingTripScenario != null) {
           throw const FormatException(
             'Categorization task scenario is invalid.',
           );
@@ -730,7 +1064,8 @@ class FinancialTask {
         if (_budgetPriorityScenario == null ||
             _choiceScenario != null ||
             _categorizationScenario != null ||
-            _planAdaptationScenario != null) {
+            _planAdaptationScenario != null ||
+            _shoppingTripScenario != null) {
           throw const FormatException(
             'Budget priority task scenario is invalid.',
           );
@@ -741,12 +1076,23 @@ class FinancialTask {
         if (_planAdaptationScenario == null ||
             _choiceScenario != null ||
             _categorizationScenario != null ||
-            _budgetPriorityScenario != null) {
+            _budgetPriorityScenario != null ||
+            _shoppingTripScenario != null) {
           throw const FormatException(
             'Plan adaptation task scenario is invalid.',
           );
         }
         _planAdaptationScenario.validate();
+        break;
+      case 'shopping_trip':
+        if (_shoppingTripScenario == null ||
+            _choiceScenario != null ||
+            _categorizationScenario != null ||
+            _budgetPriorityScenario != null ||
+            _planAdaptationScenario != null) {
+          throw const FormatException('Shopping trip scenario is invalid.');
+        }
+        _shoppingTripScenario.validate();
         break;
       default:
         throw FormatException('Unsupported task type: $type');

@@ -6,6 +6,7 @@ import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/special_purchase.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum ShopLoad {
@@ -39,12 +40,14 @@ class PurchaseAttempt {
     required this.periodId,
     required this.item,
     required this.operationId,
+    this.promotionId,
   });
 
   final int profileId;
   final int periodId;
   final ShopItem item;
   final String operationId;
+  final String? promotionId;
 }
 
 class ShopState {
@@ -55,6 +58,8 @@ class ShopState {
     this.gameState,
     this.period,
     this.quantities = const {},
+    this.promotion,
+    this.promotionPurchased = false,
     this.purchasing = false,
     this.result,
     this.pending,
@@ -66,6 +71,8 @@ class ShopState {
   final GameState? gameState;
   final GamePeriod? period;
   final Map<String, int> quantities;
+  final ShopPromotion? promotion;
+  final bool promotionPurchased;
   final bool purchasing;
   final ShopResult? result;
   final PurchaseAttempt? pending;
@@ -76,6 +83,15 @@ class ShopState {
     }
     return null;
   }
+
+  bool isPromotionActiveFor(ShopItem item) =>
+      period?.periodNumber == 4 &&
+      promotion != null &&
+      !promotionPurchased &&
+      promotion!.itemId == item.id;
+
+  int effectivePriceFor(ShopItem item) =>
+      isPromotionActiveFor(item) ? promotion!.promoPrice : item.price;
 
   String? unavailableReason(ShopItem item) {
     if (profileId == null) return 'Профиль пока не выбран.';
@@ -110,6 +126,8 @@ class ShopState {
     gameState: gameState,
     period: period,
     quantities: quantities,
+    promotion: promotion,
+    promotionPurchased: promotionPurchased,
     purchasing: purchasing,
     result: result,
     pending: pending,
@@ -194,6 +212,22 @@ class ShopController extends Notifier<ShopState> {
           item.id,
         );
       }
+      final promotions = period?.id == null
+          ? const <ShopPromotion>[]
+          : await content.loadPromotions();
+      final promotionState =
+          period?.id == null ||
+              !promotions.any(
+                (promotion) => promotion.period == period!.periodNumber,
+              )
+          ? null
+          : await ref
+                .read(specialPurchaseServiceProvider)
+                .loadPromotionState(
+                  profileId: profileId,
+                  periodId: period!.id!,
+                  periodNumber: period.periodNumber,
+                );
       return ShopState(
         load: ShopLoad.ready,
         profileId: profileId,
@@ -201,6 +235,8 @@ class ShopController extends Notifier<ShopState> {
         gameState: game,
         period: period,
         quantities: Map.unmodifiable(quantities),
+        promotion: promotionState?.promotion,
+        promotionPurchased: promotionState?.purchased ?? false,
       );
     } catch (_) {
       // A failed inventory/period read must never look like zero ownership/no period.
@@ -251,6 +287,9 @@ class ShopController extends Notifier<ShopState> {
         periodId: periodId,
         item: item,
         operationId: id,
+        promotionId: current.isPromotionActiveFor(item)
+            ? current.promotion!.id
+            : null,
       ),
     );
   }
@@ -274,19 +313,29 @@ class ShopController extends Notifier<ShopState> {
   }
 
   Future<void> _perform(PurchaseAttempt attempt) async {
-    final service = ref.read(purchaseServiceProvider);
     final generation = ++_generation;
     state = state.withOperation(purchasing: true, pending: attempt);
     GameState? purchasedState;
     ShopResult result;
     PurchaseAttempt? pending;
     try {
-      purchasedState = await service.purchase(
-        profileId: attempt.profileId,
-        periodId: attempt.periodId,
-        itemId: attempt.item.id,
-        operationId: attempt.operationId,
-      );
+      purchasedState = attempt.promotionId == null
+          ? await ref
+                .read(purchaseServiceProvider)
+                .purchase(
+                  profileId: attempt.profileId,
+                  periodId: attempt.periodId,
+                  itemId: attempt.item.id,
+                  operationId: attempt.operationId,
+                )
+          : await ref
+                .read(specialPurchaseServiceProvider)
+                .purchasePromotion(
+                  profileId: attempt.profileId,
+                  periodId: attempt.periodId,
+                  promotionId: attempt.promotionId!,
+                  operationId: attempt.operationId,
+                );
       result = const ShopResult(ShopResultKind.success);
       unawaited(ref.read(thingsControllerProvider.notifier).load());
     } on InsufficientFundsException catch (error) {
