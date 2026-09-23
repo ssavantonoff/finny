@@ -824,6 +824,7 @@ class _HomeContent extends StatelessWidget {
                   _DayStatusCard(
                     period: period,
                     completedDays: state.completedDays,
+                    allDaysCompleted: state.allDaysCompleted,
                   ),
                   if (state.startFailed) ...[
                     const SizedBox(height: AppSpacing.small),
@@ -1154,14 +1155,24 @@ class _RequiredActionRow extends StatelessWidget {
 }
 
 class _DayStatusCard extends StatelessWidget {
-  const _DayStatusCard({required this.period, required this.completedDays});
+  const _DayStatusCard({
+    required this.period,
+    required this.completedDays,
+    required this.allDaysCompleted,
+  });
 
   final GamePeriod? period;
   final int completedDays;
+  final bool allDaysCompleted;
 
   @override
   Widget build(BuildContext context) {
     final (title, description) = switch (period?.status) {
+      null when allDaysCompleted => (
+        'Все 5 дней завершены',
+        'Финни вырос вместе с тобой!',
+      ),
+      null when completedDays >= 5 => ('День 5 завершён', ''),
       null when completedDays == 0 => (
         'Первый день с Финни',
         'Получи монеты и составь план на день.',

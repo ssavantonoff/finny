@@ -13,6 +13,8 @@ import 'package:finny/models/profile.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
+import 'package:finny/models/story_event.dart';
+import 'package:finny/services/story_event_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -40,6 +42,7 @@ class _AtmosphereGames extends SqliteGameRepository {
   Pet pet;
   GameState gameState;
   GamePeriod? period;
+  List<GamePeriod>? periodsOverride;
   int petUsage = 0;
   Duration usageReadDelay = Duration.zero;
   String? failingUsageActionId;
@@ -48,7 +51,7 @@ class _AtmosphereGames extends SqliteGameRepository {
   Future<GameState?> getGameState(int profileId) async => gameState;
   @override
   Future<List<GamePeriod>> getPeriods(int profileId) async =>
-      period == null ? const [] : [period!];
+      periodsOverride ?? (period == null ? const [] : [period!]);
   @override
   Future<Pet?> getPet(int profileId) async => pet;
   @override
@@ -67,6 +70,14 @@ class _AtmosphereGames extends SqliteGameRepository {
     if (actionId == FreePetInteraction.pet.actionId) return petUsage;
     return 0;
   }
+}
+
+class _NoopStoryEventService extends StoryEventService {
+  _NoopStoryEventService(super.port, super.content);
+
+  @override
+  Future<StoryEventSnapshot?> loadDay3Bowl({required int profileId}) async =>
+      null;
 }
 
 void main() {
@@ -99,6 +110,117 @@ void main() {
       expect(find.text('85'), findsNothing);
       expect(find.text('85%'), findsNothing);
       expect(find.text('85/100'), findsNothing);
+    });
+
+    testWidgets('completed five-day campaign never suggests Day 6', (
+      tester,
+    ) async {
+      final database = createTestDatabase();
+      addTearDown(database.close);
+      final profile = Profile(
+        id: 1,
+        gameName: 'Игрок',
+        profileType: ProfileType.normal,
+        onboardingCompleted: true,
+        createdAt: DateTime.utc(2026),
+      );
+      const pet = Pet(
+        profileId: 1,
+        name: 'Финни',
+        colorId: 'blue',
+        patternId: 'plain',
+        developmentStage: 3,
+        growthPoints: 300,
+        satiety: 80,
+        care: 80,
+        mood: 80,
+      );
+      final gameState = GameState(
+        profileId: 1,
+        walletBalance: 200,
+        currentPeriod: 5,
+        savedAmount: 0,
+        updatedAt: DateTime.utc(2026),
+      );
+      final periods = List<GamePeriod>.generate(5, (index) {
+        final day = index + 1;
+        return GamePeriod(
+          id: day,
+          profileId: 1,
+          definitionId: 'period_$day',
+          periodNumber: day,
+          startWalletBalance: 500,
+          baseIncome: 500,
+          extraIncome: 0,
+          plannedNeed: 0,
+          plannedWant: 0,
+          plannedSavings: 0,
+          plannedFree: 500,
+          actualNeed: 0,
+          actualWant: 0,
+          actualSavings: 0,
+          requiredCheckpoints: const [],
+          resolvedCheckpoints: const [],
+          endWalletBalance: 500,
+          growthPointsEarned: 0,
+          status: GamePeriodStatus.completed,
+          createdAt: DateTime.utc(2026),
+          completedAt: DateTime.utc(2026),
+        );
+      });
+      final content = TestContentRepository(
+        List<PeriodDefinition>.generate(
+          5,
+          (index) => PeriodDefinition(
+            id: 'period_${index + 1}',
+            number: index + 1,
+            title: 'День ${index + 1}',
+            baseIncome: 500,
+            requiredCheckpoints: const [],
+          ),
+        ),
+      );
+      final games = _AtmosphereGames(database, pet, gameState, null)
+        ..periodsOverride = periods;
+      final container = ProviderContainer(
+        overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          storyEventServiceProvider.overrideWithValue(
+            _NoopStoryEventService(SqliteStoryEventPort(database), content),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
+          activeProfileIdProvider.overrideWith(() => _ActiveProfileMock(1)),
+          profileRepositoryProvider.overrideWithValue(
+            _AtmosphereProfiles(profile),
+          ),
+          gameRepositoryProvider.overrideWithValue(games),
+          contentRepositoryProvider.overrideWithValue(content),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(theme: AppTheme.light, home: const HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final ready = container.read(homeControllerProvider) as HomeReady;
+      expect(ready.completedDays, 5);
+      expect(ready.allDaysCompleted, isTrue);
+      expect(find.byKey(const Key('home-day-status')), findsOneWidget);
+      expect(find.text('Все 5 дней завершены'), findsOneWidget);
+      expect(find.text('Можно начать день 6.'), findsNothing);
+      final renderedText = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((widget) => widget.data ?? widget.textSpan?.toPlainText() ?? '')
+          .join('\n')
+          .toLowerCase();
+      expect(renderedText, isNot(contains('день 6')));
     });
   });
 
