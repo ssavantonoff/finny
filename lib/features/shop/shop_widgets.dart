@@ -34,7 +34,7 @@ class ShopPriceLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (!state.isPromotionActiveFor(item)) {
+    if (!state.isDiscountActiveFor(item)) {
       return Text(
         '${item.price} монет • ${shopCategory(item)}',
         style: theme.textTheme.bodyLarge?.copyWith(fontSize: fontSize),
@@ -54,7 +54,7 @@ class ShopPriceLabel extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             child: Text(
-              'Акция',
+              state.isDayFiveSaleDay ? 'Распродажа' : 'Акция',
               style: theme.textTheme.labelMedium?.copyWith(
                 color: theme.colorScheme.onTertiaryContainer,
                 fontWeight: FontWeight.w700,
@@ -78,6 +78,12 @@ class ShopPriceLabel extends StatelessWidget {
             color: theme.colorScheme.tertiary,
           ),
         ),
+        if (state.isDayFiveSaleDay)
+          Text(
+            'Скидка ${state.discountAmountFor(item)} 🪙',
+            key: Key('shop-sale-discount-${item.id}'),
+            style: theme.textTheme.bodyLarge?.copyWith(fontSize: fontSize),
+          ),
         Text(
           '• ${shopCategory(item)}',
           style: theme.textTheme.bodyLarge?.copyWith(

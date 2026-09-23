@@ -10,6 +10,35 @@ class SpecialPurchaseService {
   final SpecialPurchasePort _port;
   final ContentRepository _content;
 
+  Future<List<DayFiveSaleOffer>> loadOrCreateDayFiveSale({
+    required int profileId,
+    required int periodId,
+  }) async {
+    final canonical = await _loadCanonical();
+    return _port.loadOrCreateDayFiveSale(
+      profileId: profileId,
+      periodId: periodId,
+      canonicalItems: canonical.items,
+    );
+  }
+
+  Future<GameState> purchaseDayFiveSale({
+    required int profileId,
+    required int periodId,
+    required String itemId,
+    required String operationId,
+  }) async {
+    final canonical = await _loadCanonical();
+    final matches = canonical.items.where((item) => item.id == itemId);
+    if (matches.length != 1) throw StateError('Unknown sale item.');
+    return _port.purchaseDayFiveSale(
+      profileId: profileId,
+      periodId: periodId,
+      item: matches.single,
+      operationId: operationId,
+    );
+  }
+
   Future<
     ({
       List<StoryPurchase> stories,

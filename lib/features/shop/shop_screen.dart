@@ -444,14 +444,14 @@ class _ShopSection extends StatelessWidget {
         ),
         for (final item in items)
           Card(
-            key: state.isPromotionActiveFor(item)
+            key: state.isDiscountActiveFor(item)
                 ? Key('shop-promo-card-${item.id}')
                 : null,
-            color: state.isPromotionActiveFor(item)
+            color: state.isDiscountActiveFor(item)
                 ? Theme.of(context).colorScheme.tertiaryContainer
                       .withValues(alpha: .4)
                 : null,
-            shape: state.isPromotionActiveFor(item)
+            shape: state.isDiscountActiveFor(item)
                 ? RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadii.card),
                     side: BorderSide(
@@ -484,7 +484,7 @@ class _ShopSection extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: AppSpacing.small),
-                    if (state.isPromotionActiveFor(item)) ...[
+                    if (state.isDiscountActiveFor(item)) ...[
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Container(
@@ -500,7 +500,7 @@ class _ShopSection extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            'Акция дня',
+                            state.isDayFiveSaleDay ? 'Распродажа' : 'Акция дня',
                             style: TextStyle(
                               color: Theme.of(context)
                                   .colorScheme

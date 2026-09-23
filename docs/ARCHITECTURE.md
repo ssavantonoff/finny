@@ -168,7 +168,7 @@ Summary; после Day 2 и Day 5 используется `/progress`, а сл
 
 ## Миграции
 
-Текущая schema version — 9. Миграция v1 → v2 добавляет period definition identity,
+Текущая schema version — 12. Миграция v1 → v2 добавляет period definition identity,
 required/resolved checkpoint snapshots и индекс period transactions, не удаляя
 существующие профили, balances, планы или историю. Для прежних периодов 1–5
 identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
@@ -189,4 +189,9 @@ checkpoints, корректирует полностью решённый active
 active elapsed-time в `0/76/100/0..69`, не пересчитывает существующие Pet stats и
 идемпотентно выдаёт каждому профилю starter toothbrush. Следующие
 изменения схемы должны добавлять последовательные миграции; нельзя пересоздавать
-базу с потерей NORMAL-профиля.
+базу с потерей NORMAL-профиля. Миграция v10 → v11 нормализует Day 4,
+а v11 → v12 добавляет `day5_sale_assignments` для неизменных в течение периода
+скидок и признака использованной скидки. Миграция не переписывает Day 5
+`task_progress` и финансовую историю: завершённое старое основное задание
+признаётся через legacy compatibility path только вместе с валидной наградой и
+закрытым `financial_task`.

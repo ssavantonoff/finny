@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/day_lifecycle.dart';
+import 'package:finny/models/day_five_task.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
@@ -102,11 +103,39 @@ abstract interface class GameRepository {
 }
 
 abstract interface class TaskCompletionPort {
+  Future<DayFiveTaskCompletion> loadDayFiveCompletion({
+    required int profileId,
+    required int periodId,
+    required List<FinancialTask> requiredTasks,
+    required List<ShopItem> catalog,
+  });
+
+  Future<TaskSubmissionResult> submitFinancialTaskIndependentBudget({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required List<FinancialTask> requiredTasks,
+    required List<ShopItem> catalog,
+    required Set<String> selectedItemIds,
+    required int savingsAmount,
+  });
+
+  Future<TaskSubmissionResult> submitFinancialTaskPlanRepair({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required List<FinancialTask> requiredTasks,
+    required List<ShopItem> catalog,
+    required Set<String> nowItemIds,
+    required int savingsAmount,
+  });
+
   Future<TaskSubmissionResult> submitFinancialTaskShoppingTrip({
     required int profileId,
     required int periodId,
     required FinancialTask task,
     required Map<String, ShoppingTripSelection> selections,
+    List<FinancialTask>? requiredTasks,
   });
 
   Future<TaskSubmissionResult> submitFinancialTaskAnswer({
@@ -114,6 +143,7 @@ abstract interface class TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required String answerId,
+    List<FinancialTask>? requiredTasks,
   });
 
   Future<TaskSubmissionResult> submitFinancialTaskCategorization({
@@ -121,6 +151,7 @@ abstract interface class TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required Map<String, String> assignments,
+    List<FinancialTask>? requiredTasks,
   });
 
   Future<TaskSubmissionResult> submitFinancialTaskBudgetPriority({
@@ -128,6 +159,7 @@ abstract interface class TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required Map<String, String> assignments,
+    List<FinancialTask>? requiredTasks,
   });
 
   Future<TaskSubmissionResult> submitFinancialTaskPlanAdaptation({
@@ -135,6 +167,7 @@ abstract interface class TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required Map<String, String> assignments,
+    List<FinancialTask>? requiredTasks,
   });
 }
 
@@ -148,6 +181,18 @@ abstract interface class PurchasePort {
 }
 
 abstract interface class SpecialPurchasePort {
+  Future<List<DayFiveSaleOffer>> loadOrCreateDayFiveSale({
+    required int profileId,
+    required int periodId,
+    required List<ShopItem> canonicalItems,
+  });
+  Future<GameState> purchaseDayFiveSale({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+  });
+
   Future<GameState> purchaseStory({
     required int profileId,
     required int periodId,
@@ -1197,6 +1242,7 @@ class SqliteGameRepository implements GameRepository {
         'task_progress',
         'pet_action_operations',
         'campaign_story_events',
+        'day5_sale_assignments',
         'pet_daily_usage',
         'inventory',
         'transactions',
@@ -2050,11 +2096,105 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
   final SqliteGameRepository _core;
 
   @override
+  Future<TaskSubmissionResult> submitFinancialTaskIndependentBudget({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required List<FinancialTask> requiredTasks,
+    required List<ShopItem> catalog,
+    required Set<String> selectedItemIds,
+    required int savingsAmount,
+  }) {
+    task.validate();
+    if (task.id != 'task_independent_budget_05' ||
+        task.type != 'independent_budget' ||
+        !task.independentBudgetScenario.isValidSubmission(
+          selectedItemIds,
+          savingsAmount,
+        )) {
+      throw ArgumentError('Invalid independent budget submission.');
+    }
+    final scenario = task.independentBudgetScenario;
+    final evaluation = scenario.evaluate(
+      selectedItemIds,
+      savingsAmount,
+      catalog,
+    );
+    return _submitFinancialTask(
+      profileId: profileId,
+      periodId: periodId,
+      task: task,
+      requiredTasks: requiredTasks,
+      catalog: catalog,
+      isCorrect: evaluation.isSuccess,
+      incorrectResult: TaskDayFiveIncorrect(
+        explanation: _day5Feedback(evaluation, repair: false),
+        missingRequiredIds: evaluation.missingRequiredIds,
+        savingsShortfall: evaluation.savingsShortfall,
+        overBudgetBy: evaluation.overBudgetBy,
+        total: evaluation.total,
+      ),
+      completedScenarioState: {
+        'type': 'independent_budget',
+        'selectedItemIds': selectedItemIds.toList()..sort(),
+        'savingsAmount': savingsAmount,
+      },
+      completionExplanation: scenario.successExplanation,
+      isValidCompletedScenario: (state) =>
+          scenario.isValidStoredState(state, catalog),
+    );
+  }
+
+  @override
+  Future<TaskSubmissionResult> submitFinancialTaskPlanRepair({
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required List<FinancialTask> requiredTasks,
+    required List<ShopItem> catalog,
+    required Set<String> nowItemIds,
+    required int savingsAmount,
+  }) {
+    task.validate();
+    if (task.id != 'task_plan_repair_05' ||
+        task.type != 'plan_repair' ||
+        !task.planRepairScenario.isValidSubmission(nowItemIds, savingsAmount)) {
+      throw ArgumentError('Invalid plan repair submission.');
+    }
+    final scenario = task.planRepairScenario;
+    final evaluation = scenario.evaluate(nowItemIds, savingsAmount, catalog);
+    return _submitFinancialTask(
+      profileId: profileId,
+      periodId: periodId,
+      task: task,
+      requiredTasks: requiredTasks,
+      catalog: catalog,
+      isCorrect: evaluation.isSuccess,
+      incorrectResult: TaskDayFiveIncorrect(
+        explanation: _day5Feedback(evaluation, repair: true),
+        missingRequiredIds: evaluation.missingRequiredIds,
+        savingsShortfall: evaluation.savingsShortfall,
+        overBudgetBy: evaluation.overBudgetBy,
+        total: evaluation.total,
+      ),
+      completedScenarioState: {
+        'type': 'plan_repair',
+        'selectedItemIds': nowItemIds.toList()..sort(),
+        'savingsAmount': savingsAmount,
+      },
+      completionExplanation: scenario.successExplanation,
+      isValidCompletedScenario: (state) =>
+          scenario.isValidStoredState(state, catalog),
+    );
+  }
+
+  @override
   Future<TaskSubmissionResult> submitFinancialTaskShoppingTrip({
     required int profileId,
     required int periodId,
     required FinancialTask task,
     required Map<String, ShoppingTripSelection> selections,
+    List<FinancialTask>? requiredTasks,
   }) async {
     task.validate();
     if (profileId <= 0 ||
@@ -2074,6 +2214,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       profileId: profileId,
       periodId: periodId,
       task: task,
+      requiredTasks: requiredTasks,
       isCorrect: evaluation.isSuccess,
       incorrectResult: TaskShoppingTripIncorrect(
         explanation: 'Проверь корзину и попробуй ещё раз.',
@@ -2129,6 +2270,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required String answerId,
+    List<FinancialTask>? requiredTasks,
   }) async {
     task.validate();
     if (profileId <= 0 ||
@@ -2141,6 +2283,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       profileId: profileId,
       periodId: periodId,
       task: task,
+      requiredTasks: requiredTasks,
       isCorrect: answerId == task.choiceScenario.correctOptionId,
       incorrectResult: TaskAnswerIncorrect(
         explanation: task.choiceScenario.explanation,
@@ -2158,6 +2301,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required Map<String, String> assignments,
+    List<FinancialTask>? requiredTasks,
   }) async {
     task.validate();
     if (profileId <= 0 ||
@@ -2179,6 +2323,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       profileId: profileId,
       periodId: periodId,
       task: task,
+      requiredTasks: requiredTasks,
       isCorrect: incorrectItemIds.isEmpty,
       incorrectResult: TaskCategorizationIncorrect(
         explanation: 'Проверь выделенные карточки и попробуй ещё раз.',
@@ -2201,6 +2346,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required Map<String, String> assignments,
+    List<FinancialTask>? requiredTasks,
   }) async {
     task.validate();
     if (profileId <= 0 ||
@@ -2231,6 +2377,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       profileId: profileId,
       periodId: periodId,
       task: task,
+      requiredTasks: requiredTasks,
       isCorrect: incorrectItemIds.isEmpty && overBudgetBy == 0,
       incorrectResult: TaskBudgetPriorityIncorrect(
         explanation: scenario.incorrectExplanation,
@@ -2254,6 +2401,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
     required int periodId,
     required FinancialTask task,
     required Map<String, String> assignments,
+    List<FinancialTask>? requiredTasks,
   }) async {
     task.validate();
     if (profileId <= 0 ||
@@ -2297,6 +2445,7 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       profileId: profileId,
       periodId: periodId,
       task: task,
+      requiredTasks: requiredTasks,
       isCorrect: incorrectItemIds.isEmpty && overBudgetBy == 0,
       incorrectResult: TaskPlanAdaptationIncorrect(
         explanation: delayedWantAndSavings
@@ -2316,10 +2465,162 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
     );
   }
 
+  @override
+  Future<DayFiveTaskCompletion> loadDayFiveCompletion({
+    required int profileId,
+    required int periodId,
+    required List<FinancialTask> requiredTasks,
+    required List<ShopItem> catalog,
+  }) async {
+    final db = await _appDatabase.database;
+    return db.transaction((txn) async {
+      final period = await _core._requirePeriod(txn, profileId, periodId);
+      if (period.periodNumber != 5 ||
+          requiredTasks.length != 2 ||
+          !requiredTasks.any(
+            (task) => task.id == 'task_independent_budget_05',
+          ) ||
+          !requiredTasks.any((task) => task.id == 'task_plan_repair_05')) {
+        throw StateError('Invalid Day 5 task set.');
+      }
+      final legacy = await _hasLegacyDay5Completion(txn, profileId, period);
+      final completed = <String>{};
+      for (final task in requiredTasks) {
+        if (await _hasValidDayFiveProof(
+          txn,
+          profileId: profileId,
+          periodId: periodId,
+          task: task,
+          catalog: catalog,
+        )) {
+          completed.add(task.id);
+        }
+      }
+      if (legacy && completed.isNotEmpty) {
+        throw const TaskIntegrityException(
+          'Legacy and new Day 5 proofs are mixed.',
+        );
+      }
+      if (!legacy &&
+          period.resolvedCheckpoints.contains('financial_task') !=
+              (completed.length == requiredTasks.length)) {
+        throw const TaskIntegrityException(
+          'Day 5 checkpoint and task proofs disagree.',
+        );
+      }
+      return DayFiveTaskCompletion(
+        legacyCompleted: legacy,
+        completedTaskIds: Set.unmodifiable(completed),
+      );
+    });
+  }
+
+  Future<bool> _hasLegacyDay5Completion(
+    DatabaseExecutor txn,
+    int profileId,
+    GamePeriod period,
+  ) async {
+    const oldId = 'task_final_choice_05';
+    TaskProgress? progress;
+    try {
+      progress = await _core._readTaskProgress(txn, profileId, oldId);
+    } on FormatException catch (error) {
+      throw TaskIntegrityException('Invalid legacy Day 5 progress: $error');
+    }
+    final rows = await txn.query(
+      'transactions',
+      where: 'profile_id = ? AND (source = ? OR deduplication_key = ?)',
+      whereArgs: [
+        profileId,
+        'task_reward_$oldId',
+        'task_reward_${period.id}_$oldId',
+      ],
+    );
+    if (progress == null && rows.isEmpty) return false;
+    if (progress == null ||
+        progress.status != TaskProgressStatus.completed ||
+        !progress.rewardClaimed ||
+        progress.scenarioState.length != 1 ||
+        progress.scenarioState['answerId'] != 'balanced' ||
+        rows.length != 1 ||
+        !period.resolvedCheckpoints.contains('financial_task')) {
+      throw const TaskIntegrityException(
+        'Legacy Day 5 completion is inconsistent.',
+      );
+    }
+    final reward = GameTransaction.fromMap(rows.single);
+    if (reward.periodId != period.id ||
+        reward.type != GameTransactionType.taskReward ||
+        reward.amount != 50 ||
+        reward.source != 'task_reward_$oldId' ||
+        reward.deduplicationKey != 'task_reward_${period.id}_$oldId') {
+      throw const TaskIntegrityException(
+        'Legacy Day 5 reward is inconsistent.',
+      );
+    }
+    return true;
+  }
+
+  Future<bool> _hasValidDayFiveProof(
+    DatabaseExecutor txn, {
+    required int profileId,
+    required int periodId,
+    required FinancialTask task,
+    required List<ShopItem> catalog,
+  }) async {
+    TaskProgress? progress;
+    try {
+      progress = await _core._readTaskProgress(txn, profileId, task.id);
+    } on FormatException catch (error) {
+      throw TaskIntegrityException('Invalid Day 5 progress: $error');
+    }
+    final source = 'task_reward_${task.id}';
+    final key = 'task_reward_${periodId}_${task.id}';
+    final rows = await txn.query(
+      'transactions',
+      where: 'profile_id = ? AND (source = ? OR deduplication_key = ?)',
+      whereArgs: [profileId, source, key],
+    );
+    if (progress == null && rows.isEmpty) return false;
+    final validState =
+        progress != null &&
+        (task.type == 'independent_budget'
+            ? task.independentBudgetScenario.isValidStoredState(
+                progress.scenarioState,
+                catalog,
+              )
+            : task.type == 'plan_repair' &&
+                  task.planRepairScenario.isValidStoredState(
+                    progress.scenarioState,
+                    catalog,
+                  ));
+    if (progress == null ||
+        progress.status != TaskProgressStatus.completed ||
+        !progress.rewardClaimed ||
+        !validState ||
+        rows.length != 1) {
+      throw const TaskIntegrityException(
+        'Day 5 task completion is inconsistent.',
+      );
+    }
+    final reward = GameTransaction.fromMap(rows.single);
+    if (reward.profileId != profileId ||
+        reward.periodId != periodId ||
+        reward.type != GameTransactionType.taskReward ||
+        reward.amount != task.reward ||
+        reward.source != source ||
+        reward.deduplicationKey != key) {
+      throw const TaskIntegrityException('Day 5 task reward is inconsistent.');
+    }
+    return true;
+  }
+
   Future<TaskSubmissionResult> _submitFinancialTask({
     required int profileId,
     required int periodId,
     required FinancialTask task,
+    List<FinancialTask>? requiredTasks,
+    List<ShopItem>? catalog,
     required bool isCorrect,
     required TaskSubmissionResult incorrectResult,
     required Map<String, Object?> completedScenarioState,
@@ -2335,6 +2636,42 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       if (task.requiredForCheckpoint &&
           !period.requiredCheckpoints.contains('financial_task')) {
         throw StateError('This period does not require a financial task.');
+      }
+      final canonicalRequired = task.requiredForCheckpoint
+          ? (requiredTasks ?? [task])
+          : const <FinancialTask>[];
+      if (task.requiredForCheckpoint &&
+          (!canonicalRequired.any((entry) => entry.id == task.id) ||
+              canonicalRequired.any(
+                (entry) =>
+                    entry.period != period.periodNumber ||
+                    !entry.requiredForCheckpoint,
+              ))) {
+        throw StateError('Invalid required task set.');
+      }
+      if (period.periodNumber == 5 && task.requiredForCheckpoint) {
+        if (catalog == null ||
+            canonicalRequired.length != 2 ||
+            canonicalRequired.map((entry) => entry.id).toSet().length != 2 ||
+            !canonicalRequired.any(
+              (entry) =>
+                  entry.id == 'task_independent_budget_05' &&
+                  entry.type == 'independent_budget' &&
+                  entry.reward == 25 &&
+                  entry.dayProgressCost == 15,
+            ) ||
+            !canonicalRequired.any(
+              (entry) =>
+                  entry.id == 'task_plan_repair_05' &&
+                  entry.type == 'plan_repair' &&
+                  entry.reward == 25 &&
+                  entry.dayProgressCost == 15,
+            )) {
+          throw StateError('Invalid canonical Day 5 required tasks.');
+        }
+        if (await _hasLegacyDay5Completion(txn, profileId, period)) {
+          throw StateError('Legacy Day 5 financial task is already completed.');
+        }
       }
       if (task.id == 'task_shopping_trip_04') {
         final oldProgress = await txn.query(
@@ -2375,14 +2712,34 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       final checkpointResolved = period.resolvedCheckpoints.contains(
         'financial_task',
       );
+      var otherRequiredCompleted = true;
+      for (final other in canonicalRequired.where(
+        (entry) => entry.id != task.id,
+      )) {
+        if (catalog == null) throw StateError('Missing Day 5 catalog.');
+        otherRequiredCompleted =
+            await _hasValidDayFiveProof(
+              txn,
+              profileId: profileId,
+              periodId: periodId,
+              task: other,
+              catalog: catalog,
+            ) &&
+            otherRequiredCompleted;
+      }
       final hasCompletionProof = progress != null || rewardRows.isNotEmpty;
-      if (hasCompletionProof ||
-          (task.requiredForCheckpoint && checkpointResolved)) {
+      if (task.requiredForCheckpoint &&
+          checkpointResolved !=
+              (hasCompletionProof && otherRequiredCompleted)) {
+        throw const TaskIntegrityException(
+          'Financial task checkpoint and completion proofs disagree.',
+        );
+      }
+      if (hasCompletionProof) {
         if (progress == null ||
             progress.status != TaskProgressStatus.completed ||
             !progress.rewardClaimed ||
             !isValidCompletedScenario(progress.scenarioState) ||
-            (task.requiredForCheckpoint && !checkpointResolved) ||
             rewardRows.length != 1) {
           throw const TaskIntegrityException(
             'Task completion is inconsistent.',
@@ -2445,10 +2802,10 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
           ? (await _core._applyVirtualDayAction(
               txn,
               period: afterReward,
-              timeCost: VirtualDayRules.requiredTaskCost,
+              timeCost: task.dayProgressCost,
             )).period
           : afterReward;
-      final resolved = task.requiredForCheckpoint
+      final resolved = task.requiredForCheckpoint && otherRequiredCompleted
           ? await _core._resolveCheckpointInTransaction(
               txn,
               afterTime,
@@ -2590,6 +2947,30 @@ class SqliteTaskCompletionPort implements TaskCompletionPort {
       state['answerId'] == 'adapt';
 }
 
+String _day5Feedback(DayFiveEvaluation evaluation, {required bool repair}) {
+  final problems = <String>[];
+  if (evaluation.missingRequiredIds.contains('food_feed')) {
+    problems.add('Корм закончился. Его важно оставить в плане на сегодня.');
+  }
+  if (evaluation.missingRequiredIds.contains('care_comb')) {
+    problems.add('Сегодня Финни нужна расчёска.');
+  }
+  if (evaluation.missingRequiredIds.contains('scenario_waterer_05')) {
+    problems.add('Сломанную поилку нужно заменить сегодня.');
+  }
+  if (evaluation.savingsShortfall > 0) {
+    problems.add(
+      repair
+          ? 'В плане осталось слишком мало накоплений на цель.'
+          : 'На цель нужно отложить ещё ${evaluation.savingsShortfall} монет.',
+    );
+  }
+  if (evaluation.overBudgetBy > 0) {
+    problems.add('План превышает бюджет на ${evaluation.overBudgetBy} монет.');
+  }
+  return problems.join('\n');
+}
+
 class SqlitePurchasePort implements PurchasePort {
   SqlitePurchasePort(AppDatabase database)
     : _database = database,
@@ -2663,12 +3044,224 @@ class SqlitePurchasePort implements PurchasePort {
 }
 
 class SqliteSpecialPurchasePort implements SpecialPurchasePort {
-  SqliteSpecialPurchasePort(AppDatabase database)
+  SqliteSpecialPurchasePort(AppDatabase database, {Random? random})
     : _database = database,
-      _core = SqliteGameRepository(database);
+      _core = SqliteGameRepository(database),
+      _random = random ?? Random();
 
   final AppDatabase _database;
   final SqliteGameRepository _core;
+  final Random _random;
+
+  @override
+  Future<List<DayFiveSaleOffer>> loadOrCreateDayFiveSale({
+    required int profileId,
+    required int periodId,
+    required List<ShopItem> canonicalItems,
+  }) async {
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      final period = await _core._requirePeriod(txn, profileId, periodId);
+      if (period.periodNumber != 5) {
+        throw StateError('Day 5 sale belongs to Day 5 only.');
+      }
+      var rows = await txn.query(
+        'day5_sale_assignments',
+        where: 'profile_id = ? AND period_id = ?',
+        whereArgs: [profileId, periodId],
+        orderBy: 'item_id',
+      );
+      if (rows.isEmpty) {
+        final shampoos = canonicalItems.where(
+          (item) =>
+              item.id == 'care_shampoo' &&
+              item.price == 60 &&
+              item.category == ShopItemCategory.need &&
+              item.unlockType == 'available',
+        );
+        if (shampoos.length != 1) {
+          throw StateError('Canonical shampoo is missing.');
+        }
+        final ownedRows = await txn.query(
+          'inventory',
+          columns: ['item_id'],
+          where: 'profile_id = ? AND quantity > 0',
+          whereArgs: [profileId],
+        );
+        final owned = ownedRows.map((row) => row['item_id'] as String).toSet();
+        final candidates = canonicalItems
+            .where(
+              (item) =>
+                  item.category == ShopItemCategory.want &&
+                  item.persistent &&
+                  item.unlockType == 'available' &&
+                  item.id != 'food_treat' &&
+                  item.price > 10 &&
+                  !owned.contains(item.id),
+            )
+            .toList();
+        if (candidates.map((item) => item.id).toSet().length !=
+            candidates.length) {
+          throw StateError('Duplicate canonical sale candidates.');
+        }
+        candidates.shuffle(_random);
+        final chosen = candidates.take(2).toList(growable: false);
+        await txn.insert('day5_sale_assignments', {
+          'profile_id': profileId,
+          'period_id': periodId,
+          'item_id': 'care_shampoo',
+          'discount_amount': 20,
+        });
+        for (final item in chosen) {
+          final discounts = [
+            10,
+            20,
+            30,
+          ].where((amount) => amount < item.price).toList();
+          await txn.insert('day5_sale_assignments', {
+            'profile_id': profileId,
+            'period_id': periodId,
+            'item_id': item.id,
+            'discount_amount': discounts[_random.nextInt(discounts.length)],
+          });
+        }
+        rows = await txn.query(
+          'day5_sale_assignments',
+          where: 'profile_id = ? AND period_id = ?',
+          whereArgs: [profileId, periodId],
+          orderBy: 'item_id',
+        );
+      }
+      final offers = rows.map(DayFiveSaleOffer.fromMap).toList(growable: false);
+      if (offers.length > 3 ||
+          offers
+                  .where(
+                    (offer) =>
+                        offer.itemId == 'care_shampoo' &&
+                        offer.discountAmount == 20,
+                  )
+                  .length !=
+              1 ||
+          offers.any((offer) {
+            final matches = canonicalItems.where(
+              (item) => item.id == offer.itemId,
+            );
+            return matches.length != 1 ||
+                offer.discountAmount <= 0 ||
+                offer.discountAmount >= matches.single.price ||
+                (offer.itemId != 'care_shampoo' &&
+                    (matches.single.category != ShopItemCategory.want ||
+                        !matches.single.persistent ||
+                        offer.discountAmount % 10 != 0 ||
+                        offer.discountAmount > 30));
+          })) {
+        throw StateError('Stored Day 5 sale is inconsistent.');
+      }
+      return List.unmodifiable(offers);
+    });
+  }
+
+  @override
+  Future<GameState> purchaseDayFiveSale({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+  }) async {
+    _core._validateOperationId(operationId);
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      final period = await _core._requirePeriod(txn, profileId, periodId);
+      if (period.periodNumber != 5) throw StateError('Sale is unavailable.');
+      final rows = await txn.query(
+        'day5_sale_assignments',
+        where: 'profile_id = ? AND period_id = ? AND item_id = ?',
+        whereArgs: [profileId, periodId, item.id],
+      );
+      if (rows.length != 1) throw StateError('Sale assignment is missing.');
+      final offer = DayFiveSaleOffer.fromMap(rows.single);
+      final price = item.price - offer.discountAmount;
+      if (price <= 0) throw StateError('Sale price is invalid.');
+      final source = 'day5_sale_${item.id}';
+      final type = item.category == ShopItemCategory.need
+          ? GameTransactionType.needExpense
+          : GameTransactionType.wantExpense;
+      final transaction = await _core._readTransactionByKey(
+        txn,
+        profileId,
+        'operation:$operationId',
+      );
+      if (offer.purchased) {
+        if (rows.single['purchase_operation_id'] == operationId &&
+            transaction != null &&
+            transaction.periodId == periodId &&
+            transaction.source == source &&
+            transaction.amount == -price &&
+            transaction.type == type) {
+          return _core._requireState(txn, profileId);
+        }
+        throw SpecialPurchaseAlreadyDecidedException(item.id);
+      }
+      if (transaction != null) {
+        throw SpecialPurchaseConflictException(operationId);
+      }
+      final reused = await txn.query(
+        'day5_sale_assignments',
+        columns: ['item_id'],
+        where: 'profile_id = ? AND purchase_operation_id = ?',
+        whereArgs: [profileId, operationId],
+      );
+      if (reused.isNotEmpty) {
+        throw SpecialPurchaseConflictException(operationId);
+      }
+      _core._requireFinancialActionsAllowed(period);
+      if (item.persistent &&
+          await _core._readInventoryQuantity(txn, profileId, item.id) > 0) {
+        throw PersistentItemAlreadyOwnedException(itemId: item.id);
+      }
+      final state = await _core._requireState(txn, profileId);
+      if (state.walletBalance < price) {
+        throw InsufficientFundsException(
+          itemPrice: price,
+          availableBalance: state.walletBalance,
+        );
+      }
+      final now = DateTime.now().toUtc();
+      final updated = await _core._applyWalletTransaction(
+        txn,
+        GameTransaction(
+          profileId: profileId,
+          periodId: periodId,
+          type: type,
+          amount: -price,
+          source: source,
+          description: 'Распродажа: ${item.name}',
+          createdAt: now,
+          deduplicationKey: 'operation:$operationId',
+        ),
+      );
+      await txn.rawInsert(
+        '''
+        INSERT INTO inventory (profile_id, item_id, quantity, acquired_at)
+        VALUES (?, ?, 1, ?)
+        ON CONFLICT(profile_id, item_id) DO UPDATE SET
+          quantity = quantity + 1,
+          acquired_at = excluded.acquired_at
+      ''',
+        [profileId, item.id, now.toIso8601String()],
+      );
+      await txn.update(
+        'day5_sale_assignments',
+        {
+          'purchase_operation_id': operationId,
+          'purchased_at': now.toIso8601String(),
+        },
+        where: 'profile_id = ? AND period_id = ? AND item_id = ?',
+        whereArgs: [profileId, periodId, item.id],
+      );
+      return updated;
+    });
+  }
 
   @override
   Future<bool> hasPurchasedPromotion({

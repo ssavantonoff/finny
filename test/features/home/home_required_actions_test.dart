@@ -5,7 +5,9 @@ import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
+import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -52,6 +54,8 @@ void main() {
     List<String> resolved = const [],
     bool planning = false,
     bool bedtime = false,
+    int day = 1,
+    bool legacyDayFiveCompleted = false,
   }) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
@@ -89,8 +93,8 @@ void main() {
       );
       final started = await games.startPeriod(
         profileId: profileId,
-        definitionId: 'period_1',
-        periodNumber: 1,
+        definitionId: day == 5 ? 'period_5_independent' : 'period_1',
+        periodNumber: day,
         baseIncome: 500,
         requiredCheckpoints: required,
         createdAt: DateTime.utc(2026),
@@ -119,8 +123,58 @@ void main() {
           whereArgs: [started.id],
         );
       }
+      if (legacyDayFiveCompleted) {
+        final db = await database.database;
+        await db.insert('task_progress', {
+          'profile_id': profileId,
+          'task_id': 'task_final_choice_05',
+          'status': 'completed',
+          'reward_claimed': 1,
+          'scenario_state': '{"answerId":"balanced"}',
+          'updated_at': DateTime.utc(2026).toIso8601String(),
+        });
+        await db.insert(
+          'transactions',
+          GameTransaction(
+            profileId: profileId,
+            periodId: started.id!,
+            type: GameTransactionType.taskReward,
+            amount: 50,
+            source: 'task_reward_task_final_choice_05',
+            description: 'Старая награда',
+            createdAt: DateTime.utc(2026),
+            deduplicationKey: 'task_reward_${started.id}_task_final_choice_05',
+          ).toMap(),
+        );
+        await resolveCheckpointForTest(
+          database,
+          profileId: profileId,
+          periodId: started.id!,
+          checkpointId: 'financial_task',
+        );
+      }
     });
 
+    final dayFiveContent = day == 5
+        ? await tester.runAsync(() async {
+            final assets = AssetContentRepository();
+            return TestContentRepository(
+              [
+                PeriodDefinition(
+                  id: 'period_5_independent',
+                  number: 5,
+                  title: 'Самостоятельный выбор',
+                  baseIncome: 500,
+                  requiredCheckpoints: required,
+                ),
+              ],
+              tasks: await assets.loadTasks(),
+              shopItems: await assets.loadShopItems(),
+              stories: await assets.loadStoryPurchases(),
+              promotions: await assets.loadPromotions(),
+            );
+          })
+        : null;
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
@@ -128,15 +182,17 @@ void main() {
         profileRepositoryProvider.overrideWithValue(profiles),
         gameRepositoryProvider.overrideWithValue(games),
         contentRepositoryProvider.overrideWithValue(
-          TestContentRepository([
-            PeriodDefinition(
-              id: 'period_1',
-              number: 1,
-              title: 'День 1',
-              baseIncome: 500,
-              requiredCheckpoints: required,
-            ),
-          ]),
+          day == 5
+              ? dayFiveContent!
+              : TestContentRepository([
+                  PeriodDefinition(
+                    id: 'period_1',
+                    number: 1,
+                    title: 'День 1',
+                    baseIncome: 500,
+                    requiredCheckpoints: required,
+                  ),
+                ]),
         ),
       ],
     );
@@ -181,6 +237,66 @@ void main() {
     await tester.tap(finder);
     await tester.pumpAndSettle();
   }
+
+  testWidgets('Day 5 Home shows 0/2, 1/2 and completed', (tester) async {
+    final fixture = await mountHome(tester, day: 5);
+    final ready = fixture.container.read(homeControllerProvider) as HomeReady;
+    final profileId = ready.profile.id!;
+    final periodId = ready.period!.id!;
+    expect(find.text('Задания: 0 из 2'), findsOneWidget);
+    await tester.runAsync(
+      () => fixture.container
+          .read(taskServiceProvider)
+          .submitIndependentBudget(
+            profileId: profileId,
+            periodId: periodId,
+            taskId: 'task_independent_budget_05',
+            selectedItemIds: {'food_feed', 'care_comb'},
+            savingsAmount: 50,
+          ),
+    );
+    await tester.runAsync(
+      fixture.container.read(homeControllerProvider.notifier).load,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Задания: 1 из 2'), findsOneWidget);
+    await tester.runAsync(
+      () => fixture.container
+          .read(taskServiceProvider)
+          .submitPlanRepair(
+            profileId: profileId,
+            periodId: periodId,
+            taskId: 'task_plan_repair_05',
+            nowItemIds: {'food_feed', 'care_comb', 'scenario_waterer_05'},
+            savingsAmount: 70,
+          ),
+    );
+    await tester.runAsync(
+      fixture.container.read(homeControllerProvider.notifier).load,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Задания выполнены'), findsOneWidget);
+  });
+
+  testWidgets('Day 5 planning hides task CTA', (tester) async {
+    await mountHome(tester, day: 5, planning: true);
+    expect(find.text('Задания: 0 из 2'), findsOneWidget);
+    expect(find.byKey(const Key('home-today-task-action')), findsNothing);
+  });
+
+  testWidgets('legacy Day 5 is complete in Home without new progress', (
+    tester,
+  ) async {
+    final fixture = await mountHome(
+      tester,
+      day: 5,
+      legacyDayFiveCompleted: true,
+    );
+    expect(find.text('Задания выполнены'), findsOneWidget);
+    final home = fixture.container.read(homeControllerProvider) as HomeReady;
+    expect(home.dayFiveTaskCompletion?.legacyCompleted, isTrue);
+    expect(home.dayFiveTaskCompletion?.completedTaskIds, isEmpty);
+  });
 
   testWidgets(
     'planning shows statuses without actions, then active enables them',

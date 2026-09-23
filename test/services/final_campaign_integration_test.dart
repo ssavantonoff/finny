@@ -81,8 +81,6 @@ void main() {
       final goal = (await content.loadGoals()).first;
       await savings.selectGoal(profileId: profileId, goalId: goal.id);
 
-      const answers = {5: ('task_final_choice_05', 'balanced')};
-
       for (var day = 1; day <= 5; day++) {
         var period = (await periods.startNextPeriod(profileId: profileId))!;
         expect(period.periodNumber, day);
@@ -162,12 +160,23 @@ void main() {
             },
           );
         } else {
-          final answer = answers[day]!;
-          taskResult = await tasks.submitAnswer(
+          final first = await tasks.submitIndependentBudget(
             profileId: profileId,
             periodId: period.id!,
-            taskId: answer.$1,
-            answerId: answer.$2,
+            taskId: 'task_independent_budget_05',
+            selectedItemIds: {'food_feed', 'care_comb'},
+            savingsAmount: 50,
+          ) as TaskAnswerCompleted;
+          expect(
+            first.period.resolvedCheckpoints,
+            isNot(contains('financial_task')),
+          );
+          taskResult = await tasks.submitPlanRepair(
+            profileId: profileId,
+            periodId: period.id!,
+            taskId: 'task_plan_repair_05',
+            nowItemIds: {'food_feed', 'care_comb', 'scenario_waterer_05'},
+            savingsAmount: 70,
           );
         }
         expect(taskResult, isA<TaskAnswerCompleted>());
@@ -187,16 +196,6 @@ void main() {
         );
         if (day != 3) {
           expect(period.status.name, 'readyToFinish');
-        }
-
-        if (day == 5) {
-          final bonus = await tasks.submitAnswer(
-            profileId: profileId,
-            periodId: period.id!,
-            taskId: 'task_bonus_reserve_05',
-            answerId: 'keep',
-          );
-          expect(bonus, isA<TaskAnswerCompleted>());
         }
 
         for (final itemId in ['food_feed', 'care_shampoo']) {

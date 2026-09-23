@@ -4,6 +4,7 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/day_lifecycle.dart';
+import 'package:finny/models/day_five_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -40,6 +41,7 @@ class HomeReady extends HomeViewState {
     required this.allDaysCompleted,
     this.activeGoal,
     this.bowlEvent,
+    this.dayFiveTaskCompletion,
     this.petUsageCount = 0,
     this.interacting = false,
     this.interactionNotice,
@@ -59,6 +61,7 @@ class HomeReady extends HomeViewState {
   final bool allDaysCompleted;
   final SavingsGoal? activeGoal;
   final StoryEventSnapshot? bowlEvent;
+  final DayFiveTaskCompletion? dayFiveTaskCompletion;
   final int petUsageCount;
   final bool interacting;
   final String? interactionNotice;
@@ -92,6 +95,7 @@ class HomeReady extends HomeViewState {
     allDaysCompleted: allDaysCompleted,
     activeGoal: activeGoal ?? this.activeGoal,
     bowlEvent: bowlEvent ?? this.bowlEvent,
+    dayFiveTaskCompletion: dayFiveTaskCompletion,
     petUsageCount: petUsageCount ?? this.petUsageCount,
     interacting: interacting ?? this.interacting,
     interactionNotice: clearInteractionNotice
@@ -399,6 +403,16 @@ class HomeController extends Notifier<HomeViewState> {
             .loadDay3Bowl(profileId: profileId);
       }
 
+      final dayFiveTaskCompletion =
+          period?.periodNumber == 5 && period?.id != null
+          ? await ref
+                .read(taskServiceProvider)
+                .loadDayFiveCompletion(
+                  profileId: profileId,
+                  periodId: period!.id!,
+                )
+          : null;
+
       return HomeReady(
         profile: profile,
         pet: pet,
@@ -414,6 +428,7 @@ class HomeController extends Notifier<HomeViewState> {
             periods.every((item) => item.status == GamePeriodStatus.completed),
         activeGoal: activeGoal,
         bowlEvent: bowlEvent,
+        dayFiveTaskCompletion: dayFiveTaskCompletion,
         petUsageCount: petUsageCount,
         pendingInteraction: _pendingInteraction,
       );

@@ -4,6 +4,7 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/task_submission_result.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum TasksLoad {
@@ -23,6 +24,8 @@ class TasksState {
     this.period,
     this.tasks = const [],
     this.completedTaskIds = const {},
+    this.shopItems = const {},
+    this.legacyDayFiveCompleted = false,
     this.submittingTaskId,
   });
 
@@ -31,6 +34,8 @@ class TasksState {
   final GamePeriod? period;
   final List<FinancialTask> tasks;
   final Set<String> completedTaskIds;
+  final Map<String, ShopItem> shopItems;
+  final bool legacyDayFiveCompleted;
   final String? submittingTaskId;
 
   bool isCompleted(FinancialTask task) => completedTaskIds.contains(task.id);
@@ -44,6 +49,8 @@ class TasksState {
     period: period,
     tasks: tasks,
     completedTaskIds: completedTaskIds,
+    shopItems: shopItems,
+    legacyDayFiveCompleted: legacyDayFiveCompleted,
     submittingTaskId: clearSubmitting
         ? null
         : submittingTaskId ?? this.submittingTaskId,
@@ -151,9 +158,25 @@ class TasksController extends Notifier<TasksState> {
           .where((task) => task.period == period.periodNumber)
           .toList(growable: false);
       final completed = <String>{};
-      for (final task in tasks) {
-        if (await games.getTaskProgress(profileId, task.id) != null) {
-          completed.add(task.id);
+      var legacyDayFiveCompleted = false;
+      var shopItems = const <String, ShopItem>{};
+      if (period.periodNumber == 5) {
+        final status = await ref
+            .read(taskServiceProvider)
+            .loadDayFiveCompletion(profileId: profileId, periodId: period.id!);
+        legacyDayFiveCompleted = status.legacyCompleted;
+        completed.addAll(status.completedTaskIds);
+        final catalog = await ref
+            .read(contentRepositoryProvider)
+            .loadShopItems();
+        shopItems = Map.unmodifiable({
+          for (final item in catalog) item.id: item,
+        });
+      } else {
+        for (final task in tasks) {
+          if (await games.getTaskProgress(profileId, task.id) != null) {
+            completed.add(task.id);
+          }
         }
       }
       if (!_isCurrent(generation, profileId)) return;
@@ -163,6 +186,8 @@ class TasksController extends Notifier<TasksState> {
         period: period,
         tasks: List.unmodifiable(tasks),
         completedTaskIds: Set.unmodifiable(completed),
+        shopItems: shopItems,
+        legacyDayFiveCompleted: legacyDayFiveCompleted,
       );
     } catch (_) {
       if (_isCurrent(generation, profileId)) {
@@ -333,6 +358,75 @@ class TasksController extends Notifier<TasksState> {
         }
         await load();
       }
+      return result;
+    } catch (_) {
+      if (ref.read(activeProfileIdProvider) == profileId) {
+        state = current.copyWith(clearSubmitting: true);
+      }
+      rethrow;
+    } finally {
+      _submitting = false;
+      if (state.submittingTaskId != null) {
+        state = state.copyWith(clearSubmitting: true);
+      }
+    }
+  }
+
+  Future<TaskSubmissionResult?> submitIndependentBudget(
+    FinancialTask task,
+    Set<String> selectedItemIds,
+    int savingsAmount,
+  ) => _submitDayFive(
+    task,
+    (profileId, periodId) => ref
+        .read(taskServiceProvider)
+        .submitIndependentBudget(
+          profileId: profileId,
+          periodId: periodId,
+          taskId: task.id,
+          selectedItemIds: selectedItemIds,
+          savingsAmount: savingsAmount,
+        ),
+  );
+
+  Future<TaskSubmissionResult?> submitPlanRepair(
+    FinancialTask task,
+    Set<String> nowItemIds,
+    int savingsAmount,
+  ) => _submitDayFive(
+    task,
+    (profileId, periodId) => ref
+        .read(taskServiceProvider)
+        .submitPlanRepair(
+          profileId: profileId,
+          periodId: periodId,
+          taskId: task.id,
+          nowItemIds: nowItemIds,
+          savingsAmount: savingsAmount,
+        ),
+  );
+
+  Future<TaskSubmissionResult?> _submitDayFive(
+    FinancialTask task,
+    Future<TaskSubmissionResult> Function(int profileId, int periodId) action,
+  ) async {
+    final current = state;
+    final profileId = current.profileId;
+    final periodId = current.period?.id;
+    if (_submitting ||
+        current.load != TasksLoad.ready ||
+        current.legacyDayFiveCompleted ||
+        profileId == null ||
+        periodId == null ||
+        current.isCompleted(task)) {
+      return null;
+    }
+    _submitting = true;
+    state = current.copyWith(submittingTaskId: task.id);
+    try {
+      final result = await action(profileId, periodId);
+      if (ref.read(activeProfileIdProvider) != profileId) return null;
+      if (result is TaskAnswerCompleted) await load();
       return result;
     } catch (_) {
       if (ref.read(activeProfileIdProvider) == profileId) {

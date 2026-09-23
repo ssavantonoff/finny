@@ -11,6 +11,7 @@ import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/savings_exception.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
 import 'package:finny/services/period_service.dart';
@@ -76,6 +77,7 @@ const testSavingsGoal = SavingsGoal(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late AppDatabase database;
   late SqliteProfileRepository profiles;
   late SqliteGameRepository games;
@@ -146,6 +148,27 @@ void main() {
     for (final checkpoint in period.requiredCheckpoints) {
       if (current.resolvedCheckpoints.contains(checkpoint)) continue;
       current = switch (checkpoint) {
+        'financial_task' when period.periodNumber == 5 => await () async {
+          final dayFive = TaskService(
+            games,
+            SqliteTaskCompletionPort(database),
+            AssetContentRepository(),
+          );
+          await dayFive.submitIndependentBudget(
+            profileId: period.profileId,
+            periodId: period.id!,
+            taskId: 'task_independent_budget_05',
+            selectedItemIds: {'food_feed', 'care_comb'},
+            savingsAmount: 50,
+          );
+          return (await dayFive.submitPlanRepair(
+            profileId: period.profileId,
+            periodId: period.id!,
+            taskId: 'task_plan_repair_05',
+            nowItemIds: {'food_feed', 'care_comb', 'scenario_waterer_05'},
+            savingsAmount: 70,
+          ) as TaskAnswerCompleted).period;
+        }(),
         'financial_task' => (await tasks.submitAnswer(
           profileId: period.profileId,
           periodId: period.id!,

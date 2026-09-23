@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/tasks/budget_priority_task_screen.dart';
+import 'package:finny/features/tasks/day_five_task_screens.dart';
 import 'package:finny/features/tasks/plan_adaptation_task_screen.dart';
 import 'package:finny/features/tasks/shopping_trip_task_screen.dart';
 import 'package:finny/features/tasks/tasks_controller.dart';
@@ -91,14 +92,22 @@ class _TaskList extends StatelessWidget {
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: AppSpacing.medium),
-        const Text('Главное задание'),
-        for (final task in required)
-          _TaskCard(
-            task: task,
-            state: state,
-            controller: controller,
-            random: random,
-          ),
+        Text(required.length > 1 ? 'Главные задания' : 'Главное задание'),
+        if (state.legacyDayFiveCompleted)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(AppSpacing.medium),
+              child: Text('Финансовое задание этого дня уже выполнено.'),
+            ),
+          )
+        else
+          for (final task in required)
+            _TaskCard(
+              task: task,
+              state: state,
+              controller: controller,
+              random: random,
+            ),
         if (optional.isNotEmpty) ...[
           const SizedBox(height: AppSpacing.medium),
           const Text('Дополнительное задание'),
@@ -149,6 +158,32 @@ class _TaskCard extends StatelessWidget {
               onPressed: completed || state.submittingTaskId != null
                   ? null
                   : () {
+                      if (task.type == 'independent_budget') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            fullscreenDialog: true,
+                            builder: (_) => IndependentBudgetTaskScreen(
+                              task: task,
+                              controller: controller,
+                              shopItems: state.shopItems,
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      if (task.type == 'plan_repair') {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            fullscreenDialog: true,
+                            builder: (_) => PlanRepairTaskScreen(
+                              task: task,
+                              controller: controller,
+                              shopItems: state.shopItems,
+                            ),
+                          ),
+                        );
+                        return;
+                      }
                       if (task.type == 'shopping_trip') {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(

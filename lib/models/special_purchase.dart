@@ -61,6 +61,25 @@ class ShopPromotion {
   );
 }
 
+class DayFiveSaleOffer {
+  const DayFiveSaleOffer({
+    required this.itemId,
+    required this.discountAmount,
+    required this.purchased,
+  });
+
+  final String itemId;
+  final int discountAmount;
+  final bool purchased;
+
+  factory DayFiveSaleOffer.fromMap(Map<String, Object?> map) =>
+      DayFiveSaleOffer(
+        itemId: map['item_id'] as String,
+        discountAmount: map['discount_amount'] as int,
+        purchased: map['purchase_operation_id'] != null,
+      );
+}
+
 void validateSpecialContent(
   List<StoryPurchase> stories,
   List<ShopPromotion> promotions,

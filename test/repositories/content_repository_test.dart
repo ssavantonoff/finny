@@ -148,12 +148,19 @@ FinancialTask _copyTask(FinancialTask task, {bool? requiredForCheckpoint}) =>
       period: task.period,
       requiredForCheckpoint:
           requiredForCheckpoint ?? task.requiredForCheckpoint,
+      dayProgressCost: task.dayProgressCost,
       choiceScenario: task.type == 'choice' ? task.choiceScenario : null,
       categorizationScenario: task.type == 'categorization'
           ? task.categorizationScenario
           : null,
       budgetPriorityScenario: task.type == 'budget_priority'
           ? task.budgetPriorityScenario
+          : null,
+      independentBudgetScenario: task.type == 'independent_budget'
+          ? task.independentBudgetScenario
+          : null,
+      planRepairScenario: task.type == 'plan_repair'
+          ? task.planRepairScenario
           : null,
     );
 
@@ -202,12 +209,20 @@ void main() {
         ('bow', 80, 'later'),
       ],
     );
-    expect(tasks.where((task) => task.requiredForCheckpoint), hasLength(5));
+    expect(tasks.where((task) => task.requiredForCheckpoint), hasLength(6));
+    expect(tasks.any((task) => task.id == 'task_final_choice_05'), isFalse);
+    expect(tasks.any((task) => task.id == 'task_bonus_reserve_05'), isFalse);
     expect(
       tasks
-          .singleWhere((task) => task.id == 'task_bonus_reserve_05')
-          .requiredForCheckpoint,
-      isFalse,
+          .singleWhere((task) => task.id == 'task_independent_budget_05')
+          .dayProgressCost,
+      15,
+    );
+    expect(
+      tasks
+          .singleWhere((task) => task.id == 'task_plan_repair_05')
+          .dayProgressCost,
+      15,
     );
     expect(
       tasks.map((task) => task.topic).toSet().length,
@@ -577,36 +592,33 @@ void main() {
     await expectLater(repository.loadTasks(), throwsFormatException);
   });
 
-  test(
-    'campaign requires exactly one required task on each of five days',
-    () async {
-      final tasks = await AssetContentRepository().loadTasks();
-      expect(() => validateCampaignTaskContent(tasks), returnsNormally);
+  test('campaign requires one task on Days 1-4 and two on Day 5', () async {
+    final tasks = await AssetContentRepository().loadTasks();
+    expect(() => validateCampaignTaskContent(tasks), returnsNormally);
 
-      final withoutDayThree = tasks
-          .where((task) => task.period != 3)
-          .toList(growable: false);
-      expect(
-        () => validateCampaignTaskContent(withoutDayThree),
-        throwsFormatException,
-      );
+    final withoutDayThree = tasks
+        .where((task) => task.period != 3)
+        .toList(growable: false);
+    expect(
+      () => validateCampaignTaskContent(withoutDayThree),
+      throwsFormatException,
+    );
 
-      final bonus = tasks.singleWhere(
-        (task) => task.id == 'task_bonus_reserve_05',
-      );
-      final twoRequiredOnDayFive = [
-        for (final task in tasks)
-          if (task.id == bonus.id)
-            _copyTask(task, requiredForCheckpoint: true)
-          else
-            task,
-      ];
-      expect(
-        () => validateCampaignTaskContent(twoRequiredOnDayFive),
-        throwsFormatException,
-      );
-    },
-  );
+    final planRepair = tasks.singleWhere(
+      (task) => task.id == 'task_plan_repair_05',
+    );
+    final oneRequiredOnDayFive = [
+      for (final task in tasks)
+        if (task.id == planRepair.id)
+          _copyTask(task, requiredForCheckpoint: false)
+        else
+          task,
+    ];
+    expect(
+      () => validateCampaignTaskContent(oneRequiredOnDayFive),
+      throwsFormatException,
+    );
+  });
 
   test('choice task content rejects malformed canonical fields', () {
     final invalidCases = <String, void Function(Map<String, Object?>)>{
@@ -874,7 +886,7 @@ void main() {
       expect(dayTwoRequired.single.id, 'task_priority_02');
       expect(dayTwoRequired.single.type, 'budget_priority');
       expect(() => validateCampaignTaskContent(tasks), returnsNormally);
-      expect(tasks.where((task) => task.type == 'choice'), hasLength(2));
+      expect(tasks.where((task) => task.type == 'choice'), isEmpty);
       expect(tasks.where((task) => task.type == 'shopping_trip'), hasLength(1));
     },
   );

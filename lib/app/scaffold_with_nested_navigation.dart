@@ -81,8 +81,9 @@ class _ScaffoldWithNestedNavigationState
     final treat = shop.itemById('food_treat');
     final showShopPromotion =
         shop.load == ShopLoad.ready &&
-        treat != null &&
-        shop.isPromotionActiveFor(treat);
+        (shop.isDayFiveSaleDay ||
+            (treat != null && shop.isPromotionActiveFor(treat)));
+    final badgeText = shop.isDayFiveSaleDay ? 'SALE' : 'АКЦИЯ';
     return Scaffold(
       body: widget.navigationShell,
       bottomNavigationBar: NavigationBar(
@@ -103,9 +104,13 @@ class _ScaffoldWithNestedNavigationState
           ),
           NavigationDestination(
             key: const Key('nav-shop'),
-            icon: _ShopNavigationIcon(showPromotion: showShopPromotion),
+            icon: _ShopNavigationIcon(
+              showPromotion: showShopPromotion,
+              badgeText: badgeText,
+            ),
             selectedIcon: _ShopNavigationIcon(
               showPromotion: showShopPromotion,
+              badgeText: badgeText,
               selected: true,
             ),
             label: 'Магазин',
@@ -131,10 +136,12 @@ class _ScaffoldWithNestedNavigationState
 class _ShopNavigationIcon extends StatelessWidget {
   const _ShopNavigationIcon({
     required this.showPromotion,
+    required this.badgeText,
     this.selected = false,
   });
 
   final bool showPromotion;
+  final String badgeText;
   final bool selected;
 
   @override
@@ -150,7 +157,9 @@ class _ShopNavigationIcon extends StatelessWidget {
         Positioned(
           top: -14,
           child: Semantics(
-            label: 'В магазине действует акция',
+            label: badgeText == 'SALE'
+                ? 'В магазине распродажа'
+                : 'В магазине действует акция',
             child: ExcludeSemantics(
               child: DecoratedBox(
                 key: const Key('nav-shop-promo-badge'),
@@ -167,7 +176,7 @@ class _ShopNavigationIcon extends StatelessWidget {
                     vertical: 1,
                   ),
                   child: Text(
-                    'АКЦИЯ',
+                    badgeText,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onTertiaryContainer,
                       fontSize: 10,
