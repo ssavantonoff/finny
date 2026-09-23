@@ -1,7 +1,34 @@
+import java.io.File
+import java.util.Properties
+import org.gradle.api.GradleException
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val releaseProperties = Properties()
+val releasePropertiesFile = rootProject.file("key.properties")
+if (releasePropertiesFile.isFile) {
+    releasePropertiesFile.inputStream().use { releaseProperties.load(it) }
+}
+
+val releaseKeystoreFile = releaseProperties.getProperty("storeFile")?.let(::File)
+val repositoryPath = rootProject.projectDir.parentFile.canonicalFile.toPath()
+val releaseSigningReady =
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword").all {
+        !releaseProperties.getProperty(it).isNullOrBlank()
+    } &&
+        releaseKeystoreFile?.isAbsolute == true &&
+        releaseKeystoreFile.isFile &&
+        !releaseKeystoreFile.canonicalFile.toPath().startsWith(repositoryPath)
+
+if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) } && !releaseSigningReady) {
+    throw GradleException(
+        "Release signing requires android/key.properties with all four values " +
+            "and an existing keystore outside the repository. No debug signing fallback is available."
+    )
 }
 
 android {
@@ -29,11 +56,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (releaseSigningReady) {
+                storeFile = releaseKeystoreFile
+                storePassword = releaseProperties.getProperty("storePassword")
+                keyAlias = releaseProperties.getProperty("keyAlias")
+                keyPassword = releaseProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
