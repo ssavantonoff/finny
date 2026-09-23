@@ -135,7 +135,7 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
                           if (!_confirming) {
                             setState(() {
                               _confirming = true;
-                              _periodId = latest.period!.id;
+                              _periodId = latest.period?.id;
                               _confirmedPrice = latest.effectivePriceFor(item);
                             });
                           } else {
@@ -152,7 +152,7 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
                               controller.buy(
                                 item.id,
                                 profileId: widget.profileId!,
-                                periodId: _periodId!,
+                                periodId: _periodId,
                               ),
                             );
                           }

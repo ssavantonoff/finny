@@ -7,7 +7,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 12;
+  static const schemaVersion = 13;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -165,6 +165,7 @@ class AppDatabase {
     await _createPeriodSpecialActionsTable(db);
     await _createCampaignStoryEventsTable(db);
     await _createDayFiveSaleAssignmentsTable(db);
+    await _createPostCampaignTables(db);
   }
 
   static Future<void> _upgradeSchema(
@@ -274,6 +275,44 @@ class AppDatabase {
     if (oldVersion < 12) {
       await _createDayFiveSaleAssignmentsTable(db);
     }
+    if (oldVersion < 13) {
+      await _createPostCampaignTables(db);
+    }
+  }
+
+  static Future<void> _createPostCampaignTables(
+    sqflite.DatabaseExecutor db,
+  ) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS campaign_completion (
+        profile_id INTEGER PRIMARY KEY,
+        finale_acknowledged_at TEXT,
+        free_play_started_at TEXT,
+        CHECK (free_play_started_at IS NULL OR finale_acknowledged_at IS NOT NULL),
+        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS free_play_pet_operations (
+        profile_id INTEGER NOT NULL,
+        operation_id TEXT NOT NULL CHECK (length(trim(operation_id)) > 0),
+        action_id TEXT NOT NULL CHECK (length(trim(action_id)) > 0),
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (profile_id, operation_id),
+        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS free_play_equipped_accessories (
+        profile_id INTEGER NOT NULL,
+        slot TEXT NOT NULL CHECK (slot IN ('head', 'neck')),
+        item_id TEXT NOT NULL,
+        PRIMARY KEY (profile_id, slot),
+        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+        FOREIGN KEY (profile_id, item_id)
+          REFERENCES inventory(profile_id, item_id) ON DELETE CASCADE
+      )
+    ''');
   }
 
   static Future<void> _migrateDay4V11(sqflite.DatabaseExecutor db) async {

@@ -23,7 +23,7 @@ class _BootstrapScreenState extends ConsumerState<BootstrapScreen> {
   String? _scheduledDestination;
 
   void _navigate(BootstrapState state) {
-    final destination = bootstrapDestination(state.phase);
+    final destination = state.destination ?? bootstrapDestination(state.phase);
     if (destination == null) {
       _scheduledDestination = null;
       return;

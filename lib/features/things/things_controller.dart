@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:finny/app/providers.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/models/game_period.dart';
+import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/virtual_day_rules.dart';
@@ -12,6 +13,7 @@ enum ThingsLoad { loading, ready, noProfile, contentError, runtimeError }
 
 enum ItemUseResultKind {
   success,
+  noEffect,
   alreadyUsed,
   itemMissing,
   slotUnavailable,
@@ -35,7 +37,7 @@ class ItemUseAttempt {
   });
 
   final int profileId;
-  final int periodId;
+  final int? periodId;
   final ShopItem item;
   final String operationId;
   final PetActionSlot slot;
@@ -46,9 +48,11 @@ class ThingsState {
     this.load = ThingsLoad.loading,
     this.profileId,
     this.period,
+    this.freePlay = false,
     this.items = const [],
     this.quantities = const {},
     this.usageCounts = const {},
+    this.equipped = const {},
     this.mutating = false,
     this.result,
     this.pending,
@@ -57,9 +61,11 @@ class ThingsState {
   final ThingsLoad load;
   final int? profileId;
   final GamePeriod? period;
+  final bool freePlay;
   final List<ShopItem> items;
   final Map<String, int> quantities;
   final Map<String, int> usageCounts;
+  final Map<ShopEquipSlot, String> equipped;
   final bool mutating;
   final ItemUseResult? result;
   final ItemUseAttempt? pending;
@@ -78,6 +84,7 @@ class ThingsState {
     }
     if (quantityOf(item.id) <= 0) return false;
     if (item.usagePolicy == ItemUsagePolicy.none) return false;
+    if (freePlay) return true;
     if (period == null) return false;
     if (period!.status != GamePeriodStatus.active &&
         period!.status != GamePeriodStatus.readyToFinish) {
@@ -99,6 +106,11 @@ class ThingsState {
   }
 
   String? actionStatus(ShopItem item) {
+    if (freePlay) {
+      return item.displaySection == ShopDisplaySection.accessories
+          ? 'Аксессуар'
+          : null;
+    }
     if (item.displaySection == ShopDisplaySection.accessories) {
       return 'Аксессуар';
     }
@@ -144,9 +156,11 @@ class ThingsState {
     load: load,
     profileId: profileId,
     period: period,
+    freePlay: freePlay,
     items: items,
     quantities: quantities,
     usageCounts: usageCounts,
+    equipped: equipped,
     mutating: mutating,
     result: result,
     pending: pending,
@@ -215,6 +229,11 @@ class ThingsController extends Notifier<ThingsState> {
 
     try {
       final period = await games.getCurrentPeriod(profileId);
+      final freePlay =
+          period == null &&
+          (await ref.read(campaignLifecycleServiceProvider).load(profileId))
+                  .mode ==
+              CampaignMode.freePlay;
       final quantities = <String, int>{};
       final ownedItems = <ShopItem>[];
 
@@ -260,12 +279,54 @@ class ThingsController extends Notifier<ThingsState> {
         load: ThingsLoad.ready,
         profileId: profileId,
         period: period,
+        freePlay: freePlay,
         items: List.unmodifiable(ownedItems),
         quantities: Map.unmodifiable(quantities),
         usageCounts: Map.unmodifiable(usageCounts),
+        equipped: freePlay
+            ? Map.unmodifiable(
+                await ref.read(freePlayServiceProvider).equipped(profileId),
+              )
+            : const {},
       );
     } catch (_) {
       return ThingsState(load: ThingsLoad.runtimeError, profileId: profileId);
+    }
+  }
+
+  Future<void> toggleAccessory(ShopItem item) async {
+    final current = state;
+    final slot = item.equipSlot;
+    if (current.load != ThingsLoad.ready ||
+        !current.freePlay ||
+        current.mutating ||
+        current.profileId == null ||
+        slot == null ||
+        current.quantityOf(item.id) <= 0) {
+      return;
+    }
+    final generation = ++_generation;
+    state = current.withOperation(mutating: true);
+    try {
+      final service = ref.read(freePlayServiceProvider);
+      if (current.equipped[slot] == item.id) {
+        await service.unequip(profileId: current.profileId!, slot: slot);
+      } else {
+        await service.equip(profileId: current.profileId!, itemId: item.id);
+      }
+      if (_current(generation, current.profileId)) {
+        state = await _readSnapshot(current.profileId);
+      }
+      unawaited(ref.read(homeControllerProvider.notifier).load());
+    } catch (_) {
+      if (_current(generation, current.profileId)) {
+        state = current.withOperation(
+          result: const ItemUseResult(
+            ItemUseResultKind.ambiguous,
+            message: 'Не получилось изменить аксессуар. Попробуй ещё раз.',
+          ),
+        );
+      }
     }
   }
 
@@ -274,10 +335,10 @@ class ThingsController extends Notifier<ThingsState> {
     if (current.load != ThingsLoad.ready || !current.canUse(item)) return;
     final profileId = current.profileId;
     final periodId = current.period?.id;
-    if (profileId == null || periodId == null) return;
+    if (profileId == null || (!current.freePlay && periodId == null)) return;
 
     final PetActionSlot slot;
-    if (item.usagePolicy == ItemUsagePolicy.toothbrush) {
+    if (!current.freePlay && item.usagePolicy == ItemUsagePolicy.toothbrush) {
       if (VirtualDayRules.morningToothbrushAvailable(
         current.period!.dayProgress,
       )) {
@@ -336,14 +397,30 @@ class ThingsController extends Notifier<ThingsState> {
     ItemUseAttempt? pending;
 
     try {
-      await service.useItem(
-        profileId: attempt.profileId,
-        periodId: attempt.periodId,
-        itemId: attempt.item.id,
-        operationId: attempt.operationId,
-        slot: attempt.slot,
-      );
-      result = const ItemUseResult(ItemUseResultKind.success);
+      if (attempt.periodId == null) {
+        final outcome = await ref
+            .read(freePlayServiceProvider)
+            .useItem(
+              profileId: attempt.profileId,
+              itemId: attempt.item.id,
+              operationId: attempt.operationId,
+            );
+        result = ItemUseResult(
+          outcome.notice == null
+              ? ItemUseResultKind.success
+              : ItemUseResultKind.noEffect,
+          message: outcome.notice,
+        );
+      } else {
+        await service.useItem(
+          profileId: attempt.profileId,
+          periodId: attempt.periodId!,
+          itemId: attempt.item.id,
+          operationId: attempt.operationId,
+          slot: attempt.slot,
+        );
+        result = const ItemUseResult(ItemUseResultKind.success);
+      }
       pending = null;
       // Refresh Home so stat indicators update immediately
       unawaited(ref.read(homeControllerProvider.notifier).load());

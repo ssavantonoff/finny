@@ -256,9 +256,9 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                 ] else ...[
                   if (state.items.isEmpty)
                     _padded(const Text('В магазине пока нет товаров.')),
-                  if (state.period == null)
+                  if (state.period == null && !state.freePlay)
                     _padded(const ShopNotice('Сначала начни игровой период.'))
-                  else if (state.period!.status == GamePeriodStatus.planning)
+                  else if (state.period?.status == GamePeriodStatus.planning)
                     _padded(const ShopNotice('Сначала подтверди план.')),
                   SliverToBoxAdapter(
                     child: Column(

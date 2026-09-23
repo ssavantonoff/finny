@@ -1,3 +1,5 @@
+import '../helpers/campaign_only_lifecycle_service.dart';
+
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/models/game_period.dart';
@@ -154,6 +156,10 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
         profileRepositoryProvider.overrideWithValue(_SyncProfiles(profile)),
         gameRepositoryProvider.overrideWithValue(games),
         contentRepositoryProvider.overrideWithValue(content),

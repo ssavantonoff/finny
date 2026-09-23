@@ -4,9 +4,12 @@ import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/day_lifecycle.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/day_five_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
+import 'package:finny/models/savings_goal.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/story_event.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
@@ -361,6 +364,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         body: Center(child: CircularProgressIndicator()),
       ),
       HomeFailure() => _HomeError(onRetry: controller.load),
+      HomeReady(freePlay: true) => _FreePlayHome(
+        state: state,
+        controller: controller,
+      ),
       HomeReady() => _HomeContent(
         state: state,
         controller: controller,
@@ -370,6 +377,246 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     };
   }
+}
+
+class _FreePlayHome extends ConsumerWidget {
+  const _FreePlayHome({required this.state, required this.controller});
+  final HomeReady state;
+  final HomeController controller;
+
+  Future<(int, int, int, int)> _collection(WidgetRef ref) async {
+    final id = state.profile.id!;
+    final content = ref.read(contentRepositoryProvider);
+    final games = ref.read(gameRepositoryProvider);
+    final goals = await content.loadGoals();
+    final completed = await games.getCompletedGoals(id);
+    final persistent = (await content.loadShopItems())
+        .where((item) => item.persistent)
+        .toList();
+    var owned = 0;
+    for (final item in persistent) {
+      if (await games.getInventoryQuantity(id, item.id) > 0) owned++;
+    }
+    final canonicalIds = goals.map((goal) => goal.id).toSet();
+    return (
+      completed.where((goal) => canonicalIds.contains(goal.goalId)).length,
+      goals.length,
+      owned,
+      persistent.length,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Свободный день'),
+      actions: [
+        IconButton(
+          tooltip: 'Настройки',
+          onPressed: () => context.push('/settings'),
+          icon: const Icon(Icons.settings_outlined),
+        ),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.medium),
+            child: Text('${state.gameState.walletBalance} 🪙'),
+          ),
+        ),
+      ],
+    ),
+    body: SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.medium),
+        children: [
+          Container(
+            key: const Key('free-play-daylight'),
+            padding: const EdgeInsets.all(AppSpacing.medium),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF81D4FA), Color(0xFFFFE0B2)],
+              ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.wb_sunny, color: Color(0xFFFFD54F)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: PetStatIndicator(
+                        label: 'Сытость',
+                        value: state.pet.satiety,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.small),
+                    Expanded(
+                      child: PetStatIndicator(
+                        label: 'Уход',
+                        value: state.pet.care,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.small),
+                    Expanded(
+                      child: PetStatIndicator(
+                        label: 'Настроение',
+                        value: state.pet.mood,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.medium),
+                SizedBox(
+                  height: 170,
+                  child: FittedBox(
+                    child: FinnyPreview(
+                      colorId: state.pet.colorId,
+                      patternId: state.pet.patternId,
+                      developmentStage: state.pet.developmentStage,
+                    ),
+                  ),
+                ),
+                Text(
+                  state.pet.name,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                FutureBuilder(
+                  future: Future.wait<Object?>([
+                    ref
+                        .read(freePlayServiceProvider)
+                        .equipped(state.profile.id!),
+                    ref.read(contentRepositoryProvider).loadShopItems(),
+                    ref
+                        .read(gameRepositoryProvider)
+                        .getCompletedGoals(state.profile.id!),
+                    ref.read(contentRepositoryProvider).loadGoals(),
+                  ]),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const SizedBox.shrink();
+                    final equipped =
+                        snapshot.data![0] as Map<ShopEquipSlot, String>;
+                    final items = snapshot.data![1] as List<ShopItem>;
+                    final completed = snapshot.data![2] as List<CompletedGoal>;
+                    final goals = snapshot.data![3] as List<SavingsGoal>;
+                    final worn = items
+                        .where((item) => equipped.values.contains(item.id))
+                        .map((item) => item.name)
+                        .toList();
+                    final rewards = goals
+                        .where(
+                          (goal) =>
+                              completed.any((done) => done.goalId == goal.id),
+                        )
+                        .map((goal) => goal.name)
+                        .toList();
+                    return Column(
+                      children: [
+                        if (worn.isNotEmpty)
+                          Text(
+                            'На Финни: ${worn.join(', ')}',
+                            textAlign: TextAlign.center,
+                          ),
+                        if (rewards.isNotEmpty)
+                          Text(
+                            'В доме: ${rewards.join(', ')}',
+                            textAlign: TextAlign.center,
+                          ),
+                      ],
+                    );
+                  },
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: state.interacting
+                      ? null
+                      : () => controller.performFreeInteraction(
+                          FreePetInteraction.pet,
+                        ),
+                  icon: const Icon(Icons.favorite_outline),
+                  label: const Text('Погладить'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.medium),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.medium),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (state.activeGoal case final goal?) ...[
+                    Text(
+                      goal.name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Text('${state.gameState.savedAmount} / ${goal.price} 🪙'),
+                    TextButton(
+                      onPressed: () => context.go('/savings'),
+                      child: const Text('К цели'),
+                    ),
+                  ] else
+                    FutureBuilder(
+                      future: _collection(ref),
+                      builder: (context, snapshot) =>
+                          snapshot.hasData &&
+                              snapshot.data!.$1 == snapshot.data!.$2
+                          ? const Text('Все цели достигнуты! ✓')
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Выбери новую цель для Финни'),
+                                TextButton(
+                                  onPressed: () => context.go('/savings'),
+                                  child: const Text('Выбрать цель'),
+                                ),
+                              ],
+                            ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.medium),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.medium),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '5 дней пройдено ✓',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  FutureBuilder(
+                    future: _collection(ref),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const CircularProgressIndicator();
+                      }
+                      final (goals, totalGoals, owned, totalItems) =
+                          snapshot.data!;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Цели: $goals из $totalGoals'),
+                          Text('Коллекция: $owned из $totalItems'),
+                          if (goals == totalGoals && owned == totalItems)
+                            const Text('Всё для Финни собрано! ✓'),
+                        ],
+                      );
+                    },
+                  ),
+                  TextButton(
+                    onPressed: () => context.go('/finale?mode=recap'),
+                    child: const Text('Посмотреть итоги'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _HomeContent extends StatelessWidget {

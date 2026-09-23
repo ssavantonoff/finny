@@ -15,6 +15,9 @@ class SqliteProfileDataManagement implements ProfileDataManagementPort {
 
   static const _starterToothbrushId = 'care_toothbrush';
   static const _resettableRuntimeTables = [
+    'campaign_completion',
+    'free_play_pet_operations',
+    'free_play_equipped_accessories',
     'pet_action_operations',
     'pet_daily_usage',
     'period_special_actions',

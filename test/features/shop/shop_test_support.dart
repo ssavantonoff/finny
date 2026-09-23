@@ -1,6 +1,9 @@
+import '../../helpers/campaign_only_lifecycle_service.dart';
+
 import 'dart:async';
 
 import 'package:finny/app/providers.dart';
+import 'package:finny/core/database/app_database.dart';
 import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
@@ -10,6 +13,8 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../helpers/test_database.dart';
 
 const apple = ShopItem(
   id: 'food_apple',
@@ -219,6 +224,10 @@ class ShopHarness {
     purchases = ShopPurchases(content);
     container = ProviderContainer(
       overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
         gameRepositoryProvider.overrideWithValue(games),
         contentRepositoryProvider.overrideWithValue(content),
         purchaseServiceProvider.overrideWithValue(purchases),
@@ -237,6 +246,7 @@ class ShopHarness {
     controller = container.read(shopControllerProvider.notifier);
   }
   final games = ShopGames();
+  final AppDatabase database = createTestDatabase();
   final content = ShopContent();
   late final ShopPurchases purchases;
   late final ProviderContainer container;
@@ -250,5 +260,8 @@ class ShopHarness {
     id == null ? active.clear() : active.setActiveProfileId(id);
   }
 
-  void dispose() => container.dispose();
+  void dispose() {
+    container.dispose();
+    unawaited(database.close());
+  }
 }

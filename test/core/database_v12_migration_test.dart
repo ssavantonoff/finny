@@ -49,7 +49,7 @@ void main() {
       final next = await upgraded.database;
       expect(
         (await next.rawQuery('PRAGMA user_version')).single['user_version'],
-        12,
+        AppDatabase.schemaVersion,
       );
       expect(await next.query('day5_sale_assignments'), isEmpty);
       final progress = await next.query(

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:finny/app/providers.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/models/content_entry.dart';
+import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/day_five_task.dart';
 import 'package:finny/models/game_period.dart';
@@ -39,6 +40,7 @@ class HomeReady extends HomeViewState {
     required this.definition,
     required this.completedDays,
     required this.allDaysCompleted,
+    this.freePlay = false,
     this.activeGoal,
     this.bowlEvent,
     this.dayFiveTaskCompletion,
@@ -59,6 +61,7 @@ class HomeReady extends HomeViewState {
   final PeriodDefinition? definition;
   final int completedDays;
   final bool allDaysCompleted;
+  final bool freePlay;
   final SavingsGoal? activeGoal;
   final StoryEventSnapshot? bowlEvent;
   final DayFiveTaskCompletion? dayFiveTaskCompletion;
@@ -93,6 +96,7 @@ class HomeReady extends HomeViewState {
     definition: definition,
     completedDays: completedDays,
     allDaysCompleted: allDaysCompleted,
+    freePlay: freePlay,
     activeGoal: activeGoal ?? this.activeGoal,
     bowlEvent: bowlEvent ?? this.bowlEvent,
     dayFiveTaskCompletion: dayFiveTaskCompletion,
@@ -138,7 +142,7 @@ class HomeController extends Notifier<HomeViewState> {
     final generation = ++_loadGeneration;
     state = const HomeLoading();
     final loaded = await _readSnapshot();
-    if (generation == _loadGeneration) state = loaded;
+    if (ref.mounted && generation == _loadGeneration) state = loaded;
   }
 
   Future<GamePeriod?> startDay() async {
@@ -236,14 +240,15 @@ class HomeController extends Notifier<HomeViewState> {
     final current = state;
     if (_interacting ||
         current is! HomeReady ||
-        current.period == null ||
-        (current.period!.status != GamePeriodStatus.active &&
+        (!current.freePlay && current.period == null) ||
+        (!current.freePlay &&
+            current.period!.status != GamePeriodStatus.active &&
             current.period!.status != GamePeriodStatus.readyToFinish)) {
       return false;
     }
     _interacting = true;
     final profileId = current.profile.id!;
-    final periodId = current.period!.id!;
+    final periodId = current.period?.id;
     final actionId = interaction.actionId;
 
     final String operationId;
@@ -253,7 +258,7 @@ class HomeController extends Notifier<HomeViewState> {
     } else {
       operationId =
           operationIdFactory?.call(profileId, actionId) ??
-          'free:$profileId:${interaction.name}:$periodId:${DateTime.now().microsecondsSinceEpoch}:${++_interactionCounter}';
+          'free:$profileId:${interaction.name}:${periodId ?? 'play'}:${DateTime.now().microsecondsSinceEpoch}:${++_interactionCounter}';
       _pendingInteraction = (
         interaction: interaction,
         operationId: operationId,
@@ -267,19 +272,27 @@ class HomeController extends Notifier<HomeViewState> {
     );
 
     try {
-      await ref
-          .read(itemUseServiceProvider)
-          .performFreeInteraction(
-            profileId: profileId,
-            periodId: periodId,
-            interaction: interaction,
-            operationId: operationId,
-          );
+      if (current.freePlay) {
+        await ref
+            .read(freePlayServiceProvider)
+            .pet(profileId: profileId, operationId: operationId);
+      } else {
+        await ref
+            .read(itemUseServiceProvider)
+            .performFreeInteraction(
+              profileId: profileId,
+              periodId: periodId!,
+              interaction: interaction,
+              operationId: operationId,
+            );
+      }
       _pendingInteraction = null;
       _interacting = false;
       final refreshed = await _readSnapshot();
       state = refreshed;
-      unawaited(ref.read(campaignEventControllerProvider.notifier).load());
+      if (!current.freePlay) {
+        unawaited(ref.read(campaignEventControllerProvider.notifier).load());
+      }
       return true;
     } on PetActionAlreadyUsedException {
       _pendingInteraction = null;
@@ -338,12 +351,18 @@ class HomeController extends Notifier<HomeViewState> {
         ref.read(contentRepositoryProvider).loadPeriods(),
         ref.read(contentRepositoryProvider).loadGoals(),
       ]);
+      if (!ref.mounted) return const HomeFailure();
       final profile = values[0] as Profile?;
       final pet = values[1] as Pet?;
       final gameState = values[2] as GameState?;
       final periods = values[3] as List<GamePeriod>;
       final definitions = values[4] as List<PeriodDefinition>;
       final goals = values[5] as List<SavingsGoal>;
+      final freePlay =
+          periods.length >= 5 &&
+          (await ref.read(campaignLifecycleServiceProvider).load(profileId))
+                  .mode ==
+              CampaignMode.freePlay;
 
       if (profile == null || profile.profileType != ProfileType.normal) {
         return const HomeFailure();
@@ -376,7 +395,8 @@ class HomeController extends Notifier<HomeViewState> {
       }
 
       int petUsageCount = 0;
-      if (period != null &&
+      if (!freePlay &&
+          period != null &&
           period.id != null &&
           (period.status == GamePeriodStatus.active ||
               period.status == GamePeriodStatus.readyToFinish)) {
@@ -391,13 +411,14 @@ class HomeController extends Notifier<HomeViewState> {
       }
 
       StoryEventSnapshot? bowlEvent;
-      if (period != null &&
+      if (!freePlay &&
+          period != null &&
           period.periodNumber >= 3 &&
           period.periodNumber <= 5) {
         bowlEvent = await ref
             .read(storyEventServiceProvider)
             .armOrLoadDay3Bowl(profileId: profileId);
-      } else if (periods.any((item) => item.periodNumber >= 3)) {
+      } else if (!freePlay && periods.any((item) => item.periodNumber >= 3)) {
         bowlEvent = await ref
             .read(storyEventServiceProvider)
             .loadDay3Bowl(profileId: profileId);
@@ -426,6 +447,7 @@ class HomeController extends Notifier<HomeViewState> {
             definitions.isNotEmpty &&
             periods.length == definitions.length &&
             periods.every((item) => item.status == GamePeriodStatus.completed),
+        freePlay: freePlay,
         activeGoal: activeGoal,
         bowlEvent: bowlEvent,
         dayFiveTaskCompletion: dayFiveTaskCompletion,

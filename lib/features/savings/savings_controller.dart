@@ -1,5 +1,6 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/models/completed_goal.dart';
+import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/savings_exception.dart';
@@ -41,7 +42,7 @@ class PendingSavingsDeposit extends PendingSavingsOperation {
   });
 
   final int profileId;
-  final int periodId;
+  final int? periodId;
   final String goalId;
   final int amount;
   final String operationId;
@@ -66,6 +67,7 @@ class SavingsReady extends SavingsViewState {
     required this.goals,
     required this.completedGoals,
     required this.period,
+    this.freePlay = false,
     this.mutating = false,
     this.pendingOperation,
     this.message,
@@ -76,6 +78,7 @@ class SavingsReady extends SavingsViewState {
   final List<SavingsGoal> goals;
   final List<CompletedGoal> completedGoals;
   final GamePeriod? period;
+  final bool freePlay;
   final bool mutating;
   final PendingSavingsOperation? pendingOperation;
   final String? message;
@@ -109,7 +112,8 @@ class SavingsReady extends SavingsViewState {
       activeGoal != null &&
       !goalReached &&
       maxDeposit > 0 &&
-      (period?.status == GamePeriodStatus.active ||
+      (freePlay ||
+          period?.status == GamePeriodStatus.active ||
           period?.status == GamePeriodStatus.readyToFinish);
   bool get canSkip =>
       pendingOperation == null &&
@@ -123,7 +127,7 @@ class SavingsReady extends SavingsViewState {
       !mutating &&
       activeGoal != null &&
       !goalReached &&
-      !gameState.goalChangeUsed &&
+      (freePlay || !gameState.goalChangeUsed) &&
       availableGoals.any((goal) => goal.id != activeGoal!.id);
   bool get canClaim =>
       pendingOperation == null &&
@@ -155,6 +159,7 @@ class SavingsReady extends SavingsViewState {
     goals: goals ?? this.goals,
     completedGoals: completedGoals ?? this.completedGoals,
     period: clearPeriod ? null : period ?? this.period,
+    freePlay: freePlay,
     mutating: mutating ?? this.mutating,
     pendingOperation: clearPending
         ? null
@@ -188,7 +193,13 @@ class SavingsController extends Notifier<SavingsViewState> {
           .read(savingsServiceProvider)
           .loadSnapshot(profileId);
       if (_isCurrent(generation, profileId)) {
-        state = _ready(profileId, snapshot);
+        final freePlay =
+            (await ref.read(campaignLifecycleServiceProvider).load(profileId))
+                .mode ==
+            CampaignMode.freePlay;
+        if (_isCurrent(generation, profileId)) {
+          state = _ready(profileId, snapshot, freePlay: freePlay);
+        }
       }
     } on FormatException {
       if (_isCurrent(generation, profileId)) {
@@ -207,8 +218,11 @@ class SavingsController extends Notifier<SavingsViewState> {
   );
 
   Future<void> changeGoal(String goalId) => _simpleMutation(
-    (service, ready) =>
-        service.changeGoal(profileId: ready.profileId, goalId: goalId),
+    (service, ready) => ready.freePlay
+        ? ref
+              .read(freePlayServiceProvider)
+              .changeGoal(profileId: ready.profileId, goalId: goalId)
+        : service.changeGoal(profileId: ready.profileId, goalId: goalId),
   );
 
   Future<void> skipToday() => _simpleMutation((service, ready) {
@@ -234,19 +248,19 @@ class SavingsController extends Notifier<SavingsViewState> {
     if (current is! SavingsReady ||
         current.mutating ||
         current.pendingOperation != null ||
-        current.period?.id == null ||
+        (!current.freePlay && current.period?.id == null) ||
         current.activeGoal == null) {
       return;
     }
     final pending = PendingSavingsDeposit(
       profileId: current.profileId,
-      periodId: current.period!.id!,
+      periodId: current.period?.id,
       goalId: current.activeGoal!.id,
       amount: amount,
       operationId: _operationId(
         'deposit',
         current.profileId,
-        '${current.period!.id}',
+        '${current.period?.id ?? 'free_play'}',
       ),
     );
     await _runPending(current, pending);
@@ -296,12 +310,23 @@ class SavingsController extends Notifier<SavingsViewState> {
       final service = ref.read(savingsServiceProvider);
       switch (pending) {
         case PendingSavingsDeposit():
-          await service.deposit(
-            profileId: pending.profileId,
-            periodId: pending.periodId,
-            amount: pending.amount,
-            operationId: pending.operationId,
-          );
+          if (pending.periodId == null) {
+            await ref
+                .read(freePlayServiceProvider)
+                .deposit(
+                  profileId: pending.profileId,
+                  amount: pending.amount,
+                  operationId: pending.operationId,
+                  goalId: pending.goalId,
+                );
+          } else {
+            await service.deposit(
+              profileId: pending.profileId,
+              periodId: pending.periodId!,
+              amount: pending.amount,
+              operationId: pending.operationId,
+            );
+          }
         case PendingSavingsClaim():
           await service.claimGoal(
             profileId: pending.profileId,
@@ -382,7 +407,11 @@ class SavingsController extends Notifier<SavingsViewState> {
           .read(savingsServiceProvider)
           .loadSnapshot(previous.profileId);
       if (_isCurrent(generation, previous.profileId)) {
-        state = _ready(previous.profileId, snapshot);
+        state = _ready(
+          previous.profileId,
+          snapshot,
+          freePlay: previous.freePlay,
+        );
       }
     } catch (_) {
       if (_isCurrent(generation, previous.profileId)) {
@@ -396,12 +425,17 @@ class SavingsController extends Notifier<SavingsViewState> {
     }
   }
 
-  SavingsReady _ready(int profileId, SavingsSnapshot snapshot) => SavingsReady(
+  SavingsReady _ready(
+    int profileId,
+    SavingsSnapshot snapshot, {
+    bool freePlay = false,
+  }) => SavingsReady(
     profileId: profileId,
     gameState: snapshot.state,
     goals: snapshot.goals,
     completedGoals: snapshot.completedGoals,
     period: snapshot.period,
+    freePlay: freePlay,
   );
 
   bool _isCurrent(int generation, int profileId) =>

@@ -54,15 +54,18 @@ class ProgressScreen extends ConsumerWidget {
                       if (completedDay == 5) ...[
                         const SizedBox(height: AppSpacing.large),
                         const Text(
-                          'Ты прошёл все пять дней с Финни.',
+                          'Пять дней позади. Финни вырос вместе с тобой!',
                           textAlign: TextAlign.center,
                         ),
                       ],
                       const SizedBox(height: AppSpacing.large),
                       FilledButton(
                         key: const Key('progress-home'),
-                        onPressed: () => context.go('/home'),
-                        child: const Text('На главную'),
+                        onPressed: () =>
+                            context.go(completedDay == 5 ? '/finale' : '/home'),
+                        child: Text(
+                          completedDay == 5 ? 'Посмотреть итоги' : 'На главную',
+                        ),
                       ),
                     ],
                   ),

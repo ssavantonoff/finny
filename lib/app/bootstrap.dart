@@ -1,6 +1,7 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/features/onboarding/profile_name.dart';
 import 'package:finny/models/profile.dart';
+import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum BootstrapPhase {
@@ -19,12 +20,14 @@ class BootstrapState {
     this.profile,
     this.submitting = false,
     this.saveFailed = false,
+    this.destination,
   });
 
   final BootstrapPhase phase;
   final Profile? profile;
   final bool submitting;
   final bool saveFailed;
+  final String? destination;
 }
 
 final bootstrapProvider = NotifierProvider<BootstrapController, BootstrapState>(
@@ -134,10 +137,18 @@ class BootstrapController extends Notifier<BootstrapState> {
       return;
     }
     final pet = await game.getPet(id);
+    final mode = pet == null
+        ? CampaignMode.campaign
+        : (await ref.read(campaignLifecycleServiceProvider).load(id)).mode;
     state = BootstrapState(
       pet == null
           ? BootstrapPhase.resolvedWithoutPet
           : BootstrapPhase.resolvedWithPet,
+      destination: switch (mode) {
+        CampaignMode.finalePending => '/finale',
+        CampaignMode.campaignFinished => '/campaign-complete',
+        _ => '/home',
+      },
     );
   }
 

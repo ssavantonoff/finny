@@ -1,6 +1,8 @@
 import 'package:finny/app/bootstrap_screen.dart';
+import 'package:finny/app/providers.dart';
 import 'package:finny/app/scaffold_with_nested_navigation.dart';
 import 'package:finny/features/adult/adult_screen.dart';
+import 'package:finny/features/finale/finale_screen.dart';
 import 'package:finny/features/budget/budget_screen.dart';
 import 'package:finny/features/help/help_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
@@ -13,15 +15,45 @@ import 'package:finny/features/settings/settings_screen.dart';
 import 'package:finny/features/shop/shop_screen.dart';
 import 'package:finny/features/tasks/tasks_screen.dart';
 import 'package:finny/features/things/things_screen.dart';
+import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: '/startup',
+    redirect: (_, state) async {
+      const shellPaths = {'/home', '/things', '/shop', '/tasks', '/savings'};
+      if (!shellPaths.contains(state.uri.path) &&
+          state.uri.path != '/campaign-complete') {
+        return null;
+      }
+      final profileId = ref.read(activeProfileIdProvider);
+      if (profileId == null) return '/startup';
+      final mode =
+          (await ref.read(campaignLifecycleServiceProvider).load(profileId))
+              .mode;
+      if (state.uri.path == '/campaign-complete') {
+        return switch (mode) {
+          CampaignMode.campaignFinished => null,
+          CampaignMode.finalePending => '/finale',
+          _ => '/home',
+        };
+      }
+      return switch (mode) {
+        CampaignMode.finalePending => '/finale',
+        CampaignMode.campaignFinished => '/campaign-complete',
+        _ => null,
+      };
+    },
     routes: [
       GoRoute(path: '/', redirect: (_, _) => '/startup'),
       GoRoute(path: '/startup', builder: (_, _) => const BootstrapScreen()),
+      GoRoute(path: '/finale', builder: (_, _) => const FinaleScreen()),
+      GoRoute(
+        path: '/campaign-complete',
+        builder: (_, _) => const CampaignCompleteScreen(),
+      ),
       GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingScreen()),
       GoRoute(
         path: '/pet-creation',

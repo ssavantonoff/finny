@@ -2,12 +2,16 @@ import 'dart:async';
 
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/repositories/content_repository.dart';
+import 'package:finny/repositories/campaign_lifecycle_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/repositories/free_play_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/repositories/profile_data_management_repository.dart';
 import 'package:finny/services/budget_service.dart';
+import 'package:finny/services/campaign_lifecycle_service.dart';
 import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/item_use_service.dart';
+import 'package:finny/services/free_play_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:finny/services/savings_service.dart';
@@ -79,6 +83,21 @@ final storyEventPortProvider = Provider<StoryEventPort>(
 
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => AssetContentRepository(),
+);
+
+final campaignLifecycleServiceProvider = Provider<CampaignLifecycleService>(
+  (ref) => CampaignLifecycleService(
+    CampaignLifecycleRepository(ref.watch(appDatabaseProvider)),
+    ref.watch(contentRepositoryProvider),
+  ),
+);
+
+final freePlayServiceProvider = Provider<FreePlayService>(
+  (ref) => FreePlayService(
+    FreePlayRepository(ref.watch(appDatabaseProvider)),
+    ref.watch(contentRepositoryProvider),
+    ref.watch(gameRepositoryProvider),
+  ),
 );
 
 final budgetServiceProvider = Provider<BudgetService>(

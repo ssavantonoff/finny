@@ -1,3 +1,5 @@
+import '../../helpers/campaign_only_lifecycle_service.dart';
+
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
@@ -154,6 +156,10 @@ void main() {
       final games = _AtmosphereGames(database, pet, gameState, period);
       final container = ProviderContainer(
         overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
           activeProfileIdProvider.overrideWith(() => _ActiveProfileMock(1)),
           profileRepositoryProvider.overrideWithValue(
             _AtmosphereProfiles(profile),
@@ -330,6 +336,10 @@ void main() {
 
         final container = ProviderContainer(
           overrides: [
+            campaignLifecycleServiceProvider.overrideWithValue(
+              CampaignOnlyLifecycleService(),
+            ),
+            appDatabaseProvider.overrideWithValue(database),
             activeProfileIdProvider.overrideWith(() => _ActiveProfileMock(1)),
             profileRepositoryProvider.overrideWithValue(profiles),
             gameRepositoryProvider.overrideWithValue(games),
@@ -492,6 +502,10 @@ void main() {
 
         final container = ProviderContainer(
           overrides: [
+            campaignLifecycleServiceProvider.overrideWithValue(
+              CampaignOnlyLifecycleService(),
+            ),
+            appDatabaseProvider.overrideWithValue(database),
             activeProfileIdProvider.overrideWith(() => _ActiveProfileMock(1)),
             profileRepositoryProvider.overrideWithValue(
               _AtmosphereProfiles(profile),
