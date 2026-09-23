@@ -189,10 +189,12 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(AppSpacing.medium),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.medium),
               child: Text(
-                'Цель можно поменять только один раз. Накопленные деньги сохранятся. После смены вторую смену сделать нельзя до получения цели.',
+                state.freePlay
+                    ? 'Цель можно менять снова. Накопленные деньги сохранятся.'
+                    : 'Цель можно поменять только один раз. Накопленные деньги сохранятся. После смены вторую смену сделать нельзя до получения цели.',
                 textAlign: TextAlign.center,
               ),
             ),

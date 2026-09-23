@@ -1,3 +1,5 @@
+import 'helpers/campaign_only_lifecycle_service.dart';
+
 import 'dart:async';
 
 import 'package:finny/app/app.dart';
@@ -76,6 +78,10 @@ void main() {
     final profiles = _Profiles();
     final container = ProviderContainer(
       overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
         profileRepositoryProvider.overrideWithValue(profiles),
         gameRepositoryProvider.overrideWithValue(_Games(database)),
       ],
@@ -131,6 +137,10 @@ void main() {
       );
     final container = ProviderContainer(
       overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
         profileRepositoryProvider.overrideWithValue(profiles),
         gameRepositoryProvider.overrideWithValue(games),
       ],
@@ -152,6 +162,10 @@ void main() {
     final profiles = _Profiles()..createGate = Completer<void>();
     final container = ProviderContainer(
       overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
         profileRepositoryProvider.overrideWithValue(profiles),
         gameRepositoryProvider.overrideWithValue(_Games(database)),
       ],
@@ -186,6 +200,10 @@ void main() {
     final profiles = _Profiles()..failCreate = true;
     final container = ProviderContainer(
       overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
         profileRepositoryProvider.overrideWithValue(profiles),
         gameRepositoryProvider.overrideWithValue(_Games(database)),
       ],

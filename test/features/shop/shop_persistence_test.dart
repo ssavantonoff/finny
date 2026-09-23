@@ -1,3 +1,5 @@
+import '../../helpers/campaign_only_lifecycle_service.dart';
+
 import 'package:finny/app/providers.dart';
 import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/models/game_state.dart';
@@ -79,6 +81,10 @@ void main() {
     final service = LostReplyPurchase(SqlitePurchasePort(database), content);
     final container = ProviderContainer(
       overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
         gameRepositoryProvider.overrideWithValue(games),
         contentRepositoryProvider.overrideWithValue(content),
         purchaseServiceProvider.overrideWithValue(service),

@@ -47,6 +47,29 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             button: 'К Финни',
             onPressed: () => context.go('/home'),
           ),
+          TasksLoad.freePlayCompleted => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(AppSpacing.large),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Все задания выполнены!', textAlign: TextAlign.center),
+                  SizedBox(height: AppSpacing.small),
+                  Text(
+                    'Ты прошёл все 5 дней и выполнил задания Финни.',
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: AppSpacing.small),
+                  Text('5 / 5 дней ✓'),
+                  SizedBox(height: AppSpacing.small),
+                  Text(
+                    'Теперь можно играть, копить на цели и украшать дом Финни.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
           TasksLoad.planning => _Message(
             text: 'Сначала закончи план на этот день.',
             button: 'К плану',

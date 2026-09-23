@@ -1239,6 +1239,9 @@ class SqliteGameRepository implements GameRepository {
         throw StateError('Only DEMO runtime data can be reset.');
       }
       for (final table in [
+        'campaign_completion',
+        'free_play_pet_operations',
+        'free_play_equipped_accessories',
         'task_progress',
         'pet_action_operations',
         'campaign_story_events',

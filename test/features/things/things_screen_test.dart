@@ -1,3 +1,5 @@
+import '../../helpers/campaign_only_lifecycle_service.dart';
+
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/things/things_screen.dart';
@@ -173,6 +175,10 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
           activeProfileIdProvider.overrideWith(
             () => _ActiveThingsProfileMock(1),
           ),
@@ -219,6 +225,10 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
           activeProfileIdProvider.overrideWith(
             () => _ActiveThingsProfileMock(1),
           ),
@@ -296,6 +306,10 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
         activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
         profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
         gameRepositoryProvider.overrideWithValue(games),
@@ -341,6 +355,10 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
           activeProfileIdProvider.overrideWith(
             () => _ActiveThingsProfileMock(1),
           ),

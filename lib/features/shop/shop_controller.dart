@@ -4,6 +4,7 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/features/things/things_controller.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
+import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/special_purchase.dart';
@@ -45,7 +46,7 @@ class PurchaseAttempt {
   });
 
   final int profileId;
-  final int periodId;
+  final int? periodId;
   final ShopItem item;
   final String operationId;
   final String? promotionId;
@@ -59,6 +60,7 @@ class ShopState {
     this.items = const [],
     this.gameState,
     this.period,
+    this.freePlay = false,
     this.quantities = const {},
     this.promotion,
     this.promotionPurchased = false,
@@ -73,6 +75,7 @@ class ShopState {
   final List<ShopItem> items;
   final GameState? gameState;
   final GamePeriod? period;
+  final bool freePlay;
   final Map<String, int> quantities;
   final ShopPromotion? promotion;
   final bool promotionPurchased;
@@ -122,13 +125,14 @@ class ShopState {
     if (load != ShopLoad.ready) return 'Сначала обнови магазин.';
     if (item.unlockType != 'available') return 'Этот предмет пока недоступен.';
     if (item.persistent && (quantities[item.id] ?? 0) > 0) return 'Уже куплено';
-    if (period?.id == null || period!.id! <= 0) {
+    if (!freePlay && (period?.id == null || period!.id! <= 0)) {
       return 'Сначала начни игровой период.';
     }
-    if (period!.status == GamePeriodStatus.planning) {
+    if (!freePlay && period!.status == GamePeriodStatus.planning) {
       return 'Сначала подтверди план.';
     }
-    if (period!.status != GamePeriodStatus.active &&
+    if (!freePlay &&
+        period!.status != GamePeriodStatus.active &&
         period!.status != GamePeriodStatus.readyToFinish) {
       return 'В этом периоде покупки недоступны.';
     }
@@ -149,6 +153,7 @@ class ShopState {
     items: items,
     gameState: gameState,
     period: period,
+    freePlay: freePlay,
     quantities: quantities,
     promotion: promotion,
     promotionPurchased: promotionPurchased,
@@ -230,6 +235,11 @@ class ShopController extends Notifier<ShopState> {
         );
       }
       final period = await games.getCurrentPeriod(profileId);
+      final freePlay =
+          period == null &&
+          (await ref.read(campaignLifecycleServiceProvider).load(profileId))
+                  .mode ==
+              CampaignMode.freePlay;
       final quantities = <String, int>{};
       for (final item in items) {
         quantities[item.id] = await games.getInventoryQuantity(
@@ -267,6 +277,7 @@ class ShopController extends Notifier<ShopState> {
         items: items,
         gameState: game,
         period: period,
+        freePlay: freePlay,
         quantities: Map.unmodifiable(quantities),
         promotion: promotionState?.promotion,
         promotionPurchased: promotionState?.purchased ?? false,
@@ -301,7 +312,7 @@ class ShopController extends Notifier<ShopState> {
   Future<void> buy(
     String itemId, {
     required int profileId,
-    required int periodId,
+    int? periodId,
   }) async {
     final current = state;
     final item = current.itemById(itemId);
@@ -354,12 +365,20 @@ class ShopController extends Notifier<ShopState> {
     ShopResult result;
     PurchaseAttempt? pending;
     try {
-      purchasedState = attempt.saleItemId != null
+      purchasedState = attempt.periodId == null
+          ? await ref
+                .read(freePlayServiceProvider)
+                .purchase(
+                  profileId: attempt.profileId,
+                  itemId: attempt.item.id,
+                  operationId: attempt.operationId,
+                )
+          : attempt.saleItemId != null
           ? await ref
                 .read(specialPurchaseServiceProvider)
                 .purchaseDayFiveSale(
                   profileId: attempt.profileId,
-                  periodId: attempt.periodId,
+                  periodId: attempt.periodId!,
                   itemId: attempt.saleItemId!,
                   operationId: attempt.operationId,
                 )
@@ -368,7 +387,7 @@ class ShopController extends Notifier<ShopState> {
                 .read(purchaseServiceProvider)
                 .purchase(
                   profileId: attempt.profileId,
-                  periodId: attempt.periodId,
+                  periodId: attempt.periodId!,
                   itemId: attempt.item.id,
                   operationId: attempt.operationId,
                 )
@@ -376,7 +395,7 @@ class ShopController extends Notifier<ShopState> {
                 .read(specialPurchaseServiceProvider)
                 .purchasePromotion(
                   profileId: attempt.profileId,
-                  periodId: attempt.periodId,
+                  periodId: attempt.periodId!,
                   promotionId: attempt.promotionId!,
                   operationId: attempt.operationId,
                 );

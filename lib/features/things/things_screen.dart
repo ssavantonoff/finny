@@ -239,7 +239,20 @@ class _ItemCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.small),
-            if (item.displaySection == ShopDisplaySection.accessories)
+            if (item.displaySection == ShopDisplaySection.accessories &&
+                state.freePlay)
+              FilledButton.tonal(
+                key: Key('things-equip-${item.id}'),
+                onPressed: state.mutating
+                    ? null
+                    : () => controller.toggleAccessory(item),
+                child: Text(
+                  state.equipped[item.equipSlot] == item.id
+                      ? 'Снять'
+                      : 'Надеть',
+                ),
+              )
+            else if (item.displaySection == ShopDisplaySection.accessories)
               Text(
                 'Аксессуар',
                 style: TextStyle(

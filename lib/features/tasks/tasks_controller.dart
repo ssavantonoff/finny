@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:finny/app/providers.dart';
 import 'package:finny/models/financial_task.dart';
+import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/task_submission_result.dart';
 import 'package:finny/models/shop_item.dart';
@@ -11,6 +12,7 @@ enum TasksLoad {
   loading,
   noProfile,
   noCurrentDay,
+  freePlayCompleted,
   planning,
   ready,
   contentFailure,
@@ -143,7 +145,17 @@ class TasksController extends Notifier<TasksState> {
       final period = await games.getCurrentPeriod(profileId);
       if (!_isCurrent(generation, profileId)) return;
       if (period == null) {
-        state = TasksState(load: TasksLoad.noCurrentDay, profileId: profileId);
+        final mode =
+            (await ref.read(campaignLifecycleServiceProvider).load(profileId))
+                .mode;
+        if (_isCurrent(generation, profileId)) {
+          state = TasksState(
+            load: mode == CampaignMode.freePlay
+                ? TasksLoad.freePlayCompleted
+                : TasksLoad.noCurrentDay,
+            profileId: profileId,
+          );
+        }
         return;
       }
       if (period.status == GamePeriodStatus.planning) {
