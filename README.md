@@ -317,6 +317,42 @@ flutter devices
 flutter run -d <device-id>
 ```
 
+### Android release
+
+Текущая конфигурация: Flutter 3.47.4 (stable), Android SDK и JDK 17+.
+Проект рассчитан на Android 8.0+ (API 26); текущий `minSdk` Flutter равен 24
+и не препятствует установке на API 26. `applicationId` —
+`ru.codexteam.finny`, `versionName` — `1.0.0`, `versionCode` — `1`.
+
+Для release-сборки нужен постоянный keystore команды вне репозитория.
+Создайте локальный `android/key.properties` со следующими полями (в Windows-пути
+используйте `/` вместо `\`):
+
+```properties
+storeFile=C:/secure/finny-release.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD
+```
+
+Укажите реальный абсолютный путь и значения, полученные от ответственного за
+release-ключ. `android/key.properties`, keystore и пароли нельзя добавлять в Git:
+они исключены правилами `android/.gitignore`. Без них release-сборка завершится
+ошибкой; перехода на debug-подпись нет. Обычный `flutter run` не требует
+release-ключа.
+
+```bash
+flutter pub get
+flutter build apk --release
+```
+
+Результат: `build/app/outputs/flutter-apk/app-release.apk`. Перед финальной
+сдачей проверьте его подпись командой
+`apksigner verify --verbose --print-certs build/app/outputs/flutter-apk/app-release.apk`
+и убедитесь, что сертификат не является Android Debug certificate. Полную
+проверку финального APK на Android 8.0 / API 26, физическом устройстве,
+без сети и после перезапуска выполняют после feature freeze.
+
 ## Проверки
 
 Основные проверки перед merge:
