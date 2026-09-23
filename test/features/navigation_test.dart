@@ -87,6 +87,7 @@ void main() {
     promoContent = TestContentRepository(
       testPeriodDefinitions(count: 5),
       shopItems: await assets.loadShopItems(),
+      tasks: await assets.loadTasks(),
       stories: await assets.loadStoryPurchases(),
       promotions: await assets.loadPromotions(),
     );
@@ -344,7 +345,7 @@ void main() {
     expect(find.byKey(const Key('nav-shop-promo-badge')), findsNothing);
   });
 
-  for (final day in [1, 2, 3, 5]) {
+  for (final day in [1, 2, 3]) {
     testWidgets('Day $day has no Shop promotion badge', (tester) async {
       final nav = (await tester.runAsync(() => fixture(day)))!;
       addTearDown(nav.close);
@@ -353,6 +354,15 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('Day 5 shows SALE badge while planning', (tester) async {
+    final nav = (await tester.runAsync(() => fixture(5)))!;
+    addTearDown(nav.close);
+    await mountPromoApp(tester, nav);
+    expect(find.byKey(const Key('nav-shop-promo-badge')), findsOneWidget);
+    expect(find.text('SALE'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Home period refresh reveals Day 4 badge without visiting Shop', (
     tester,

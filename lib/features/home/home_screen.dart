@@ -4,6 +4,7 @@ import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/day_lifecycle.dart';
+import 'package:finny/models/day_five_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/story_event.dart';
@@ -648,6 +649,7 @@ class _HomeContent extends StatelessWidget {
                     const SizedBox(height: AppSpacing.medium),
                     _TodayCard(
                       period: period,
+                      dayFiveTaskCompletion: state.dayFiveTaskCompletion,
                       actionsEnabled:
                           period.status == GamePeriodStatus.active ||
                           period.status == GamePeriodStatus.readyToFinish,
@@ -727,10 +729,15 @@ class _HomeContent extends StatelessWidget {
 }
 
 class _TodayCard extends StatelessWidget {
-  const _TodayCard({required this.period, required this.actionsEnabled});
+  const _TodayCard({
+    required this.period,
+    required this.actionsEnabled,
+    this.dayFiveTaskCompletion,
+  });
 
   final GamePeriod period;
   final bool actionsEnabled;
+  final DayFiveTaskCompletion? dayFiveTaskCompletion;
 
   @override
   Widget build(BuildContext context) {
@@ -761,8 +768,15 @@ class _TodayCard extends StatelessWidget {
                         ? 'Задание дня'
                         : 'Накопления',
                     pendingText: cp == 'financial_task'
-                        ? 'Нужно выполнить'
+                        ? dayFiveTaskCompletion == null
+                              ? 'Нужно выполнить'
+                              : 'Задания: ${dayFiveTaskCompletion!.completedCount} из 2'
                         : 'Нужно решить',
+                    resolvedText:
+                        cp == 'financial_task' &&
+                            dayFiveTaskCompletion?.completedCount == 2
+                        ? 'Задания выполнены'
+                        : null,
                     actionText: cp == 'financial_task' ? 'Выполнить' : 'Решить',
                     actionKey: Key(
                       cp == 'financial_task'
@@ -835,6 +849,7 @@ class _RequiredActionRow extends StatelessWidget {
   const _RequiredActionRow({
     required this.title,
     required this.pendingText,
+    this.resolvedText,
     required this.actionText,
     required this.actionKey,
     required this.route,
@@ -844,6 +859,7 @@ class _RequiredActionRow extends StatelessWidget {
 
   final String title;
   final String pendingText;
+  final String? resolvedText;
   final String actionText;
   final Key actionKey;
   final String route;
@@ -870,6 +886,7 @@ class _RequiredActionRow extends StatelessWidget {
               children: [
                 Text(title, style: theme.textTheme.titleSmall),
                 if (!resolved) Text(pendingText),
+                if (resolved && resolvedText != null) Text(resolvedText!),
               ],
             ),
           ),

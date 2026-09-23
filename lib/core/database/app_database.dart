@@ -7,7 +7,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 11;
+  static const schemaVersion = 12;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -164,6 +164,7 @@ class AppDatabase {
     await _createPetActionOperationsTable(db);
     await _createPeriodSpecialActionsTable(db);
     await _createCampaignStoryEventsTable(db);
+    await _createDayFiveSaleAssignmentsTable(db);
   }
 
   static Future<void> _upgradeSchema(
@@ -269,6 +270,9 @@ class AppDatabase {
     }
     if (oldVersion < 11) {
       await _migrateDay4V11(db);
+    }
+    if (oldVersion < 12) {
+      await _createDayFiveSaleAssignmentsTable(db);
     }
   }
 
@@ -547,6 +551,24 @@ class AppDatabase {
       updated_at TEXT NOT NULL,
       PRIMARY KEY (profile_id, task_id),
       FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE
+    )
+  ''');
+
+  static Future<void> _createDayFiveSaleAssignmentsTable(
+    sqflite.DatabaseExecutor db,
+  ) => db.execute('''
+    CREATE TABLE IF NOT EXISTS day5_sale_assignments (
+      profile_id INTEGER NOT NULL,
+      period_id INTEGER NOT NULL,
+      item_id TEXT NOT NULL CHECK (length(trim(item_id)) > 0),
+      discount_amount INTEGER NOT NULL CHECK (discount_amount > 0),
+      purchase_operation_id TEXT,
+      purchased_at TEXT,
+      PRIMARY KEY (profile_id, period_id, item_id),
+      UNIQUE (profile_id, purchase_operation_id),
+      FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+      FOREIGN KEY (profile_id, period_id)
+        REFERENCES game_periods(profile_id, id) ON DELETE CASCADE
     )
   ''');
 

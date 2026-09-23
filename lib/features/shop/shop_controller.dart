@@ -41,6 +41,7 @@ class PurchaseAttempt {
     required this.item,
     required this.operationId,
     this.promotionId,
+    this.saleItemId,
   });
 
   final int profileId;
@@ -48,6 +49,7 @@ class PurchaseAttempt {
   final ShopItem item;
   final String operationId;
   final String? promotionId;
+  final String? saleItemId;
 }
 
 class ShopState {
@@ -60,6 +62,7 @@ class ShopState {
     this.quantities = const {},
     this.promotion,
     this.promotionPurchased = false,
+    this.saleOffers = const [],
     this.purchasing = false,
     this.result,
     this.pending,
@@ -73,6 +76,7 @@ class ShopState {
   final Map<String, int> quantities;
   final ShopPromotion? promotion;
   final bool promotionPurchased;
+  final List<DayFiveSaleOffer> saleOffers;
   final bool purchasing;
   final ShopResult? result;
   final PurchaseAttempt? pending;
@@ -90,8 +94,28 @@ class ShopState {
       !promotionPurchased &&
       promotion!.itemId == item.id;
 
-  int effectivePriceFor(ShopItem item) =>
-      isPromotionActiveFor(item) ? promotion!.promoPrice : item.price;
+  bool get isDayFiveSaleDay => period?.periodNumber == 5;
+
+  DayFiveSaleOffer? activeSaleFor(ShopItem item) {
+    if (!isDayFiveSaleDay) return null;
+    for (final offer in saleOffers) {
+      if (offer.itemId == item.id && !offer.purchased) return offer;
+    }
+    return null;
+  }
+
+  bool isDiscountActiveFor(ShopItem item) =>
+      isPromotionActiveFor(item) || activeSaleFor(item) != null;
+
+  int? discountAmountFor(ShopItem item) =>
+      activeSaleFor(item)?.discountAmount ??
+      (isPromotionActiveFor(item) ? item.price - promotion!.promoPrice : null);
+
+  int effectivePriceFor(ShopItem item) {
+    final sale = activeSaleFor(item);
+    if (sale != null) return item.price - sale.discountAmount;
+    return isPromotionActiveFor(item) ? promotion!.promoPrice : item.price;
+  }
 
   String? unavailableReason(ShopItem item) {
     if (profileId == null) return 'Профиль пока не выбран.';
@@ -128,6 +152,7 @@ class ShopState {
     quantities: quantities,
     promotion: promotion,
     promotionPurchased: promotionPurchased,
+    saleOffers: saleOffers,
     purchasing: purchasing,
     result: result,
     pending: pending,
@@ -228,6 +253,14 @@ class ShopController extends Notifier<ShopState> {
                   periodId: period!.id!,
                   periodNumber: period.periodNumber,
                 );
+      final saleOffers = period?.periodNumber == 5 && period?.id != null
+          ? await ref
+                .read(specialPurchaseServiceProvider)
+                .loadOrCreateDayFiveSale(
+                  profileId: profileId,
+                  periodId: period!.id!,
+                )
+          : const <DayFiveSaleOffer>[];
       return ShopState(
         load: ShopLoad.ready,
         profileId: profileId,
@@ -237,6 +270,7 @@ class ShopController extends Notifier<ShopState> {
         quantities: Map.unmodifiable(quantities),
         promotion: promotionState?.promotion,
         promotionPurchased: promotionState?.purchased ?? false,
+        saleOffers: saleOffers,
       );
     } catch (_) {
       // A failed inventory/period read must never look like zero ownership/no period.
@@ -290,6 +324,7 @@ class ShopController extends Notifier<ShopState> {
         promotionId: current.isPromotionActiveFor(item)
             ? current.promotion!.id
             : null,
+        saleItemId: current.activeSaleFor(item) != null ? item.id : null,
       ),
     );
   }
@@ -319,7 +354,16 @@ class ShopController extends Notifier<ShopState> {
     ShopResult result;
     PurchaseAttempt? pending;
     try {
-      purchasedState = attempt.promotionId == null
+      purchasedState = attempt.saleItemId != null
+          ? await ref
+                .read(specialPurchaseServiceProvider)
+                .purchaseDayFiveSale(
+                  profileId: attempt.profileId,
+                  periodId: attempt.periodId,
+                  itemId: attempt.saleItemId!,
+                  operationId: attempt.operationId,
+                )
+          : attempt.promotionId == null
           ? await ref
                 .read(purchaseServiceProvider)
                 .purchase(

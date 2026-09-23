@@ -1,4 +1,5 @@
 import 'package:finny/models/financial_task.dart';
+import 'package:finny/models/day_five_task.dart';
 import 'package:finny/models/task_submission_result.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
@@ -13,6 +14,107 @@ class TaskService {
   final GameRepository _gameRepository;
   final TaskCompletionPort _taskCompletionPort;
   final ContentRepository _contentRepository;
+
+  Future<DayFiveTaskCompletion> loadDayFiveCompletion({
+    required int profileId,
+    required int periodId,
+  }) async {
+    final tasks = await _contentRepository.loadTasks();
+    validateCampaignTaskContent(tasks);
+    final required = tasks
+        .where((task) => task.period == 5 && task.requiredForCheckpoint)
+        .toList(growable: false);
+    final catalog = await _contentRepository.loadShopItems();
+    return _taskCompletionPort.loadDayFiveCompletion(
+      profileId: profileId,
+      periodId: periodId,
+      requiredTasks: required,
+      catalog: catalog,
+    );
+  }
+
+  Future<({FinancialTask task, List<FinancialTask> requiredTasks})>
+  _dayFiveTask(int profileId, int periodId, String taskId, String type) async {
+    if (profileId <= 0 || periodId <= 0 || taskId.trim().isEmpty) {
+      throw ArgumentError('Profile, period and task IDs are required.');
+    }
+    final tasks = await _contentRepository.loadTasks();
+    validateCampaignTaskContent(tasks);
+    final requiredTasks = tasks
+        .where((task) => task.period == 5 && task.requiredForCheckpoint)
+        .toList(growable: false);
+    final matches = requiredTasks.where(
+      (task) => task.id == taskId && task.type == type,
+    );
+    if (matches.length != 1) throw StateError('Unknown Day 5 task.');
+    final period = await _gameRepository.getPeriodById(profileId, periodId);
+    if (period == null ||
+        period.periodNumber != 5 ||
+        !period.requiredCheckpoints.contains('financial_task')) {
+      throw StateError('Task does not belong to this period.');
+    }
+    return (task: matches.single, requiredTasks: requiredTasks);
+  }
+
+  Future<TaskSubmissionResult> submitIndependentBudget({
+    required int profileId,
+    required int periodId,
+    required String taskId,
+    required Set<String> selectedItemIds,
+    required int savingsAmount,
+  }) async {
+    final canonical = await _dayFiveTask(
+      profileId,
+      periodId,
+      taskId,
+      'independent_budget',
+    );
+    final catalog = await _contentRepository.loadShopItems();
+    canonical.task.independentBudgetScenario.evaluate(
+      selectedItemIds,
+      savingsAmount,
+      catalog,
+    );
+    return _taskCompletionPort.submitFinancialTaskIndependentBudget(
+      profileId: profileId,
+      periodId: periodId,
+      task: canonical.task,
+      requiredTasks: canonical.requiredTasks,
+      catalog: catalog,
+      selectedItemIds: Set.unmodifiable(selectedItemIds),
+      savingsAmount: savingsAmount,
+    );
+  }
+
+  Future<TaskSubmissionResult> submitPlanRepair({
+    required int profileId,
+    required int periodId,
+    required String taskId,
+    required Set<String> nowItemIds,
+    required int savingsAmount,
+  }) async {
+    final canonical = await _dayFiveTask(
+      profileId,
+      periodId,
+      taskId,
+      'plan_repair',
+    );
+    final catalog = await _contentRepository.loadShopItems();
+    canonical.task.planRepairScenario.evaluate(
+      nowItemIds,
+      savingsAmount,
+      catalog,
+    );
+    return _taskCompletionPort.submitFinancialTaskPlanRepair(
+      profileId: profileId,
+      periodId: periodId,
+      task: canonical.task,
+      requiredTasks: canonical.requiredTasks,
+      catalog: catalog,
+      nowItemIds: Set.unmodifiable(nowItemIds),
+      savingsAmount: savingsAmount,
+    );
+  }
 
   Future<TaskSubmissionResult> submitShoppingTrip({
     required int profileId,

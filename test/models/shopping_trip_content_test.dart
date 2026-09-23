@@ -78,33 +78,29 @@ void main() {
     },
   );
 
-  test(
-    'campaign retains old task types and one required task per day',
-    () async {
-      final tasks = await AssetContentRepository().loadTasks();
-      expect(tasks.length, greaterThanOrEqualTo(6));
+  test('campaign contains two Day 5 tasks and retains Days 1-4', () async {
+    final tasks = await AssetContentRepository().loadTasks();
+    expect(tasks.length, greaterThanOrEqualTo(6));
+    expect(
+      tasks.map((task) => task.topic).toSet().length,
+      greaterThanOrEqualTo(3),
+    );
+    for (var day = 1; day <= 5; day++) {
       expect(
-        tasks.map((task) => task.topic).toSet().length,
-        greaterThanOrEqualTo(3),
+        tasks.where((task) => task.period == day && task.requiredForCheckpoint),
+        hasLength(day == 5 ? 2 : 1),
       );
-      for (var day = 1; day <= 5; day++) {
-        expect(
-          tasks.where(
-            (task) => task.period == day && task.requiredForCheckpoint,
-          ),
-          hasLength(1),
-        );
-      }
-      expect(
-        tasks.map((task) => task.type).toSet(),
-        containsAll([
-          'choice',
-          'categorization',
-          'budget_priority',
-          'plan_adaptation',
-          'shopping_trip',
-        ]),
-      );
-    },
-  );
+    }
+    expect(
+      tasks.map((task) => task.type).toSet(),
+      containsAll([
+        'categorization',
+        'budget_priority',
+        'plan_adaptation',
+        'shopping_trip',
+        'independent_budget',
+        'plan_repair',
+      ]),
+    );
+  });
 }

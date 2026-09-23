@@ -1,3 +1,5 @@
+import 'package:finny/models/day_five_task.dart';
+
 class ChoiceTaskOption {
   const ChoiceTaskOption({required this.id, required this.label});
 
@@ -935,11 +937,14 @@ class FinancialTask {
     required this.reward,
     required this.period,
     this.requiredForCheckpoint = true,
+    this.dayProgressCost = 30,
     ChoiceTaskScenario? choiceScenario,
     CategorizationTaskScenario? categorizationScenario,
     BudgetPriorityTaskScenario? budgetPriorityScenario,
     PlanAdaptationTaskScenario? planAdaptationScenario,
     ShoppingTripTaskScenario? shoppingTripScenario,
+    IndependentBudgetScenario? independentBudgetScenario,
+    PlanRepairScenario? planRepairScenario,
   }) : // The public parameter names preserve the existing choice constructor.
        // ignore: prefer_initializing_formals
        _choiceScenario = choiceScenario,
@@ -950,7 +955,11 @@ class FinancialTask {
        // ignore: prefer_initializing_formals
        _planAdaptationScenario = planAdaptationScenario,
        // ignore: prefer_initializing_formals
-       _shoppingTripScenario = shoppingTripScenario;
+       _shoppingTripScenario = shoppingTripScenario,
+       // ignore: prefer_initializing_formals
+       _independentBudgetScenario = independentBudgetScenario,
+       // ignore: prefer_initializing_formals
+       _planRepairScenario = planRepairScenario;
 
   // Stable identity: a new period, reward, correct answer, or task meaning
   // requires a new ID rather than reusing persisted task progress.
@@ -962,11 +971,14 @@ class FinancialTask {
   final int reward;
   final int period;
   final bool requiredForCheckpoint;
+  final int dayProgressCost;
   final ChoiceTaskScenario? _choiceScenario;
   final CategorizationTaskScenario? _categorizationScenario;
   final BudgetPriorityTaskScenario? _budgetPriorityScenario;
   final PlanAdaptationTaskScenario? _planAdaptationScenario;
   final ShoppingTripTaskScenario? _shoppingTripScenario;
+  final IndependentBudgetScenario? _independentBudgetScenario;
+  final PlanRepairScenario? _planRepairScenario;
 
   ChoiceTaskScenario get choiceScenario =>
       _choiceScenario ?? (throw StateError('Task $id is not a choice task.'));
@@ -987,6 +999,14 @@ class FinancialTask {
       _shoppingTripScenario ??
       (throw StateError('Task $id is not a shopping trip task.'));
 
+  IndependentBudgetScenario get independentBudgetScenario =>
+      _independentBudgetScenario ??
+      (throw StateError('Task $id is not an independent budget task.'));
+
+  PlanRepairScenario get planRepairScenario =>
+      _planRepairScenario ??
+      (throw StateError('Task $id is not a plan repair task.'));
+
   factory FinancialTask.fromJson(Map<String, Object?> json) {
     final scenario = json['scenarioData'];
     if (scenario is! Map) {
@@ -1002,6 +1022,9 @@ class FinancialTask {
       reward: _requiredInt(json, 'reward'),
       period: _requiredInt(json, 'period'),
       requiredForCheckpoint: _requiredBool(json, 'requiredForCheckpoint'),
+      dayProgressCost: json['dayProgressCost'] == null
+          ? 30
+          : _requiredInt(json, 'dayProgressCost'),
       choiceScenario: type == 'choice'
           ? ChoiceTaskScenario.fromJson(Map<String, Object?>.from(scenario))
           : null,
@@ -1025,6 +1048,14 @@ class FinancialTask {
               Map<String, Object?>.from(scenario),
             )
           : null,
+      independentBudgetScenario: type == 'independent_budget'
+          ? IndependentBudgetScenario.fromJson(
+              Map<String, Object?>.from(scenario),
+            )
+          : null,
+      planRepairScenario: type == 'plan_repair'
+          ? PlanRepairScenario.fromJson(Map<String, Object?>.from(scenario))
+          : null,
     );
     task.validate();
     return task;
@@ -1034,8 +1065,15 @@ class FinancialTask {
     if (id.trim().isEmpty || title.trim().isEmpty || type.trim().isEmpty) {
       throw const FormatException('Task ID, title and type are required.');
     }
-    if (period <= 0 || reward <= 0) {
+    if (period <= 0 || reward <= 0 || dayProgressCost <= 0) {
       throw const FormatException('Task period and reward must be positive.');
+    }
+    if ((_independentBudgetScenario != null || _planRepairScenario != null) &&
+        (period != 5 ||
+            reward != 25 ||
+            dayProgressCost != 15 ||
+            !requiredForCheckpoint)) {
+      throw const FormatException('Day 5 task reward or progress is invalid.');
     }
     switch (type) {
       case 'choice':
@@ -1094,6 +1132,32 @@ class FinancialTask {
         }
         _shoppingTripScenario.validate();
         break;
+      case 'independent_budget':
+        if (_independentBudgetScenario == null ||
+            _choiceScenario != null ||
+            _categorizationScenario != null ||
+            _budgetPriorityScenario != null ||
+            _planAdaptationScenario != null ||
+            _shoppingTripScenario != null ||
+            _planRepairScenario != null) {
+          throw const FormatException(
+            'Independent budget scenario is invalid.',
+          );
+        }
+        _independentBudgetScenario.validate();
+        break;
+      case 'plan_repair':
+        if (_planRepairScenario == null ||
+            _choiceScenario != null ||
+            _categorizationScenario != null ||
+            _budgetPriorityScenario != null ||
+            _planAdaptationScenario != null ||
+            _shoppingTripScenario != null ||
+            _independentBudgetScenario != null) {
+          throw const FormatException('Plan repair scenario is invalid.');
+        }
+        _planRepairScenario.validate();
+        break;
       default:
         throw FormatException('Unsupported task type: $type');
     }
@@ -1122,8 +1186,26 @@ void validateCampaignTaskContent(List<FinancialTask> tasks) {
     final required = tasks.where(
       (task) => task.period == day && task.requiredForCheckpoint,
     );
-    if (required.length != 1) {
-      throw FormatException('Day $day must have exactly one required task.');
+    if (required.length != (day == 5 ? 2 : 1)) {
+      throw FormatException(
+        'Day $day has an invalid number of required tasks.',
+      );
+    }
+    if (day == 5 &&
+        (tasks.where((task) => task.period == 5).length != 2 ||
+            !required.any(
+              (task) =>
+                  task.id == 'task_independent_budget_05' &&
+                  task.type == 'independent_budget',
+            ) ||
+            !required.any(
+              (task) =>
+                  task.id == 'task_plan_repair_05' &&
+                  task.type == 'plan_repair',
+            ))) {
+      throw const FormatException(
+        'Day 5 must contain the two canonical tasks.',
+      );
     }
   }
   if (tasks.any((task) => task.period < 1 || task.period > 5)) {

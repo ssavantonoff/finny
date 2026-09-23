@@ -166,7 +166,7 @@ void main() {
       );
       addTearDown(migrated.close);
       final upgraded = await migrated.database;
-      expect(await upgraded.getVersion(), 11);
+      expect(await upgraded.getVersion(), AppDatabase.schemaVersion);
       final migratedGames = SqliteGameRepository(migrated);
       for (final entry in ids.entries) {
         final (profileId, periodId) = entry.value;

@@ -67,6 +67,21 @@ final class TaskShoppingTripIncorrect extends TaskSubmissionResult {
   bool get rewardAppliedNow => false;
 }
 
+final class TaskDayFiveIncorrect extends TaskSubmissionResult {
+  const TaskDayFiveIncorrect({
+    required super.explanation,
+    required this.missingRequiredIds,
+    required this.savingsShortfall,
+    required this.overBudgetBy,
+    required this.total,
+  });
+
+  final Set<String> missingRequiredIds;
+  final int savingsShortfall;
+  final int overBudgetBy;
+  final int total;
+}
+
 final class TaskAnswerCompleted extends TaskSubmissionResult {
   const TaskAnswerCompleted({
     required super.explanation,
