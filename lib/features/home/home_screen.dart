@@ -651,6 +651,9 @@ class _FreePlayHome extends ConsumerWidget {
                     key: const Key('free-play-daylight'),
                     pet: state.pet,
                     showBackground: false,
+                    heightScale: MediaQuery.sizeOf(context).height < 700
+                        ? 0.67
+                        : 1,
                   ),
                   Center(
                     child: FinnyNameBadge(
@@ -676,6 +679,8 @@ class _FreePlayHome extends ConsumerWidget {
                       label: const Text('Погладить'),
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.tiny),
+                  FreePlayCatchCard(onPlay: () => context.push('/finny-catch')),
                   SizedBox(
                     height: MediaQuery.sizeOf(context).height < 700
                         ? 2

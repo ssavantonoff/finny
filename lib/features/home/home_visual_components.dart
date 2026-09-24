@@ -1,4 +1,6 @@
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/features/minigames/finny_catch/finny_catch_art.dart';
+import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +29,66 @@ class FinnyCoin extends StatelessWidget {
         Icons.star_rounded,
         color: const Color(0xFFFFC44F),
         size: size * 0.56,
+      ),
+    ),
+  );
+}
+
+class FreePlayCatchCard extends StatelessWidget {
+  const FreePlayCatchCard({super.key, required this.onPlay});
+
+  final VoidCallback onPlay;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    key: const Key('free-play-finny-catch'),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [AppColors.primaryDark, AppColors.primary],
+      ),
+      borderRadius: BorderRadius.circular(AppRadii.card),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Row(
+        children: [
+          const FinnyCatchArt(type: FinnyCatchObjectType.coin, size: 44),
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Лови монеты',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(color: Colors.white),
+                ),
+                Text(
+                  'Играй с Финни и зарабатывай монеты',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: Colors.white, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.tiny),
+          FilledButton(
+            key: const Key('free-play-finny-catch-play'),
+            onPressed: onPlay,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(68, 44),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primaryDark,
+            ),
+            child: const Text('Играть'),
+          ),
+        ],
       ),
     ),
   );
@@ -136,10 +198,12 @@ class FinnyRoomScene extends StatelessWidget {
     super.key,
     required this.pet,
     this.showBackground = true,
+    this.heightScale = 1,
   });
 
   final Pet pet;
   final bool showBackground;
+  final double heightScale;
 
   static String assetForStage(int stage) => switch (stage.clamp(1, 3)) {
     1 => 'assets/images/home/finny_stage1_neutral.png',
@@ -156,6 +220,7 @@ class FinnyRoomScene extends StatelessWidget {
     );
     final finnyHeight =
         roomHeight *
+        heightScale *
         switch (stage) {
           1 => 0.62,
           2 => 0.69,

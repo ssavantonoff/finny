@@ -157,6 +157,21 @@ void main() {
     },
   );
 
+  testWidgets('result return uses Home fallback when opened directly', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.tap(find.text('Начать игру'));
+    await tester.pump();
+    await elapse(tester, const Duration(seconds: 2));
+    await elapse(tester, const Duration(seconds: 30));
+    await tester.pump();
+    expect(rewardCount, 1);
+    await tester.tap(find.text('Вернуться к Финни'));
+    await tester.pumpAndSettle();
+    expect(find.text('Home'), findsOneWidget);
+  });
+
   testWidgets('active back shows pause confirmation without granting reward', (
     tester,
   ) async {

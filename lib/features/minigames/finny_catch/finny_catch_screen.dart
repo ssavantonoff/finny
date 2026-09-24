@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:finny/app/providers.dart';
+import 'package:finny/features/home/home_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -54,21 +55,27 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
     super.dispose();
   }
 
-  void _goHome() {
+  Future<void> _goHome() async {
     _controller.abort();
-    context.go('/home');
+    await ref.read(homeControllerProvider.notifier).load();
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
   }
 
   Future<void> _handleBack() async {
     if (_exitDialogOpen) return;
     final state = _controller.state;
     if (state.phase == FinnyCatchPhase.prepare) {
-      _goHome();
+      await _goHome();
       return;
     }
     if (state.phase == FinnyCatchPhase.result) {
       if (state.rewardGranted) {
-        _goHome();
+        await _goHome();
       } else if (!state.savingReward) {
         await _confirmUnsavedReward();
       }
@@ -97,7 +104,7 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
     _exitDialogOpen = false;
     if (!mounted) return;
     if (leave == true) {
-      _goHome();
+      await _goHome();
     } else {
       _controller.resume();
     }
@@ -128,7 +135,7 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
     _exitDialogOpen = false;
     if (!mounted) return;
     if (leave == true) {
-      _goHome();
+      await _goHome();
     } else {
       await _controller.retryReward();
     }
