@@ -4,6 +4,7 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/home_screen.dart';
+import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
@@ -82,13 +83,10 @@ class _NoopStoryEventService extends StoryEventService {
 
 void main() {
   group('PetStatIndicator unit tests', () {
-    test('color thresholds: <=39 red, <=69 yellow, >=70 green', () {
-      expect(PetStatIndicator.statColor(0), PetStatIndicator.red);
-      expect(PetStatIndicator.statColor(39), PetStatIndicator.red);
-      expect(PetStatIndicator.statColor(40), PetStatIndicator.yellow);
-      expect(PetStatIndicator.statColor(69), PetStatIndicator.yellow);
-      expect(PetStatIndicator.statColor(70), PetStatIndicator.green);
-      expect(PetStatIndicator.statColor(100), PetStatIndicator.green);
+    test('each stat has its own visual accent', () {
+      expect(PetStatIndicator.accentFor('Сытость'), AppColors.satiety);
+      expect(PetStatIndicator.accentFor('Уход'), AppColors.care);
+      expect(PetStatIndicator.accentFor('Настроение'), AppColors.mood);
     });
 
     testWidgets('renders progress bar and label without raw numbers', (
@@ -380,8 +378,12 @@ void main() {
     });
 
     testWidgets(
-      'renders Pet, wallet, stat indicators, day status, today card and goal',
+      'renders campaign actions, stage art, room, shared wallet and goal at 360dp',
       (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
         final database = createTestDatabase();
         addTearDown(database.close);
 
@@ -478,9 +480,10 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        // Wallet in AppBar
+        // Shared wallet in AppBar
         expect(find.byKey(const Key('home-wallet')), findsOneWidget);
-        expect(find.text('350 🪙'), findsOneWidget);
+        expect(find.byType(HomeWallet), findsOneWidget);
+        expect(find.text('350'), findsOneWidget);
 
         // Pet name
         expect(find.byKey(const Key('home-pet-name')), findsOneWidget);
@@ -497,7 +500,8 @@ void main() {
         expect(find.text('Погладить'), findsOneWidget);
         expect(find.text('Поиграть'), findsNothing);
         expect(find.byKey(const Key('home-day-sky')), findsOneWidget);
-        expect(find.byKey(const Key('home-sun')), findsOneWidget);
+        expect(find.byKey(const Key('home-finny-stage-1')), findsOneWidget);
+        expect(find.byKey(const Key('home-room-background')), findsOneWidget);
         expect(find.text('Утро'), findsNothing);
         expect(find.text('День'), findsNothing);
         expect(find.text('Вечер'), findsNothing);
@@ -519,39 +523,14 @@ void main() {
         // Active savings goal card
         expect(find.byKey(const Key('home-savings-goal')), findsOneWidget);
         expect(find.text('Велосипед'), findsOneWidget);
-        expect(find.text('150/500 🪙'), findsOneWidget);
-
-        final morningSun = tester.widget<Positioned>(
-          find.ancestor(
-            of: find.byKey(const Key('home-sun')),
-            matching: find.byType(Positioned),
-          ),
-        );
-        final morningSky = tester.widget<Container>(
-          find.byKey(const Key('home-day-sky')),
-        );
-        final morningGradient =
-            (morningSky.decoration! as BoxDecoration).gradient!
-                as LinearGradient;
+        expect(find.text('150/500'), findsOneWidget);
 
         games.period = period.copyWith(dayProgress: 100);
         await container.read(homeControllerProvider.notifier).load();
         await tester.pumpAndSettle();
-        final eveningSun = tester.widget<Positioned>(
-          find.ancestor(
-            of: find.byKey(const Key('home-sun')),
-            matching: find.byType(Positioned),
-          ),
-        );
-        final eveningSky = tester.widget<Container>(
-          find.byKey(const Key('home-day-sky')),
-        );
-        final eveningGradient =
-            (eveningSky.decoration! as BoxDecoration).gradient!
-                as LinearGradient;
-        expect(eveningSun.left, greaterThan(morningSun.left!));
-        expect(eveningGradient.colors, isNot(morningGradient.colors));
+        expect(find.byKey(const Key('home-room-background')), findsOneWidget);
         expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
+        expect(tester.takeException(), isNull);
 
         games.period = period.copyWith(
           status: GamePeriodStatus.readyToFinish,

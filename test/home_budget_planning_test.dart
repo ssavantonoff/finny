@@ -5,6 +5,7 @@ import 'package:finny/features/budget/budget_controller.dart';
 import 'package:finny/features/budget/budget_screen.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/home_screen.dart';
+import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
@@ -341,7 +342,7 @@ void main() {
 
     expect(find.text('Первый день с Финни'), findsOneWidget);
     expect(find.text('Начать день'), findsOneWidget);
-    expect(find.text('40 🪙'), findsOneWidget);
+    expect(tester.widget<HomeWallet>(find.byType(HomeWallet)).balance, 40);
     expect(find.text('Пушок'), findsOneWidget);
 
     var period = (await tester.runAsync(
@@ -1220,7 +1221,7 @@ void main() {
       content: content,
       database: database,
     );
-    expect(find.text('550 🪙'), findsOneWidget);
+    expect(tester.widget<HomeWallet>(find.byType(HomeWallet)).balance, 550);
     harness.router.go('/budget');
     await _settleFeature(tester, harness.container);
     expect(find.text('200 🪙'), findsOneWidget);

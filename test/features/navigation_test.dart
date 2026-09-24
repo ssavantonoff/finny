@@ -301,7 +301,7 @@ void main() {
       expect(find.byKey(const Key('nav-shop-promo-badge')), findsOneWidget);
       final selectedShopIcon = find.descendant(
         of: find.byKey(const Key('nav-shop')),
-        matching: find.byIcon(Icons.storefront),
+        matching: find.byIcon(Icons.storefront_rounded),
       );
       expect(
         tester.getCenter(selectedShopIcon).dy,

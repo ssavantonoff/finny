@@ -2,6 +2,7 @@ import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/app/router.dart';
 import 'package:finny/core/database/app_database.dart';
+import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
@@ -193,6 +194,10 @@ void main() {
       await waitFor(tester, find.text('История завершена'));
       await tapVisible(tester, find.text('Продолжить играть'));
       await waitFor(tester, find.text('Свободный день'));
+      expect(find.byType(HomeWallet), findsOneWidget);
+      expect(find.byType(FinnyRoomScene), findsOneWidget);
+      expect(find.byKey(const Key('home-finny-stage-3')), findsOneWidget);
+      expect(find.text('🪙'), findsNothing);
       expect(find.text('Начать следующий день'), findsNothing);
       expect(find.text('Уложить Финни спать'), findsNothing);
       expect(find.text('Сегодня'), findsNothing);
@@ -236,6 +241,41 @@ void main() {
     await waitFor(tester, find.byKey(const Key('shop-item-food_treat')));
     expect(find.text('SALE'), findsNothing);
     expect(find.text('Сначала начни игровой период.'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    scope.dispose();
+  });
+
+  testWidgets('Free Play Home and five destinations fit at 360dp', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final (database, content, games) = await completedSave(tester);
+    addTearDown(database.close);
+    final scope = container(database, content, games);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+    );
+    await waitFor(tester, find.text('5 дней вместе!'));
+    await tapVisible(tester, find.text('Продолжить с Финни'));
+    await waitFor(tester, find.text('Свободный день'));
+    expect(find.byType(HomeWallet), findsOneWidget);
+    expect(find.byType(FinnyRoomScene), findsOneWidget);
+    for (final key in [
+      'nav-home',
+      'nav-things',
+      'nav-shop',
+      'nav-tasks',
+      'nav-savings',
+    ]) {
+      expect(find.byKey(Key(key)), findsOneWidget);
+    }
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 200)),
