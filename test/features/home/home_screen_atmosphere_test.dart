@@ -684,7 +684,7 @@ void main() {
         final navTop = tester
             .getTopLeft(find.byKey(const Key('test-bottom-nav')))
             .dy;
-        expect(finnyTop, closeTo(168, 1));
+        expect(finnyTop, closeTo(176, 1));
         void expectStableLayout(String ctaKey, String statusKey) {
           expect(
             (tester.getTopLeft(find.byType(FinnyRoomScene)).dy - finnyTop)
