@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/features/home/home_controller.dart';
+import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/savings/savings_controller.dart';
 import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/features/things/things_controller.dart';
@@ -84,22 +85,27 @@ class _ScaffoldWithNestedNavigationState
         (shop.isDayFiveSaleDay ||
             (treat != null && shop.isPromotionActiveFor(treat)));
     final badgeText = shop.isDayFiveSaleDay ? 'SALE' : 'АКЦИЯ';
-    return Scaffold(
-      body: widget.navigationShell,
-      bottomNavigationBar: NavigationBar(
+    final isHome = widget.navigationShell.currentIndex == 0;
+    final navigation = NavigationBarTheme(
+      data: isHome
+          ? AppTheme.navigation.copyWith(
+              backgroundColor: AppColors.surface.withValues(alpha: 0.93),
+            )
+          : AppTheme.navigation,
+      child: NavigationBar(
         selectedIndex: widget.navigationShell.currentIndex,
         onDestinationSelected: (index) => _onTap(context, ref, index),
         destinations: [
           const NavigationDestination(
             key: Key('nav-home'),
             icon: Icon(Icons.pets_outlined),
-            selectedIcon: Icon(Icons.pets),
+            selectedIcon: Icon(Icons.pets_rounded),
             label: 'Финни',
           ),
           const NavigationDestination(
             key: Key('nav-things'),
             icon: Icon(Icons.backpack_outlined),
-            selectedIcon: Icon(Icons.backpack),
+            selectedIcon: Icon(Icons.backpack_rounded),
             label: 'Вещи',
           ),
           NavigationDestination(
@@ -118,17 +124,35 @@ class _ScaffoldWithNestedNavigationState
           const NavigationDestination(
             key: Key('nav-tasks'),
             icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(Icons.assignment),
+            selectedIcon: Icon(Icons.assignment_rounded),
             label: 'Задания',
           ),
           const NavigationDestination(
             key: Key('nav-savings'),
             icon: Icon(Icons.savings_outlined),
-            selectedIcon: Icon(Icons.savings),
+            selectedIcon: Icon(Icons.savings_rounded),
             label: 'Накопления',
           ),
         ],
       ),
+    );
+    return Scaffold(
+      backgroundColor: isHome ? Colors.transparent : null,
+      extendBody: isHome,
+      body: widget.navigationShell,
+      bottomNavigationBar: isHome
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: ClipRRect(
+                  key: const Key('home-floating-navigation'),
+                  borderRadius: BorderRadius.circular(28),
+                  child: navigation,
+                ),
+              ),
+            )
+          : navigation,
     );
   }
 }
@@ -146,7 +170,9 @@ class _ShopNavigationIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final icon = Icon(selected ? Icons.storefront : Icons.storefront_outlined);
+    final icon = Icon(
+      selected ? Icons.storefront_rounded : Icons.storefront_outlined,
+    );
     if (!showPromotion) return icon;
 
     return Stack(
