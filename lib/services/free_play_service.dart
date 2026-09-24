@@ -53,6 +53,17 @@ class FreePlayService {
     );
   }
 
+  Future<GameState> grantMinigameReward({
+    required int profileId,
+    required int amount,
+    required String runId,
+  }) async => _repository.grantMinigameReward(
+    profileId: profileId,
+    amount: amount,
+    runId: runId,
+    definitions: await _content.loadPeriods(),
+  );
+
   Future<GameState> deposit({
     required int profileId,
     required int amount,

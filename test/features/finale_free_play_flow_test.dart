@@ -8,6 +8,7 @@ import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/free_play_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
@@ -240,6 +241,76 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 200)),
     );
+    scope.dispose();
+  });
+
+  testWidgets('direct Finny Catch route follows campaign lifecycle guard', (
+    tester,
+  ) async {
+    final (database, content, games) = await completedSave(tester);
+    addTearDown(database.close);
+    final scope = container(database, content, games);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+    );
+    await waitFor(tester, find.text('5 дней вместе!'));
+    final router = scope.read(routerProvider);
+
+    await tester.runAsync(() async {
+      router.go('/finny-catch');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(router.routeInformationProvider.value.uri.path, '/finale');
+
+    await tester.runAsync(() async {
+      await scope.read(campaignLifecycleServiceProvider).finishStory(1);
+      router.go('/finny-catch');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/campaign-complete',
+    );
+
+    await tester.runAsync(() async {
+      await scope.read(campaignLifecycleServiceProvider).startFreePlay(1);
+      router.go('/finny-catch');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    await waitFor(tester, find.text('Приготовься!'));
+    expect(router.routeInformationProvider.value.uri.path, '/finny-catch');
+    expect(find.byType(NavigationBar), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    scope.dispose();
+  });
+
+  testWidgets('campaign cannot open direct Finny Catch route', (tester) async {
+    final (database, content, games) = await completedSave(tester);
+    addTearDown(database.close);
+    await tester.runAsync(() async {
+      final db = await database.database;
+      await db.delete(
+        'game_periods',
+        where: 'profile_id = ? AND period_number = 5',
+        whereArgs: [1],
+      );
+    });
+    final scope = container(database, content, games);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+    );
+    await waitFor(tester, find.byType(HomeScreen));
+    final router = scope.read(routerProvider);
+    await tester.runAsync(() async {
+      router.go('/finny-catch');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(router.routeInformationProvider.value.uri.path, '/home');
+    await tester.pumpWidget(const SizedBox.shrink());
     scope.dispose();
   });
 }

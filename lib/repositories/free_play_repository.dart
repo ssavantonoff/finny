@@ -151,6 +151,48 @@ class FreePlayRepository {
     }
   }
 
+  Future<GameState> grantMinigameReward({
+    required int profileId,
+    required int amount,
+    required String runId,
+    required List<PeriodDefinition> definitions,
+  }) async {
+    _checkOperation(runId);
+    if (amount <= 0) throw ArgumentError.value(amount, 'amount');
+    final now = DateTime.now().toUtc();
+    final command = GameTransaction(
+      profileId: profileId,
+      type: GameTransactionType.otherIncome,
+      amount: amount,
+      source: 'free_play_minigame:finny_catch',
+      description: 'Мини-игра «Лови монеты»',
+      createdAt: now,
+      deduplicationKey: 'operation:$runId',
+    );
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      await _requireFreePlay(txn, profileId, definitions);
+      final previous = await _operation(txn, profileId, runId);
+      if (previous != null) {
+        _sameTransaction(previous, command);
+        return _state(txn, profileId);
+      }
+      final state = await _state(txn, profileId);
+      final updated = state.copyWith(
+        walletBalance: state.walletBalance + amount,
+        updatedAt: now,
+      );
+      await txn.insert('transactions', command.toMap());
+      await txn.update(
+        'game_states',
+        updated.toMap(),
+        where: 'profile_id = ?',
+        whereArgs: [profileId],
+      );
+      return updated;
+    });
+  }
+
   Future<GameState> purchase({
     required int profileId,
     required ShopItem item,

@@ -355,6 +355,98 @@ void main() {
     },
   );
 
+  test('Finny Catch reward is Free Play-only, periodless and idempotent without changing Day 5', () async {
+    await completeCampaign();
+    await expectLater(
+      freePlay.grantMinigameReward(
+        profileId: profileId,
+        amount: 33,
+        runId: 'run-1',
+      ),
+      throwsStateError,
+    );
+    await lifecycle.startFreePlay(profileId, days);
+    final dayFiveId = (await games.getPeriod(profileId, 5))!.id!;
+    final summaryService = PeriodService(games, TestContentRepository(days));
+    final beforeSummary = await summaryService.getSummary(
+      profileId: profileId,
+      periodId: dayFiveId,
+    );
+    final db = await database.database;
+    final beforePeriod = (await db.query(
+      'game_periods',
+      where: 'id = ?',
+      whereArgs: [dayFiveId],
+    )).single;
+    final awarded = await freePlay.grantMinigameReward(
+      profileId: profileId,
+      amount: 33,
+      runId: 'run-1',
+    );
+    expect(awarded.walletBalance, 233);
+    final repeated = await freePlay.grantMinigameReward(
+      profileId: profileId,
+      amount: 33,
+      runId: 'run-1',
+    );
+    expect(repeated.walletBalance, 233);
+    await expectLater(
+      freePlay.grantMinigameReward(
+        profileId: profileId,
+        amount: 34,
+        runId: 'run-1',
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      freePlay.grantMinigameReward(
+        profileId: profileId,
+        amount: 0,
+        runId: 'bad',
+      ),
+      throwsArgumentError,
+    );
+    await expectLater(
+      freePlay.grantMinigameReward(profileId: profileId, amount: 10, runId: ''),
+      throwsArgumentError,
+    );
+    final transactions = await db.query(
+      'transactions',
+      where: 'profile_id = ?',
+      whereArgs: [profileId],
+    );
+    expect(transactions, hasLength(1));
+    final reward = transactions.single;
+    expect(reward['period_id'], isNull);
+    expect(reward['type'], 'other_income');
+    expect(reward['amount'], 33);
+    expect(reward['source'], 'free_play_minigame:finny_catch');
+    expect(reward['description'], 'Мини-игра «Лови монеты»');
+    expect(reward['deduplication_key'], 'operation:run-1');
+    expect((await games.getGameState(profileId))!.walletBalance, 233);
+    final afterPeriod = (await db.query(
+      'game_periods',
+      where: 'id = ?',
+      whereArgs: [dayFiveId],
+    )).single;
+    for (final field in [
+      'actual_need',
+      'actual_want',
+      'actual_savings',
+      'extra_income',
+    ]) {
+      expect(afterPeriod[field], beforePeriod[field]);
+    }
+    final afterSummary = await summaryService.getSummary(
+      profileId: profileId,
+      periodId: dayFiveId,
+    );
+    expect(afterSummary.factNeed, beforeSummary.factNeed);
+    expect(afterSummary.factWant, beforeSummary.factWant);
+    expect(afterSummary.factSavings, beforeSummary.factSavings);
+    expect(afterSummary.factRemainder, beforeSummary.factRemainder);
+  });
+
   test(
     'petting repeats, toy repeats and consumable at max is preserved',
     () async {
