@@ -42,14 +42,51 @@ abstract final class AppRadii {
 // Nunito can be bundled later; these styles use the current local font.
 abstract final class AppTypography {
   static const textTheme = TextTheme(
-    displaySmall: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-    headlineSmall: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
-    titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
-    titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-    bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-    bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-    bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-    labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+    displaySmall: TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.w800,
+      color: AppColors.textPrimary,
+    ),
+    headlineSmall: TextStyle(
+      fontSize: 24,
+      fontWeight: FontWeight.w800,
+      color: AppColors.textPrimary,
+    ),
+    titleLarge: TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w800,
+      color: AppColors.textPrimary,
+    ),
+    titleMedium: TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    ),
+    titleSmall: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    ),
+    bodyLarge: TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textPrimary,
+    ),
+    bodyMedium: TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+      color: AppColors.textPrimary,
+    ),
+    bodySmall: TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textSecondary,
+    ),
+    labelLarge: TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w700,
+      color: AppColors.textPrimary,
+    ),
   );
 }
 

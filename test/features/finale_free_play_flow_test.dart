@@ -2,6 +2,8 @@ import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/app/router.dart';
 import 'package:finny/core/database/app_database.dart';
+import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/completed_goal.dart';
@@ -279,6 +281,19 @@ void main() {
     expect(find.byKey(const Key('home-room-background')), findsOneWidget);
     expect(tester.getBottomRight(find.text('Погладить')).dy, lessThan(730));
     expect(find.text('Накоплено: 73'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(HomeScreen),
+        matching: find.byType(Scrollable),
+      ),
+      findsNothing,
+    );
+    expect(
+      tester.getBottomRight(find.byKey(const Key('home-savings-goal'))).dy,
+      lessThan(tester.getTopLeft(find.byKey(const Key('nav-home'))).dy),
+    );
+    final noGoal = tester.widget<Text>(find.text('Цель не выбрана'));
+    expect(noGoal.style?.color, AppColors.textPrimary);
     expect(find.byKey(const Key('home-saved-without-goal')), findsOneWidget);
     expect(find.text('Уложить Финни спать'), findsNothing);
     expect(find.text('Начать следующий день'), findsNothing);

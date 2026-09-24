@@ -1410,7 +1410,7 @@ void main() {
         expect(find.byKey(const Key('home-bowl-obligation')), findsOneWidget);
         expect(
           tester
-                  .widget<FilledButton>(
+                  .widget<TextButton>(
                     find.byKey(const Key('home-bowl-purchase')),
                   )
                   .onPressed !=

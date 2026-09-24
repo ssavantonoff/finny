@@ -95,16 +95,18 @@ class FinnyNameBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: AppColors.surface.withValues(alpha: 0.88),
+      color: AppColors.surface.withValues(alpha: 0.93),
       borderRadius: BorderRadius.circular(100),
       border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
     ),
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Text(
         name,
         textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleLarge
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodyLarge
             ?.copyWith(color: AppColors.textPrimary),
       ),
     ),
@@ -130,12 +132,12 @@ class FinnyRoomScene extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stage = pet.developmentStage.clamp(1, 3);
-    final sceneHeight = (MediaQuery.sizeOf(context).height * 0.43).clamp(
+    final roomHeight = (MediaQuery.sizeOf(context).height * 0.43).clamp(
       300.0,
       420.0,
     );
     final finnyHeight =
-        sceneHeight *
+        roomHeight *
         switch (stage) {
           1 => 0.62,
           2 => 0.69,
@@ -145,7 +147,7 @@ class FinnyRoomScene extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadii.scene),
       child: SizedBox(
         key: const Key('home-room-scene'),
-        height: sceneHeight,
+        height: showBackground ? roomHeight : finnyHeight,
         width: double.infinity,
         child: Stack(
           fit: StackFit.expand,
@@ -158,7 +160,9 @@ class FinnyRoomScene extends StatelessWidget {
                 alignment: Alignment.topCenter,
               ),
             Align(
-              alignment: const Alignment(0, 0.87),
+              alignment: showBackground
+                  ? const Alignment(0, 0.87)
+                  : Alignment.bottomCenter,
               child: SizedBox(
                 height: finnyHeight,
                 child: Image.asset(
@@ -191,47 +195,67 @@ class HomeGoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-savings-goal'),
-    color: AppColors.surface.withValues(alpha: 0.9),
+    color: AppColors.surface.withValues(alpha: 0.93),
     child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.compact),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.compact,
+        vertical: 2,
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.savings_rounded, color: AppColors.savings),
-              const SizedBox(width: AppSpacing.small),
+              const Icon(
+                Icons.savings_rounded,
+                size: 20,
+                color: AppColors.savings,
+              ),
+              const SizedBox(width: AppSpacing.tiny),
               Expanded(
                 child: Text(
                   name,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(color: AppColors.textPrimary),
                 ),
               ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () => context.go('/savings'),
+                child: const Text('К цели'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Row(
+            children: [
               Text(
                 '$saved/$price',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: AppColors.textPrimary),
               ),
               const SizedBox(width: AppSpacing.tiny),
               const FinnyCoin(size: 18),
+              const SizedBox(width: AppSpacing.small),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: LinearProgressIndicator(
+                    value: price > 0 ? (saved / price).clamp(0.0, 1.0) : 0,
+                    minHeight: 6,
+                    color: AppColors.savings,
+                    backgroundColor: AppColors.surfaceSecondary,
+                  ),
+                ),
+              ),
             ],
-          ),
-          const SizedBox(height: AppSpacing.compact),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(100),
-            child: LinearProgressIndicator(
-              value: price > 0 ? (saved / price).clamp(0.0, 1.0) : 0,
-              minHeight: 8,
-              color: AppColors.savings,
-              backgroundColor: AppColors.surfaceSecondary,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.small),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () => context.go('/savings'),
-              child: const Text('К цели'),
-            ),
           ),
         ],
       ),
@@ -254,47 +278,59 @@ class HomeNoGoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-savings-goal'),
-    color: AppColors.surface.withValues(alpha: 0.9),
+    color: AppColors.surface.withValues(alpha: 0.93),
     child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.compact),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.compact,
+        vertical: 2,
+      ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.savings_rounded, color: AppColors.savings),
-              const SizedBox(width: AppSpacing.small),
+              const Icon(
+                Icons.savings_rounded,
+                size: 20,
+                color: AppColors.savings,
+              ),
+              const SizedBox(width: AppSpacing.tiny),
               Expanded(
                 child: Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(color: AppColors.textPrimary),
                 ),
               ),
+              if (onSelect != null)
+                TextButton(
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 32),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: onSelect,
+                  child: const Text('Выбрать цель'),
+                ),
             ],
           ),
-          const SizedBox(height: AppSpacing.small),
+          const SizedBox(height: 2),
           Row(
             children: [
               Expanded(
                 child: Text(
                   'Накоплено: $saved',
                   key: const Key('home-saved-without-goal'),
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(color: AppColors.textPrimary),
                 ),
               ),
               const FinnyCoin(size: 18),
             ],
           ),
-          if (onSelect != null) ...[
-            const SizedBox(height: AppSpacing.tiny),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: onSelect,
-                child: const Text('Выбрать цель'),
-              ),
-            ),
-          ],
         ],
       ),
     ),

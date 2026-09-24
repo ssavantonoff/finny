@@ -59,16 +59,17 @@ class PetStatIndicator extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: AppColors.textPrimary),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.tiny),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: SizedBox(
-              height: 8,
+              height: 6,
               child: LinearProgressIndicator(
                 key: barKey,
                 value: clamped / 100.0,
@@ -81,6 +82,58 @@ class PetStatIndicator extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HomeStatsBar extends StatelessWidget {
+  const _HomeStatsBar({
+    required this.satiety,
+    required this.care,
+    required this.mood,
+    this.campaignKeys = false,
+  });
+
+  final int satiety;
+  final int care;
+  final int mood;
+  final bool campaignKeys;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    color: AppColors.surface.withValues(alpha: 0.93),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: PetStatIndicator(
+              key: campaignKeys ? const Key('home-stat-satiety') : null,
+              barKey: campaignKeys ? const Key('home-stat-satiety-bar') : null,
+              label: 'Сытость',
+              value: satiety,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: PetStatIndicator(
+              key: campaignKeys ? const Key('home-stat-care') : null,
+              barKey: campaignKeys ? const Key('home-stat-care-bar') : null,
+              label: 'Уход',
+              value: care,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: PetStatIndicator(
+              key: campaignKeys ? const Key('home-stat-mood') : null,
+              barKey: campaignKeys ? const Key('home-stat-mood-bar') : null,
+              label: 'Настроение',
+              value: mood,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -436,52 +489,32 @@ class _FreePlayHome extends ConsumerWidget {
     ),
     body: HomeSceneBackdrop(
       child: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.medium),
-          children: [
-            Column(
-              children: [
-                FinnyRoomScene(
-                  key: const Key('free-play-daylight'),
-                  pet: state.pet,
-                  showBackground: false,
-                ),
-                FinnyNameBadge(name: state.pet.name),
-                const SizedBox(height: AppSpacing.small),
-                Card(
-                  color: AppColors.surface.withValues(alpha: 0.9),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.compact),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: PetStatIndicator(
-                            label: 'Сытость',
-                            value: state.pet.satiety,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.small),
-                        Expanded(
-                          child: PetStatIndicator(
-                            label: 'Уход',
-                            value: state.pet.care,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.small),
-                        Expanded(
-                          child: PetStatIndicator(
-                            label: 'Настроение',
-                            value: state.pet.mood,
-                          ),
-                        ),
-                      ],
-                    ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.medium,
+            vertical: 2,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _HomeStatsBar(
+                    satiety: state.pet.satiety,
+                    care: state.pet.care,
+                    mood: state.pet.mood,
                   ),
-                ),
-                const SizedBox(height: AppSpacing.compact),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
+                  const SizedBox(height: AppSpacing.tiny),
+                  const Spacer(),
+                  FinnyRoomScene(
+                    key: const Key('free-play-daylight'),
+                    pet: state.pet,
+                    showBackground: false,
+                  ),
+                  Center(child: FinnyNameBadge(name: state.pet.name)),
+                  const SizedBox(height: AppSpacing.tiny),
+                  FilledButton.icon(
                     onPressed: state.interacting
                         ? null
                         : () => controller.performFreeInteraction(
@@ -490,126 +523,153 @@ class _FreePlayHome extends ConsumerWidget {
                     icon: const Icon(Icons.favorite_outline),
                     label: const Text('Погладить'),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.medium),
-            if (state.activeGoal case final goal?)
-              HomeGoalCard(
-                name: goal.name,
-                saved: state.gameState.savedAmount,
-                price: goal.price,
-              )
-            else
-              FutureBuilder(
-                future: _collection(ref),
-                builder: (context, snapshot) {
-                  final allGoalsReached =
-                      snapshot.hasData &&
-                      snapshot.data!.$1 == snapshot.data!.$2;
-                  return HomeNoGoalCard(
-                    saved: state.gameState.savedAmount,
-                    title: allGoalsReached
-                        ? 'Все цели достигнуты! ✓'
-                        : 'Цель не выбрана',
-                    onSelect: allGoalsReached
-                        ? null
-                        : () => context.go('/savings'),
-                  );
-                },
-              ),
-            const SizedBox(height: AppSpacing.small),
-            FutureBuilder(
-              future: Future.wait<Object?>([
-                ref.read(freePlayServiceProvider).equipped(state.profile.id!),
-                ref.read(contentRepositoryProvider).loadShopItems(),
-                ref
-                    .read(gameRepositoryProvider)
-                    .getCompletedGoals(state.profile.id!),
-                ref.read(contentRepositoryProvider).loadGoals(),
-              ]),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const SizedBox.shrink();
-                final equipped =
-                    snapshot.data![0] as Map<ShopEquipSlot, String>;
-                final items = snapshot.data![1] as List<ShopItem>;
-                final completed = snapshot.data![2] as List<CompletedGoal>;
-                final goals = snapshot.data![3] as List<SavingsGoal>;
-                final worn = items
-                    .where((item) => equipped.values.contains(item.id))
-                    .map((item) => item.name)
-                    .toList();
-                final rewards = goals
-                    .where(
-                      (goal) => completed.any((done) => done.goalId == goal.id),
+                  const SizedBox(height: AppSpacing.tiny),
+                  if (state.activeGoal case final goal?)
+                    HomeGoalCard(
+                      name: goal.name,
+                      saved: state.gameState.savedAmount,
+                      price: goal.price,
                     )
-                    .map((goal) => goal.name)
-                    .toList();
-                if (worn.isEmpty && rewards.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                return Card(
-                  color: AppColors.surface.withValues(alpha: 0.9),
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.compact),
-                    child: Column(
-                      children: [
-                        if (worn.isNotEmpty)
-                          Text(
-                            'На Финни: ${worn.join(', ')}',
-                            textAlign: TextAlign.center,
-                          ),
-                        if (rewards.isNotEmpty)
-                          Text(
-                            'В доме: ${rewards.join(', ')}',
-                            textAlign: TextAlign.center,
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: AppSpacing.medium),
-            Card(
-              color: AppColors.surface.withValues(alpha: 0.9),
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.medium),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '5 дней пройдено ✓',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+                  else
                     FutureBuilder(
                       future: _collection(ref),
                       builder: (context, snapshot) {
-                        if (!snapshot.hasData) {
-                          return const CircularProgressIndicator();
-                        }
-                        final (goals, totalGoals, owned, totalItems) =
-                            snapshot.data!;
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Цели: $goals из $totalGoals'),
-                            Text('Коллекция: $owned из $totalItems'),
-                            if (goals == totalGoals && owned == totalItems)
-                              const Text('Всё для Финни собрано! ✓'),
-                          ],
+                        final allGoalsReached =
+                            snapshot.hasData &&
+                            snapshot.data!.$1 == snapshot.data!.$2;
+                        return HomeNoGoalCard(
+                          saved: state.gameState.savedAmount,
+                          title: allGoalsReached
+                              ? 'Все цели достигнуты! ✓'
+                              : 'Цель не выбрана',
+                          onSelect: allGoalsReached
+                              ? null
+                              : () => context.go('/savings'),
                         );
                       },
                     ),
-                    TextButton(
-                      onPressed: () => context.go('/finale?mode=recap'),
-                      child: const Text('Посмотреть итоги'),
-                    ),
-                  ],
-                ),
+                  const SizedBox(height: AppSpacing.tiny),
+                  FutureBuilder(
+                    future: Future.wait<Object?>([
+                      _collection(ref),
+                      ref
+                          .read(freePlayServiceProvider)
+                          .equipped(state.profile.id!),
+                      ref.read(contentRepositoryProvider).loadShopItems(),
+                      ref
+                          .read(gameRepositoryProvider)
+                          .getCompletedGoals(state.profile.id!),
+                      ref.read(contentRepositoryProvider).loadGoals(),
+                    ]),
+                    builder: (context, snapshot) {
+                      String? collectionLabel;
+                      String? inventoryLabel;
+                      var collectionComplete = false;
+                      if (snapshot.hasData) {
+                        final collection =
+                            snapshot.data![0] as (int, int, int, int);
+                        final (goalCount, totalGoals, ownedCount, totalItems) =
+                            collection;
+                        final equipped =
+                            snapshot.data![1] as Map<ShopEquipSlot, String>;
+                        final items = snapshot.data![2] as List<ShopItem>;
+                        final completed =
+                            snapshot.data![3] as List<CompletedGoal>;
+                        final goals = snapshot.data![4] as List<SavingsGoal>;
+                        final worn = items
+                            .where((item) => equipped.values.contains(item.id))
+                            .map((item) => item.name)
+                            .toList();
+                        final rewards = goals
+                            .where(
+                              (goal) => completed.any(
+                                (done) => done.goalId == goal.id,
+                              ),
+                            )
+                            .map((goal) => goal.name)
+                            .toList();
+                        collectionLabel =
+                            'Цели: $goalCount из $totalGoals · Коллекция: $ownedCount из $totalItems';
+                        inventoryLabel = [
+                          if (worn.isNotEmpty) 'На Финни: ${worn.join(', ')}',
+                          if (rewards.isNotEmpty)
+                            'В доме: ${rewards.join(', ')}',
+                        ].join(' · ');
+                        collectionComplete =
+                            goalCount == totalGoals && ownedCount == totalItems;
+                      }
+                      return Card(
+                        color: AppColors.surface.withValues(alpha: 0.93),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.compact,
+                            vertical: 2,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '5 дней пройдено ✓',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            color: AppColors.textPrimary,
+                                          ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      minimumSize: const Size(0, 36),
+                                      padding: EdgeInsets.zero,
+                                      textStyle: const TextStyle(fontSize: 12),
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    onPressed: () =>
+                                        context.go('/finale?mode=recap'),
+                                    child: const Text('Посмотреть итоги'),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                collectionLabel ?? 'Загружаем коллекцию…',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.textSecondary),
+                              ),
+                              if (inventoryLabel?.isNotEmpty == true)
+                                Text(
+                                  inventoryLabel!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                ),
+                              if (collectionComplete)
+                                Text(
+                                  'Всё для Финни собрано! ✓',
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: AppColors.textPrimary),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     ),
@@ -654,6 +714,19 @@ class _HomeContent extends StatelessWidget {
     final savingsUnresolved =
         period?.requiredCheckpoints.contains('savings_decision') == true &&
         period?.resolvedCheckpoints.contains('savings_decision') != true;
+    final activeActionPeriod =
+        period?.status == GamePeriodStatus.active ||
+        period?.status == GamePeriodStatus.readyToFinish;
+    final primaryCheckpoint =
+        activeActionPeriod &&
+            period != null &&
+            !VirtualDayRules.bedtimeReached(period.dayProgress)
+        ? taskUnresolved
+              ? 'financial_task'
+              : savingsUnresolved
+              ? 'savings_decision'
+              : null
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -675,14 +748,25 @@ class _HomeContent extends StatelessWidget {
       ),
       body: HomeSceneBackdrop(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.medium),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.medium,
+              vertical: 2,
+            ),
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 560),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    _HomeStatsBar(
+                      satiety: state.pet.satiety,
+                      care: state.pet.care,
+                      mood: state.pet.mood,
+                      campaignKeys: true,
+                    ),
+                    const SizedBox(height: 2),
+                    const Spacer(),
                     FinnyRoomScene(
                       key: const Key('home-day-sky'),
                       pet: state.pet,
@@ -694,44 +778,7 @@ class _HomeContent extends StatelessWidget {
                         name: state.pet.name,
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.small),
-                    Card(
-                      color: AppColors.surface.withValues(alpha: 0.9),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.compact),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: PetStatIndicator(
-                                key: const Key('home-stat-satiety'),
-                                barKey: const Key('home-stat-satiety-bar'),
-                                label: 'Сытость',
-                                value: state.pet.satiety,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.small),
-                            Expanded(
-                              child: PetStatIndicator(
-                                key: const Key('home-stat-care'),
-                                barKey: const Key('home-stat-care-bar'),
-                                label: 'Уход',
-                                value: state.pet.care,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.small),
-                            Expanded(
-                              child: PetStatIndicator(
-                                key: const Key('home-stat-mood'),
-                                barKey: const Key('home-stat-mood-bar'),
-                                label: 'Настроение',
-                                value: state.pet.mood,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.small),
+                    const SizedBox(height: 2),
                     Center(
                       child: FilledButton.tonalIcon(
                         key: const Key('home-free-pet'),
@@ -747,22 +794,22 @@ class _HomeContent extends StatelessWidget {
                       ),
                     ),
                     if (state.interactionNotice case final notice?) ...[
-                      const SizedBox(height: AppSpacing.small),
+                      const SizedBox(height: AppSpacing.tiny),
                       _Notice(notice),
                     ],
                     if (state.startFailed) ...[
-                      const SizedBox(height: AppSpacing.small),
+                      const SizedBox(height: AppSpacing.tiny),
                       const _Notice(
                         'Не получилось начать день. Попробуй ещё раз.',
                       ),
                     ],
                     if (state.finishFailed) ...[
-                      const SizedBox(height: AppSpacing.small),
+                      const SizedBox(height: AppSpacing.tiny),
                       const _Notice(
                         'Не получилось завершить день. Попробуй ещё раз.',
                       ),
                     ],
-                    const SizedBox(height: AppSpacing.small),
+                    const SizedBox(height: 2),
                     if (state.allDaysCompleted)
                       _Notice(
                         'Все 5 дней завершены • Финни — этап '
@@ -818,14 +865,14 @@ class _HomeContent extends StatelessWidget {
                               child: const Text('Посмотреть план'),
                             ),
                     if (state.activeGoal case final goal?) ...[
-                      const SizedBox(height: AppSpacing.medium),
+                      const SizedBox(height: 2),
                       HomeGoalCard(
                         name: goal.name,
                         saved: state.gameState.savedAmount,
                         price: goal.price,
                       ),
                     ] else ...[
-                      const SizedBox(height: AppSpacing.medium),
+                      const SizedBox(height: 2),
                       HomeNoGoalCard(
                         saved: state.gameState.savedAmount,
                         onSelect: () => context.go('/savings'),
@@ -837,17 +884,18 @@ class _HomeContent extends StatelessWidget {
                               id == 'financial_task' ||
                               id == 'savings_decision',
                         )) ...[
-                      const SizedBox(height: AppSpacing.medium),
+                      const SizedBox(height: 2),
                       _RequiredActionsSummary(
                         period: period,
                         dayFiveTaskCompletion: state.dayFiveTaskCompletion,
+                        primaryCheckpoint: primaryCheckpoint,
                         actionsEnabled:
                             period.status == GamePeriodStatus.active ||
                             period.status == GamePeriodStatus.readyToFinish,
                       ),
                     ],
                     if (state.bowlEvent?.isOutstanding == true) ...[
-                      const SizedBox(height: AppSpacing.medium),
+                      const SizedBox(height: 2),
                       _BowlObligationCard(
                         event: state.bowlEvent!,
                         onPressed:
@@ -877,28 +925,35 @@ class _RequiredActionsSummary extends StatelessWidget {
   const _RequiredActionsSummary({
     required this.period,
     required this.actionsEnabled,
+    required this.primaryCheckpoint,
     this.dayFiveTaskCompletion,
   });
 
   final GamePeriod period;
   final bool actionsEnabled;
+  final String? primaryCheckpoint;
   final DayFiveTaskCompletion? dayFiveTaskCompletion;
 
   @override
   Widget build(BuildContext context) {
     final checkpoints = period.requiredCheckpoints
-        .where((id) => id == 'financial_task' || id == 'savings_decision')
+        .where(
+          (id) =>
+              (id == 'financial_task' || id == 'savings_decision') &&
+              (primaryCheckpoint != id ||
+                  (id == 'financial_task' && dayFiveTaskCompletion != null)),
+        )
         .toList(growable: false);
 
     if (checkpoints.isEmpty) return const SizedBox.shrink();
 
     return Card(
       key: const Key('home-required-actions'),
-      color: AppColors.surface.withValues(alpha: 0.9),
+      color: AppColors.surface.withValues(alpha: 0.93),
       child: Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.compact,
-          vertical: AppSpacing.tiny,
+          horizontal: AppSpacing.small,
+          vertical: 2,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -925,6 +980,9 @@ class _RequiredActionsSummary extends StatelessWidget {
                 route: cp == 'financial_task' ? '/tasks' : '/savings',
                 resolved: period.resolvedCheckpoints.contains(cp),
                 actionsEnabled: actionsEnabled,
+                isPrimary: primaryCheckpoint == cp,
+                showPrimaryDetail:
+                    cp == 'financial_task' && dayFiveTaskCompletion != null,
               ),
           ],
         ),
@@ -947,36 +1005,48 @@ class _BowlObligationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-bowl-obligation'),
-    color: AppColors.surface.withValues(alpha: 0.9),
+    color: AppColors.surface.withValues(alpha: 0.93),
     child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.small,
+        vertical: AppSpacing.tiny,
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(Icons.pets_outlined),
-              const SizedBox(width: AppSpacing.small),
-              Text(
-                'Новая миска нужна',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ],
+          const Icon(
+            Icons.pets_outlined,
+            size: 20,
+            color: AppColors.textPrimary,
           ),
-          const SizedBox(height: 4),
-          Text('Отложенная нужная покупка · ${event.price} монет'),
-          const SizedBox(height: 4),
-          const Text('Сейчас Финни пользуется временной миской'),
-          const SizedBox(height: AppSpacing.small),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.tonal(
-              key: const Key('home-bowl-purchase'),
-              onPressed: onPressed,
-              child: const Text('Купить'),
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Новая миска нужна · ${event.price} монет',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(color: AppColors.textPrimary),
+                ),
+                Text(
+                  onPressed == null
+                      ? unavailableText
+                      : 'Сейчас Финни пользуется временной миской',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall
+                      ?.copyWith(color: AppColors.textSecondary),
+                ),
+              ],
             ),
           ),
-          if (onPressed == null) Text(unavailableText),
+          TextButton(
+            key: const Key('home-bowl-purchase'),
+            onPressed: onPressed,
+            child: const Text('Купить'),
+          ),
         ],
       ),
     ),
@@ -993,6 +1063,8 @@ class _RequiredActionRow extends StatelessWidget {
     required this.route,
     required this.resolved,
     required this.actionsEnabled,
+    required this.isPrimary,
+    required this.showPrimaryDetail,
   });
 
   final String title;
@@ -1003,38 +1075,60 @@ class _RequiredActionRow extends StatelessWidget {
   final String route;
   final bool resolved;
   final bool actionsEnabled;
+  final bool isPrimary;
+  final bool showPrimaryDetail;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.tiny),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
           Icon(
             resolved ? Icons.check_circle : Icons.radio_button_unchecked,
             size: 20,
-            color: resolved
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant,
+            color: resolved ? AppColors.primary : AppColors.textSecondary,
           ),
-          const SizedBox(width: AppSpacing.small),
+          const SizedBox(width: AppSpacing.tiny),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: theme.textTheme.titleSmall),
-                if (!resolved)
-                  Text(pendingText, style: theme.textTheme.bodySmall),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (!resolved &&
+                    (actionsEnabled || showPrimaryDetail) &&
+                    (!isPrimary || showPrimaryDetail))
+                  Text(
+                    pendingText,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 if (resolved && resolvedText != null)
-                  Text(resolvedText!, style: theme.textTheme.bodySmall),
+                  Text(
+                    resolvedText!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.small),
+          const SizedBox(width: AppSpacing.tiny),
           if (resolved)
-            Text('Готово', style: theme.textTheme.bodySmall)
-          else if (actionsEnabled)
+            Text(
+              'Готово',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            )
+          else if (actionsEnabled && !isPrimary)
             TextButton(
               key: actionKey,
               onPressed: () => context.go(route),

@@ -504,7 +504,16 @@ void main() {
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
-            child: MaterialApp(theme: AppTheme.light, home: const HomeScreen()),
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: const Scaffold(
+                body: HomeScreen(),
+                bottomNavigationBar: SizedBox(
+                  key: Key('test-bottom-nav'),
+                  height: 72,
+                ),
+              ),
+            ),
           ),
         );
         await tester.pumpAndSettle();
@@ -566,7 +575,7 @@ void main() {
         expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
         expect(find.text('Сегодня'), findsNothing);
         expect(find.text('Задание дня'), findsOneWidget);
-        expect(find.text('Накопления'), findsOneWidget);
+        expect(find.text('Накопления'), findsNothing);
         expect(find.text('Готово'), findsOneWidget);
         expect(find.text('Событие'), findsNothing);
         expect(find.text('Скидка'), findsNothing);
@@ -575,6 +584,21 @@ void main() {
         expect(find.byKey(const Key('home-savings-goal')), findsOneWidget);
         expect(find.text('Велосипед'), findsOneWidget);
         expect(find.text('150/500'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(HomeScreen),
+            matching: find.byType(Scrollable),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester.getBottomRight(find.byKey(const Key('home-savings-goal'))).dy,
+          lessThan(
+            tester.getTopLeft(find.byKey(const Key('test-bottom-nav'))).dy,
+          ),
+        );
+        final goalName = tester.widget<Text>(find.text('Велосипед'));
+        expect(goalName.style?.color, AppColors.textPrimary);
 
         games.period = period.copyWith(dayProgress: 100);
         await container.read(homeControllerProvider.notifier).load();

@@ -332,7 +332,7 @@ void main() {
 
       expect(find.byKey(const Key('home-continue-plan')), findsNothing);
       expect(find.byKey(const Key('home-next-task')), findsOneWidget);
-      expect(find.byKey(const Key('home-today-task-action')), findsOneWidget);
+      expect(find.byKey(const Key('home-today-task-action')), findsNothing);
       expect(
         find.byKey(const Key('home-today-savings-action')),
         findsOneWidget,
@@ -346,27 +346,26 @@ void main() {
   ) async {
     await mountHome(tester);
     expect(find.text('Выполнить задание'), findsOneWidget);
-    expect(find.text('Задание дня'), findsOneWidget);
-    expect(find.text('Нужно выполнить'), findsOneWidget);
+    expect(find.text('Задание дня'), findsNothing);
     expect(find.text('Накопления'), findsOneWidget);
     expect(find.text('Нужно решить'), findsOneWidget);
-    for (final key in [
-      'home-next-task',
-      'home-today-task-action',
-      'home-today-savings-action',
-    ]) {
+    for (final key in ['home-next-task', 'home-today-savings-action']) {
       final button = find.byKey(Key(key));
       await tester.ensureVisible(button);
       expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
       expect(tester.getSize(button).width, greaterThanOrEqualTo(48));
     }
+    expect(
+      find.descendant(
+        of: find.byType(HomeScreen),
+        matching: find.byType(Scrollable),
+      ),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 
-  for (final (key, destination) in [
-    ('home-next-task', '/tasks'),
-    ('home-today-task-action', '/tasks'),
-  ]) {
+  for (final (key, destination) in [('home-next-task', '/tasks')]) {
     testWidgets('$key opens $destination', (tester) async {
       final fixture = await mountHome(tester);
       await tapVisible(tester, key);
@@ -378,7 +377,7 @@ void main() {
     });
   }
 
-  testWidgets('resolved task recommends savings and its Today CTA navigates', (
+  testWidgets('resolved task recommends savings and main CTA navigates', (
     tester,
   ) async {
     final fixture = await mountHome(tester, resolved: ['financial_task']);
@@ -388,7 +387,8 @@ void main() {
     expect(find.byKey(const Key('home-next-task')), findsNothing);
     expect(find.byKey(const Key('home-next-savings')), findsOneWidget);
     expect(find.text('Решить про накопления'), findsOneWidget);
-    await tapVisible(tester, 'home-today-savings-action');
+    expect(find.byKey(const Key('home-today-savings-action')), findsNothing);
+    await tapVisible(tester, 'home-next-savings');
     expect(fixture.router.routeInformationProvider.value.uri.path, '/savings');
     expect(find.text('Savings target'), findsOneWidget);
   });
