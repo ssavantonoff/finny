@@ -199,6 +199,59 @@ void main() {
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   }
 
+  testWidgets(
+    'Campaign Home fills the room behind floating navigation at 360dp',
+    (tester) async {
+      final nav = (await tester.runAsync(() => fixture(1)))!;
+      addTearDown(nav.close);
+      useSingleLineNavigationLabels(tester);
+      await mountPromoApp(tester, nav);
+
+      final navigation = find.byKey(const Key('home-floating-navigation'));
+      final room = find.byKey(const Key('home-room-background'));
+      expect(navigation, findsOneWidget);
+      expect(find.byKey(const Key('home-floating-header')), findsOneWidget);
+      expect(find.text('День 1'), findsOneWidget);
+      expect(find.byKey(const Key('home-wallet')), findsOneWidget);
+      expect(find.byKey(const Key('home-settings')), findsOneWidget);
+      expect(find.byKey(const Key('home-stat-satiety-bar')), findsOneWidget);
+      expect(find.byKey(const Key('home-stat-care-bar')), findsOneWidget);
+      expect(find.byKey(const Key('home-stat-mood-bar')), findsOneWidget);
+      expect(find.byKey(const Key('home-finny-stage-1')), findsOneWidget);
+      expect(find.byKey(const Key('home-pet-name')), findsOneWidget);
+      expect(find.byKey(const Key('home-free-pet')), findsOneWidget);
+      expect(find.byKey(const Key('home-continue-plan')), findsOneWidget);
+      expect(find.byKey(const Key('home-savings-goal')), findsOneWidget);
+      expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
+      expect(find.byType(AppBar), findsNothing);
+      expect(tester.getTopLeft(room).dy, 0);
+      expect(
+        tester.getBottomRight(room).dy,
+        greaterThanOrEqualTo(tester.getBottomRight(navigation).dy),
+      );
+      expect(tester.getTopLeft(navigation).dx, greaterThan(0));
+      expect(tester.getBottomRight(navigation).dx, lessThan(360));
+      expect(
+        tester
+            .getBottomRight(find.byKey(const Key('home-required-actions')))
+            .dy,
+        lessThan(tester.getTopLeft(navigation).dy - 24),
+      );
+      for (final key in [
+        'home-free-pet',
+        'home-continue-plan',
+        'home-savings-goal',
+        'home-required-actions',
+      ]) {
+        expect(
+          tester.getBottomRight(find.byKey(Key(key))).dy,
+          lessThan(tester.getTopLeft(navigation).dy),
+        );
+      }
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Day 1 Shop icon and label align without promotion', (
     tester,
   ) async {
@@ -248,6 +301,14 @@ void main() {
       );
       expect(find.byKey(const Key('nav-shop-promo-badge')), findsOneWidget);
       expect(find.text('АКЦИЯ'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(const Key('nav-shop-promo-badge'))).dy,
+        greaterThanOrEqualTo(
+          tester
+              .getTopLeft(find.byKey(const Key('home-floating-navigation')))
+              .dy,
+        ),
+      );
       expect(
         find.bySemanticsLabel(RegExp('В магазине действует акция')),
         findsOneWidget,
@@ -301,7 +362,7 @@ void main() {
       expect(find.byKey(const Key('nav-shop-promo-badge')), findsOneWidget);
       final selectedShopIcon = find.descendant(
         of: find.byKey(const Key('nav-shop')),
-        matching: find.byIcon(Icons.storefront),
+        matching: find.byIcon(Icons.storefront_rounded),
       );
       expect(
         tester.getCenter(selectedShopIcon).dy,
@@ -493,6 +554,7 @@ void main() {
         tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
         1,
       );
+      expect(find.byKey(const Key('home-floating-navigation')), findsNothing);
 
       // Tap "Магазин" (index 2)
       await tester.tap(navItem('Магазин'));
@@ -517,6 +579,7 @@ void main() {
         tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
         4,
       );
+      expect(find.byKey(const Key('home-floating-navigation')), findsNothing);
 
       // Tap back to "Финни" (index 0)
       await tester.tap(navItem('Финни'));
@@ -525,6 +588,7 @@ void main() {
         tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
         0,
       );
+      expect(find.byKey(const Key('home-floating-navigation')), findsOneWidget);
 
       expect(find.byType(HomeScreen), findsOneWidget);
       expect(find.byKey(const Key('home-settings')), findsOneWidget);

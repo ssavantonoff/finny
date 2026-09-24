@@ -4,6 +4,7 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/home_screen.dart';
+import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
@@ -14,6 +15,7 @@ import 'package:finny/models/savings_goal.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/models/story_event.dart';
+import 'package:finny/models/virtual_day_rules.dart';
 import 'package:finny/services/story_event_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,13 +84,10 @@ class _NoopStoryEventService extends StoryEventService {
 
 void main() {
   group('PetStatIndicator unit tests', () {
-    test('color thresholds: <=39 red, <=69 yellow, >=70 green', () {
-      expect(PetStatIndicator.statColor(0), PetStatIndicator.red);
-      expect(PetStatIndicator.statColor(39), PetStatIndicator.red);
-      expect(PetStatIndicator.statColor(40), PetStatIndicator.yellow);
-      expect(PetStatIndicator.statColor(69), PetStatIndicator.yellow);
-      expect(PetStatIndicator.statColor(70), PetStatIndicator.green);
-      expect(PetStatIndicator.statColor(100), PetStatIndicator.green);
+    test('each stat has its own visual accent', () {
+      expect(PetStatIndicator.accentFor('Сытость'), AppColors.satiety);
+      expect(PetStatIndicator.accentFor('Уход'), AppColors.care);
+      expect(PetStatIndicator.accentFor('Настроение'), AppColors.mood);
     });
 
     testWidgets('renders progress bar and label without raw numbers', (
@@ -212,8 +211,8 @@ void main() {
       final ready = container.read(homeControllerProvider) as HomeReady;
       expect(ready.completedDays, 5);
       expect(ready.allDaysCompleted, isTrue);
-      expect(find.byKey(const Key('home-day-status')), findsOneWidget);
-      expect(find.text('Все 5 дней завершены'), findsOneWidget);
+      expect(find.byKey(const Key('home-day-status')), findsNothing);
+      expect(find.textContaining('Все 5 дней завершены'), findsOneWidget);
       expect(find.text('Можно начать день 6.'), findsNothing);
       final renderedText = tester
           .widgetList<Text>(find.byType(Text))
@@ -226,7 +225,7 @@ void main() {
 
   group('HomeScreen atmosphere and interactions', () {
     Future<({ProviderContainer container, _AtmosphereGames games})>
-    controllerHarness() async {
+    controllerHarness({int savedAmount = 0}) async {
       final database = createTestDatabase();
       addTearDown(database.close);
       final profile = Profile(
@@ -251,7 +250,7 @@ void main() {
         profileId: 1,
         walletBalance: 500,
         currentPeriod: 1,
-        savedAmount: 0,
+        savedAmount: savedAmount,
         updatedAt: DateTime.utc(2026),
       );
       final period = GamePeriod(
@@ -303,6 +302,97 @@ void main() {
       addTearDown(container.dispose);
       return (container: container, games: games);
     }
+
+    test('campaign phase boundaries use canonical VirtualDayRules', () {
+      expect(VirtualDayRules.phaseAt(0), VirtualDayPhase.morning);
+      expect(VirtualDayRules.phaseAt(34), VirtualDayPhase.morning);
+      expect(VirtualDayRules.phaseAt(35), VirtualDayPhase.daytime);
+      expect(VirtualDayRules.phaseAt(69), VirtualDayPhase.daytime);
+      expect(VirtualDayRules.phaseAt(70), VirtualDayPhase.evening);
+    });
+
+    testWidgets('Campaign Home icon and room lighting follow canonical phase', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await controllerHarness();
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: MaterialApp(theme: AppTheme.light, home: const HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final colors = <VirtualDayPhase, List<Color>>{};
+      for (final (progress, phase, label, icon) in [
+        (0, VirtualDayPhase.morning, 'Утро', Icons.wb_twilight_rounded),
+        (34, VirtualDayPhase.morning, 'Утро', Icons.wb_twilight_rounded),
+        (35, VirtualDayPhase.daytime, 'День', Icons.wb_sunny_rounded),
+        (69, VirtualDayPhase.daytime, 'День', Icons.wb_sunny_rounded),
+        (70, VirtualDayPhase.evening, 'Вечер', Icons.nights_stay_rounded),
+      ]) {
+        harness.games.period = harness.games.period!.copyWith(
+          dayProgress: progress,
+        );
+        await harness.container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.byKey(Key('home-phase-${phase.name}')), findsOneWidget);
+        expect(find.byTooltip(label), findsOneWidget);
+        expect(
+          tester
+              .widget<Icon>(
+                find.descendant(
+                  of: find.byKey(Key('home-phase-${phase.name}')),
+                  matching: find.byType(Icon),
+                ),
+              )
+              .icon,
+          icon,
+        );
+        expect(
+          tester
+              .widget<HomeSceneBackdrop>(find.byType(HomeSceneBackdrop))
+              .phase,
+          phase,
+        );
+        final tint = tester.widget<DecoratedBox>(
+          find.byKey(const Key('home-room-phase-tint')),
+        );
+        colors[phase] = (tint.decoration as BoxDecoration).gradient!.colors;
+        expect(tester.takeException(), isNull);
+      }
+      expect(
+        colors[VirtualDayPhase.morning],
+        isNot(colors[VirtualDayPhase.daytime]),
+      );
+      expect(
+        colors[VirtualDayPhase.daytime],
+        isNot(colors[VirtualDayPhase.evening]),
+      );
+      expect(
+        colors[VirtualDayPhase.evening]!.first.a,
+        greaterThan(colors[VirtualDayPhase.daytime]!.first.a),
+      );
+      expect(
+        colors[VirtualDayPhase.evening]!.last.a,
+        greaterThan(colors[VirtualDayPhase.daytime]!.last.a),
+      );
+
+      harness.games.period = null;
+      await harness.container.read(homeControllerProvider.notifier).load();
+      await tester.pumpAndSettle();
+      for (final phase in VirtualDayPhase.values) {
+        expect(find.byKey(Key('home-phase-${phase.name}')), findsNothing);
+      }
+      expect(
+        tester.widget<HomeSceneBackdrop>(find.byType(HomeSceneBackdrop)).phase,
+        isNull,
+      );
+    });
 
     for (final interaction in FreePetInteraction.values) {
       test(
@@ -379,9 +469,42 @@ void main() {
       expect(harness.games.period?.toMap(), beforePeriod);
     });
 
+    testWidgets('Campaign Home shows savings when no goal is selected', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await controllerHarness(savedAmount: 73);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: MaterialApp(theme: AppTheme.light, home: const HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Цель не выбрана'), findsOneWidget);
+      expect(find.text('Накоплено: 73'), findsOneWidget);
+      expect(find.byKey(const Key('home-saved-without-goal')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('home-savings-goal')),
+          matching: find.byType(FinnyCoin),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets(
-      'renders Pet, wallet, stat indicators, day status, today card and goal',
+      'renders campaign actions, stage art, room, shared wallet and goal at 360dp',
       (tester) async {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
         final database = createTestDatabase();
         addTearDown(database.close);
 
@@ -452,6 +575,13 @@ void main() {
               baseIncome: 500,
               requiredCheckpoints: ['financial_task', 'savings_decision'],
             ),
+            const PeriodDefinition(
+              id: 'period_2',
+              number: 2,
+              title: 'День 2',
+              baseIncome: 500,
+              requiredCheckpoints: ['financial_task', 'savings_decision'],
+            ),
           ],
           goals: [goal],
         );
@@ -473,14 +603,24 @@ void main() {
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
-            child: MaterialApp(theme: AppTheme.light, home: const HomeScreen()),
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: const Scaffold(
+                body: HomeScreen(),
+                bottomNavigationBar: SizedBox(
+                  key: Key('test-bottom-nav'),
+                  height: 72,
+                ),
+              ),
+            ),
           ),
         );
         await tester.pumpAndSettle();
 
-        // Wallet in AppBar
+        // Shared wallet in AppBar
         expect(find.byKey(const Key('home-wallet')), findsOneWidget);
-        expect(find.text('350 🪙'), findsOneWidget);
+        expect(find.byType(HomeWallet), findsOneWidget);
+        expect(find.text('350'), findsOneWidget);
 
         // Pet name
         expect(find.byKey(const Key('home-pet-name')), findsOneWidget);
@@ -497,61 +637,143 @@ void main() {
         expect(find.text('Погладить'), findsOneWidget);
         expect(find.text('Поиграть'), findsNothing);
         expect(find.byKey(const Key('home-day-sky')), findsOneWidget);
-        expect(find.byKey(const Key('home-sun')), findsOneWidget);
+        expect(find.byKey(const Key('home-finny-stage-1')), findsOneWidget);
+        expect(find.byKey(const Key('home-room-background')), findsOneWidget);
+        expect(find.byType(HomeSceneBackdrop), findsOneWidget);
+        final room = tester.widget<Image>(
+          find.byKey(const Key('home-room-background')),
+        );
+        expect(room.fit, BoxFit.cover);
+        final name = tester.widget<Text>(
+          find.descendant(
+            of: find.byKey(const Key('home-pet-name')),
+            matching: find.text('Финни'),
+          ),
+        );
+        expect(name.style?.color, AppColors.textPrimary);
+        expect(
+          tester.getBottomRight(find.byKey(const Key('home-free-pet'))).dy,
+          lessThan(730),
+        );
+        expect(
+          tester.getTopLeft(find.byKey(const Key('home-free-pet'))).dy,
+          lessThan(
+            tester.getTopLeft(find.byKey(const Key('home-next-savings'))).dy,
+          ),
+        );
         expect(find.text('Утро'), findsNothing);
         expect(find.text('День'), findsNothing);
         expect(find.text('Вечер'), findsNothing);
 
-        // Day status card and the next unresolved action.
-        expect(find.byKey(const Key('home-day-status')), findsOneWidget);
+        // One main action and a compact summary of required decisions.
+        expect(find.byKey(const Key('home-day-status')), findsNothing);
         expect(find.byKey(const Key('home-next-savings')), findsOneWidget);
         expect(find.text('Решить про накопления'), findsOneWidget);
 
-        // Today card with checkpoints
-        expect(find.byKey(const Key('home-today-card')), findsOneWidget);
-        expect(find.text('Сегодня'), findsOneWidget);
+        expect(find.byKey(const Key('home-today-card')), findsNothing);
+        expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
+        expect(find.text('Сегодня'), findsNothing);
         expect(find.text('Задание дня'), findsOneWidget);
         expect(find.text('Накопления'), findsOneWidget);
         expect(find.text('Готово'), findsOneWidget);
         expect(find.text('Событие'), findsNothing);
         expect(find.text('Скидка'), findsNothing);
 
+        final finnyTop = tester.getTopLeft(find.byType(FinnyRoomScene)).dy;
+        final ctaTop = tester
+            .getTopLeft(find.byKey(const Key('home-next-savings')))
+            .dy;
+        final goalTop = tester
+            .getTopLeft(find.byKey(const Key('home-savings-goal')))
+            .dy;
+        final statusTop = tester
+            .getTopLeft(find.byKey(const Key('home-required-actions')))
+            .dy;
+        final navTop = tester
+            .getTopLeft(find.byKey(const Key('test-bottom-nav')))
+            .dy;
+        expect(finnyTop, closeTo(176, 1));
+        void expectStableLayout(String ctaKey, String statusKey) {
+          expect(
+            (tester.getTopLeft(find.byType(FinnyRoomScene)).dy - finnyTop)
+                .abs(),
+            lessThan(2),
+          );
+          expect(
+            (tester.getTopLeft(find.byKey(Key(ctaKey))).dy - ctaTop).abs(),
+            lessThan(2),
+          );
+          expect(
+            (tester.getTopLeft(find.byKey(const Key('home-savings-goal'))).dy -
+                    goalTop)
+                .abs(),
+            lessThan(2),
+          );
+          expect(
+            (tester.getTopLeft(find.byKey(Key(statusKey))).dy - statusTop)
+                .abs(),
+            lessThan(2),
+          );
+          expect(
+            tester.getBottomRight(find.byKey(Key(statusKey))).dy,
+            lessThan(navTop - 24),
+          );
+          expect(
+            find.descendant(
+              of: find.byType(HomeScreen),
+              matching: find.byType(Scrollable),
+            ),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        }
+
+        games.period = period.copyWith(resolvedCheckpoints: const []);
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.text('Задание дня'), findsOneWidget);
+        expect(find.text('Накопления'), findsOneWidget);
+        expectStableLayout('home-next-task', 'home-required-actions');
+
+        games.period = period.copyWith(
+          resolvedCheckpoints: const ['financial_task', 'savings_decision'],
+        );
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.text('Готово'), findsNWidgets(2));
+        expectStableLayout('home-view-plan', 'home-required-actions');
+
+        games.period = period;
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expectStableLayout('home-next-savings', 'home-required-actions');
+
         // Active savings goal card
         expect(find.byKey(const Key('home-savings-goal')), findsOneWidget);
         expect(find.text('Велосипед'), findsOneWidget);
-        expect(find.text('150/500 🪙'), findsOneWidget);
-
-        final morningSun = tester.widget<Positioned>(
-          find.ancestor(
-            of: find.byKey(const Key('home-sun')),
-            matching: find.byType(Positioned),
+        expect(find.text('150/500'), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byType(HomeScreen),
+            matching: find.byType(Scrollable),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester.getBottomRight(find.byKey(const Key('home-savings-goal'))).dy,
+          lessThan(
+            tester.getTopLeft(find.byKey(const Key('test-bottom-nav'))).dy,
           ),
         );
-        final morningSky = tester.widget<Container>(
-          find.byKey(const Key('home-day-sky')),
-        );
-        final morningGradient =
-            (morningSky.decoration! as BoxDecoration).gradient!
-                as LinearGradient;
+        final goalName = tester.widget<Text>(find.text('Велосипед'));
+        expect(goalName.style?.color, AppColors.textPrimary);
 
         games.period = period.copyWith(dayProgress: 100);
         await container.read(homeControllerProvider.notifier).load();
         await tester.pumpAndSettle();
-        final eveningSun = tester.widget<Positioned>(
-          find.ancestor(
-            of: find.byKey(const Key('home-sun')),
-            matching: find.byType(Positioned),
-          ),
-        );
-        final eveningSky = tester.widget<Container>(
-          find.byKey(const Key('home-day-sky')),
-        );
-        final eveningGradient =
-            (eveningSky.decoration! as BoxDecoration).gradient!
-                as LinearGradient;
-        expect(eveningSun.left, greaterThan(morningSun.left!));
-        expect(eveningGradient.colors, isNot(morningGradient.colors));
+        expect(find.byKey(const Key('home-room-background')), findsOneWidget);
         expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
+        expectStableLayout('home-finish-day', 'home-required-actions');
 
         games.period = period.copyWith(
           status: GamePeriodStatus.readyToFinish,
@@ -562,6 +784,50 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('home-finish-day')), findsNothing);
         expect(find.byKey(const Key('home-view-plan')), findsOneWidget);
+
+        games.periodsOverride = [
+          period.copyWith(
+            status: GamePeriodStatus.completed,
+            resolvedCheckpoints: const ['financial_task', 'savings_decision'],
+            completedAt: DateTime.utc(2026, 1, 2),
+          ),
+        ];
+        games.period = null;
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.text('Начать следующий день'), findsOneWidget);
+        expect(find.text('День завершён'), findsOneWidget);
+        expectStableLayout('home-start-day', 'home-between-days-status');
+
+        games.periodsOverride = const [];
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.text('Начать день'), findsOneWidget);
+        expect(find.byKey(const Key('home-start-day')), findsOneWidget);
+        expect(
+          tester.getTopLeft(find.byType(FinnyRoomScene)).dy,
+          closeTo(finnyTop, 1),
+        );
+        expect(
+          tester.getTopLeft(find.byKey(const Key('home-start-day'))).dy,
+          closeTo(ctaTop, 1),
+        );
+        expect(
+          tester.getTopLeft(find.byKey(const Key('home-savings-goal'))).dy,
+          closeTo(goalTop, 1),
+        );
+        expect(
+          tester.getBottomRight(find.byKey(const Key('home-savings-goal'))).dy,
+          lessThan(navTop - 24),
+        );
+        expect(
+          find.descendant(
+            of: find.byType(HomeScreen),
+            matching: find.byType(Scrollable),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
       },
     );
 
@@ -662,6 +928,11 @@ void main() {
         expect(find.text('Погладить ✓'), findsOneWidget);
         final buttonWidget = tester.widget<FilledButton>(petBtnFinder);
         expect(buttonWidget.onPressed, isNull);
+        expect(
+          buttonWidget.style?.foregroundColor?.resolve({WidgetState.disabled}),
+          AppColors.textSecondary,
+        );
+        expect(tester.getSize(petBtnFinder).height, greaterThan(0));
 
         expect(find.byKey(const Key('home-free-play')), findsNothing);
       },

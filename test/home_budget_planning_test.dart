@@ -5,6 +5,7 @@ import 'package:finny/features/budget/budget_controller.dart';
 import 'package:finny/features/budget/budget_screen.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/home_screen.dart';
+import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
@@ -339,9 +340,9 @@ void main() {
       database: database,
     );
 
-    expect(find.text('Первый день с Финни'), findsOneWidget);
+    expect(find.text('Первый день'), findsOneWidget);
     expect(find.text('Начать день'), findsOneWidget);
-    expect(find.text('40 🪙'), findsOneWidget);
+    expect(tester.widget<HomeWallet>(find.byType(HomeWallet)).balance, 40);
     expect(find.text('Пушок'), findsOneWidget);
 
     var period = (await tester.runAsync(
@@ -351,7 +352,7 @@ void main() {
       harness.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('План ещё не готов'), findsOneWidget);
+    expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
     expect(find.text('Продолжить план'), findsOneWidget);
 
     period = (await tester.runAsync(
@@ -365,7 +366,7 @@ void main() {
       harness.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('План готов'), findsOneWidget);
+    expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
     expect(find.text('Выполнить задание'), findsOneWidget);
 
     final periods = PeriodService(games, content);
@@ -385,8 +386,7 @@ void main() {
       harness.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Все важные решения приняты'), findsOneWidget);
-    expect(find.text('День почти завершён.'), findsOneWidget);
+    expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
     expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
 
     await tester.runAsync(
@@ -543,8 +543,7 @@ void main() {
         database: database,
       );
       expect(find.text('Первый день с Финни'), findsNothing);
-      expect(find.text('День 1 завершён'), findsOneWidget);
-      expect(find.text('Можно начать день 2.'), findsOneWidget);
+      expect(find.byKey(const Key('home-day-status')), findsNothing);
       expect(find.text('Начать следующий день'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('home-start-day')));
@@ -630,8 +629,8 @@ void main() {
         await harness.container.read(homeControllerProvider.notifier).load();
       });
       await tester.pumpAndSettle();
-      expect(find.text('День 2 завершён'), findsOneWidget);
-      expect(find.text('Можно начать день 3.'), findsOneWidget);
+      expect(find.byKey(const Key('home-day-status')), findsNothing);
+      expect(find.text('Начать следующий день'), findsOneWidget);
 
       final day3 = (await tester.runAsync(
         harness.container.read(homeControllerProvider.notifier).startDay,
@@ -1220,7 +1219,7 @@ void main() {
       content: content,
       database: database,
     );
-    expect(find.text('550 🪙'), findsOneWidget);
+    expect(tester.widget<HomeWallet>(find.byType(HomeWallet)).balance, 550);
     harness.router.go('/budget');
     await _settleFeature(tester, harness.container);
     expect(find.text('200 🪙'), findsOneWidget);
@@ -1302,6 +1301,10 @@ void main() {
   testWidgets(
     'postponed bowl remains visible between days and after campaign',
     (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final definitions = testPeriodDefinitions(count: 5);
       definitions[2] = PeriodDefinition(
         id: 'period_3',
@@ -1411,7 +1414,7 @@ void main() {
         expect(find.byKey(const Key('home-bowl-obligation')), findsOneWidget);
         expect(
           tester
-                  .widget<FilledButton>(
+                  .widget<TextButton>(
                     find.byKey(const Key('home-bowl-purchase')),
                   )
                   .onPressed !=
@@ -1443,7 +1446,7 @@ void main() {
       );
       await reload();
       expectCard(enabled: true, message: '');
-      expect(find.byKey(const Key('home-today-card')), findsOneWidget);
+      expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
 
       await tester.runAsync(() async {
         for (final checkpoint in day4.requiredCheckpoints) {
