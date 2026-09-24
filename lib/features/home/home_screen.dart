@@ -52,7 +52,21 @@ class PetStatIndicator extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(iconFor(label), size: 16, color: color),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: SizedBox(
+                  width: MediaQuery.sizeOf(context).height < 700 ? 20 : 24,
+                  height: MediaQuery.sizeOf(context).height < 700 ? 20 : 24,
+                  child: Icon(
+                    iconFor(label),
+                    size: MediaQuery.sizeOf(context).height < 700 ? 14 : 16,
+                    color: color,
+                  ),
+                ),
+              ),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(
@@ -84,6 +98,98 @@ class PetStatIndicator extends StatelessWidget {
   }
 }
 
+class _HomeFloatingHeader extends StatelessWidget {
+  const _HomeFloatingHeader({
+    required this.title,
+    required this.balance,
+    required this.freePlay,
+  });
+
+  final String title;
+  final int balance;
+  final bool freePlay;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    key: const Key('home-floating-header'),
+    children: [
+      Expanded(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surface.withValues(alpha: 0.93),
+              borderRadius: BorderRadius.circular(100),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: MediaQuery.sizeOf(context).height < 700 ? 5 : 10,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    freePlay
+                        ? Icons.sports_esports_rounded
+                        : Icons.calendar_month_rounded,
+                    size: 20,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          (freePlay
+                                  ? Theme.of(context).textTheme.titleSmall
+                                  : Theme.of(context).textTheme.bodyLarge)
+                              ?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: AppSpacing.small),
+      HomeWallet(key: const Key('home-wallet'), balance: balance),
+      const SizedBox(width: AppSpacing.small),
+      DecoratedBox(
+        decoration: BoxDecoration(
+          color: AppColors.surface.withValues(alpha: 0.93),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: IconButton(
+          key: const Key('home-settings'),
+          tooltip: 'Настройки',
+          onPressed: () => context.push('/settings'),
+          constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+          icon: const Icon(Icons.settings_rounded, color: AppColors.primary),
+        ),
+      ),
+    ],
+  );
+}
+
+ButtonStyle _petActionStyle(BuildContext context) => FilledButton.styleFrom(
+  minimumSize: Size(144, MediaQuery.sizeOf(context).height < 700 ? 36 : 40),
+  padding: const EdgeInsets.symmetric(horizontal: 18),
+  backgroundColor: AppColors.surface.withValues(alpha: 0.94),
+  foregroundColor: AppColors.primaryDark,
+  disabledBackgroundColor: AppColors.surface.withValues(alpha: 0.9),
+  disabledForegroundColor: AppColors.textSecondary,
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+);
+
 class _HomeStatsBar extends StatelessWidget {
   const _HomeStatsBar({
     required this.satiety,
@@ -99,9 +205,13 @@ class _HomeStatsBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
+    key: const Key('home-stats'),
     color: AppColors.surface.withValues(alpha: 0.93),
     child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: MediaQuery.sizeOf(context).height < 700 ? 6 : 8,
+      ),
       child: Row(
         children: [
           Expanded(
@@ -474,19 +584,7 @@ class _FreePlayHome extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Свободный день'),
-      actions: [
-        HomeWallet(balance: state.gameState.walletBalance),
-        const SizedBox(width: AppSpacing.small),
-        IconButton(
-          tooltip: 'Настройки',
-          onPressed: () => context.push('/settings'),
-          icon: const Icon(Icons.settings_rounded),
-        ),
-        const SizedBox(width: AppSpacing.small),
-      ],
-    ),
+    backgroundColor: Colors.transparent,
     body: HomeSceneBackdrop(
       child: SafeArea(
         child: Padding(
@@ -500,30 +598,61 @@ class _FreePlayHome extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  _HomeFloatingHeader(
+                    title: 'Свободный режим',
+                    balance: state.gameState.walletBalance,
+                    freePlay: true,
+                  ),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height < 700
+                        ? 4
+                        : AppSpacing.small,
+                  ),
                   _HomeStatsBar(
                     satiety: state.pet.satiety,
                     care: state.pet.care,
                     mood: state.pet.mood,
                   ),
-                  const SizedBox(height: AppSpacing.tiny),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height < 700
+                        ? 2
+                        : AppSpacing.tiny,
+                  ),
                   const Spacer(),
                   FinnyRoomScene(
                     key: const Key('free-play-daylight'),
                     pet: state.pet,
                     showBackground: false,
                   ),
-                  Center(child: FinnyNameBadge(name: state.pet.name)),
-                  const SizedBox(height: AppSpacing.tiny),
-                  FilledButton.icon(
-                    onPressed: state.interacting
-                        ? null
-                        : () => controller.performFreeInteraction(
-                            FreePetInteraction.pet,
-                          ),
-                    icon: const Icon(Icons.favorite_outline),
-                    label: const Text('Погладить'),
+                  Center(
+                    child: FinnyNameBadge(
+                      key: const Key('home-pet-name'),
+                      name: state.pet.name,
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.tiny),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height < 700
+                        ? 2
+                        : AppSpacing.tiny,
+                  ),
+                  Center(
+                    child: FilledButton.icon(
+                      key: const Key('home-free-pet'),
+                      style: _petActionStyle(context),
+                      onPressed: state.interacting
+                          ? null
+                          : () => controller.performFreeInteraction(
+                              FreePetInteraction.pet,
+                            ),
+                      icon: const Icon(Icons.favorite_outline),
+                      label: const Text('Погладить'),
+                    ),
+                  ),
+                  SizedBox(
+                    height: MediaQuery.sizeOf(context).height < 700
+                        ? 2
+                        : AppSpacing.tiny,
+                  ),
                   if (state.activeGoal case final goal?)
                     HomeGoalCard(
                       name: goal.name,
@@ -589,7 +718,7 @@ class _FreePlayHome extends ConsumerWidget {
                             .map((goal) => goal.name)
                             .toList();
                         collectionLabel =
-                            'Цели: $goalCount из $totalGoals · Коллекция: $ownedCount из $totalItems';
+                            'Цели $goalCount/$totalGoals · Предметы $ownedCount/$totalItems';
                         inventoryLabel = [
                           if (worn.isNotEmpty) 'На Финни: ${worn.join(', ')}',
                           if (rewards.isNotEmpty)
@@ -599,20 +728,39 @@ class _FreePlayHome extends ConsumerWidget {
                             goalCount == totalGoals && ownedCount == totalItems;
                       }
                       return Card(
+                        key: const Key('free-play-collection'),
                         color: AppColors.surface.withValues(alpha: 0.93),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(
+                          padding: EdgeInsets.symmetric(
                             horizontal: AppSpacing.compact,
-                            vertical: 2,
+                            vertical: MediaQuery.sizeOf(context).height < 700
+                                ? 2
+                                : AppSpacing.small,
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      '5 дней пройдено ✓',
+                              DecoratedBox(
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primaryLight,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const SizedBox(
+                                  width: 44,
+                                  height: 44,
+                                  child: Icon(
+                                    Icons.inventory_2_rounded,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.small),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Твоя коллекция',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: Theme.of(context)
@@ -622,44 +770,63 @@ class _FreePlayHome extends ConsumerWidget {
                                             color: AppColors.textPrimary,
                                           ),
                                     ),
-                                  ),
-                                  TextButton(
-                                    style: TextButton.styleFrom(
-                                      minimumSize: const Size(0, 36),
-                                      padding: EdgeInsets.zero,
-                                      textStyle: const TextStyle(fontSize: 12),
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
+                                    Text(
+                                      collectionLabel ?? 'Загружаем коллекцию…',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: AppColors.textSecondary,
+                                          ),
                                     ),
-                                    onPressed: () =>
-                                        context.go('/finale?mode=recap'),
-                                    child: const Text('Посмотреть итоги'),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                collectionLabel ?? 'Загружаем коллекцию…',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: AppColors.textSecondary),
-                              ),
-                              if (inventoryLabel?.isNotEmpty == true)
-                                Text(
-                                  inventoryLabel!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: AppColors.textSecondary,
+                                    if (MediaQuery.sizeOf(context).height >=
+                                            700 &&
+                                        inventoryLabel?.isNotEmpty == true)
+                                      Text(
+                                        inventoryLabel!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppColors.textSecondary,
+                                            ),
                                       ),
+                                    if (MediaQuery.sizeOf(context).height >=
+                                            700 &&
+                                        collectionComplete)
+                                      Text(
+                                        'Всё для Финни собрано! ✓',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppColors.textPrimary,
+                                            ),
+                                      ),
+                                  ],
                                 ),
-                              if (collectionComplete)
-                                Text(
-                                  'Всё для Финни собрано! ✓',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(width: AppSpacing.tiny),
+                              TextButton(
+                                key: const Key('free-play-recap'),
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(0, 40),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
+                                onPressed: () =>
+                                    context.go('/finale?mode=recap'),
+                                child: const Text('Итоги'),
+                              ),
                             ],
                           ),
                         ),
@@ -729,29 +896,13 @@ class _HomeContent extends StatelessWidget {
         : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        actions: [
-          HomeWallet(
-            key: const Key('home-wallet'),
-            balance: state.gameState.walletBalance,
-          ),
-          const SizedBox(width: AppSpacing.small),
-          IconButton(
-            key: const Key('home-settings'),
-            tooltip: 'Настройки',
-            onPressed: () => context.push('/settings'),
-            icon: const Icon(Icons.settings_rounded),
-          ),
-          const SizedBox(width: AppSpacing.small),
-        ],
-      ),
+      backgroundColor: Colors.transparent,
       body: HomeSceneBackdrop(
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(
+            padding: EdgeInsets.symmetric(
               horizontal: AppSpacing.medium,
-              vertical: 2,
+              vertical: MediaQuery.sizeOf(context).height < 700 ? 1 : 2,
             ),
             child: Center(
               child: ConstrainedBox(
@@ -759,6 +910,16 @@ class _HomeContent extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    _HomeFloatingHeader(
+                      title: title,
+                      balance: state.gameState.walletBalance,
+                      freePlay: false,
+                    ),
+                    SizedBox(
+                      height: MediaQuery.sizeOf(context).height < 700
+                          ? 2
+                          : AppSpacing.small,
+                    ),
                     _HomeStatsBar(
                       satiety: state.pet.satiety,
                       care: state.pet.care,
@@ -782,6 +943,7 @@ class _HomeContent extends StatelessWidget {
                     Center(
                       child: FilledButton.tonalIcon(
                         key: const Key('home-free-pet'),
+                        style: _petActionStyle(context),
                         onPressed: canPet
                             ? () => controller.performFreeInteraction(
                                 FreePetInteraction.pet,
@@ -809,7 +971,11 @@ class _HomeContent extends StatelessWidget {
                         'Не получилось завершить день. Попробуй ещё раз.',
                       ),
                     ],
-                    const SizedBox(height: 2),
+                    SizedBox(
+                      height: MediaQuery.sizeOf(context).height < 700
+                          ? 2
+                          : AppSpacing.small,
+                    ),
                     if (state.allDaysCompleted)
                       _Notice(
                         'Все 5 дней завершены • Финни — этап '
@@ -865,14 +1031,22 @@ class _HomeContent extends StatelessWidget {
                               child: const Text('Посмотреть план'),
                             ),
                     if (state.activeGoal case final goal?) ...[
-                      const SizedBox(height: 2),
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height < 700
+                            ? 2
+                            : AppSpacing.small,
+                      ),
                       HomeGoalCard(
                         name: goal.name,
                         saved: state.gameState.savedAmount,
                         price: goal.price,
                       ),
                     ] else ...[
-                      const SizedBox(height: 2),
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height < 700
+                            ? 2
+                            : AppSpacing.small,
+                      ),
                       HomeNoGoalCard(
                         saved: state.gameState.savedAmount,
                         onSelect: () => context.go('/savings'),
@@ -884,7 +1058,11 @@ class _HomeContent extends StatelessWidget {
                               id == 'financial_task' ||
                               id == 'savings_decision',
                         )) ...[
-                      const SizedBox(height: 2),
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height < 700
+                            ? 2
+                            : AppSpacing.small,
+                      ),
                       _RequiredActionsSummary(
                         period: period,
                         dayFiveTaskCompletion: state.dayFiveTaskCompletion,

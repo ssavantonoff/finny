@@ -42,7 +42,7 @@ class HomeWallet extends StatelessWidget {
     child: ExcludeSemantics(
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.surface.withValues(alpha: 0.93),
           borderRadius: BorderRadius.circular(100),
           border: Border.all(color: AppColors.border),
         ),
@@ -197,71 +197,93 @@ class HomeGoalCard extends StatelessWidget {
     key: const Key('home-savings-goal'),
     color: AppColors.surface.withValues(alpha: 0.93),
     child: Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.compact,
-        vertical: 2,
+      padding: EdgeInsets.all(
+        MediaQuery.sizeOf(context).height < 700 ? 6 : AppSpacing.small,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.savings_rounded,
-                size: 20,
-                color: AppColors.savings,
-              ),
-              const SizedBox(width: AppSpacing.tiny),
-              Expanded(
-                child: Text(
+          const _GoalIcon(),
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (MediaQuery.sizeOf(context).height >= 700)
+                  Text(
+                    'Текущая цель',
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: AppColors.textSecondary),
+                  ),
+                Text(
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium
+                  style: Theme.of(context).textTheme.titleSmall
                       ?.copyWith(color: AppColors.textPrimary),
                 ),
-              ),
-              TextButton(
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(0, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Row(
+                  children: [
+                    Text(
+                      '$saved/$price',
+                      style: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(color: AppColors.textPrimary),
+                    ),
+                    const SizedBox(width: AppSpacing.tiny),
+                    const FinnyCoin(size: 16),
+                  ],
                 ),
-                onPressed: () => context.go('/savings'),
-                child: const Text('К цели'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              Text(
-                '$saved/$price',
-                style: Theme.of(context).textTheme.bodyMedium
-                    ?.copyWith(color: AppColors.textPrimary),
-              ),
-              const SizedBox(width: AppSpacing.tiny),
-              const FinnyCoin(size: 18),
-              const SizedBox(width: AppSpacing.small),
-              Expanded(
-                child: ClipRRect(
+                const SizedBox(height: AppSpacing.tiny),
+                ClipRRect(
                   borderRadius: BorderRadius.circular(100),
                   child: LinearProgressIndicator(
                     value: price > 0 ? (saved / price).clamp(0.0, 1.0) : 0,
                     minHeight: 6,
-                    color: AppColors.savings,
-                    backgroundColor: AppColors.surfaceSecondary,
+                    color: AppColors.primary,
+                    backgroundColor: AppColors.primaryLight,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.small),
+          TextButton(
+            style: _goalActionStyle(),
+            onPressed: () => context.go('/savings'),
+            child: const Text('К цели'),
           ),
         ],
       ),
     ),
   );
 }
+
+class _GoalIcon extends StatelessWidget {
+  const _GoalIcon();
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: AppColors.primaryLight,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: const SizedBox(
+      width: 48,
+      height: 48,
+      child: Icon(Icons.savings_rounded, color: AppColors.primary),
+    ),
+  );
+}
+
+ButtonStyle _goalActionStyle() => TextButton.styleFrom(
+  backgroundColor: AppColors.primaryLight,
+  foregroundColor: AppColors.primaryDark,
+  minimumSize: const Size(0, 40),
+  padding: const EdgeInsets.symmetric(horizontal: 8),
+  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  shape: const StadiumBorder(),
+);
 
 class HomeNoGoalCard extends StatelessWidget {
   const HomeNoGoalCard({
@@ -280,57 +302,52 @@ class HomeNoGoalCard extends StatelessWidget {
     key: const Key('home-savings-goal'),
     color: AppColors.surface.withValues(alpha: 0.93),
     child: Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.compact,
-        vertical: 2,
+      padding: EdgeInsets.all(
+        MediaQuery.sizeOf(context).height < 700 ? 6 : AppSpacing.small,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.savings_rounded,
-                size: 20,
-                color: AppColors.savings,
-              ),
-              const SizedBox(width: AppSpacing.tiny),
-              Expanded(
-                child: Text(
+          const _GoalIcon(),
+          const SizedBox(width: AppSpacing.small),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium
+                  style: Theme.of(context).textTheme.titleSmall
                       ?.copyWith(color: AppColors.textPrimary),
                 ),
-              ),
-              if (onSelect != null)
-                TextButton(
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 32),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: onSelect,
-                  child: const Text('Выбрать цель'),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Накоплено: $saved',
+                        key: const Key('home-saved-without-goal'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(color: AppColors.textPrimary),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.tiny),
+                    const FinnyCoin(size: 16),
+                  ],
                 ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Накоплено: $saved',
-                  key: const Key('home-saved-without-goal'),
-                  style: Theme.of(context).textTheme.bodyMedium
-                      ?.copyWith(color: AppColors.textPrimary),
-                ),
-              ),
-              const FinnyCoin(size: 18),
-            ],
-          ),
+          if (onSelect != null) ...[
+            const SizedBox(width: AppSpacing.small),
+            TextButton(
+              style: _goalActionStyle(),
+              onPressed: onSelect,
+              child: const Text('Выбрать цель'),
+            ),
+          ],
         ],
       ),
     ),

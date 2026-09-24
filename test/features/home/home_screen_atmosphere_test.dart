@@ -716,6 +716,11 @@ void main() {
         expect(find.text('Погладить ✓'), findsOneWidget);
         final buttonWidget = tester.widget<FilledButton>(petBtnFinder);
         expect(buttonWidget.onPressed, isNull);
+        expect(
+          buttonWidget.style?.foregroundColor?.resolve({WidgetState.disabled}),
+          AppColors.textSecondary,
+        );
+        expect(tester.getSize(petBtnFinder).height, greaterThan(0));
 
         expect(find.byKey(const Key('home-free-play')), findsNothing);
       },

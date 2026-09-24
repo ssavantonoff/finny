@@ -85,54 +85,74 @@ class _ScaffoldWithNestedNavigationState
         (shop.isDayFiveSaleDay ||
             (treat != null && shop.isPromotionActiveFor(treat)));
     final badgeText = shop.isDayFiveSaleDay ? 'SALE' : 'АКЦИЯ';
-    return Scaffold(
-      body: widget.navigationShell,
-      bottomNavigationBar: NavigationBarTheme(
-        data: AppTheme.navigation,
-        child: NavigationBar(
-          selectedIndex: widget.navigationShell.currentIndex,
-          onDestinationSelected: (index) => _onTap(context, ref, index),
-          destinations: [
-            const NavigationDestination(
-              key: Key('nav-home'),
-              icon: Icon(Icons.pets_outlined),
-              selectedIcon: Icon(Icons.pets_rounded),
-              label: 'Финни',
+    final isHome = widget.navigationShell.currentIndex == 0;
+    final navigation = NavigationBarTheme(
+      data: isHome
+          ? AppTheme.navigation.copyWith(
+              backgroundColor: AppColors.surface.withValues(alpha: 0.93),
+            )
+          : AppTheme.navigation,
+      child: NavigationBar(
+        selectedIndex: widget.navigationShell.currentIndex,
+        onDestinationSelected: (index) => _onTap(context, ref, index),
+        destinations: [
+          const NavigationDestination(
+            key: Key('nav-home'),
+            icon: Icon(Icons.pets_outlined),
+            selectedIcon: Icon(Icons.pets_rounded),
+            label: 'Финни',
+          ),
+          const NavigationDestination(
+            key: Key('nav-things'),
+            icon: Icon(Icons.backpack_outlined),
+            selectedIcon: Icon(Icons.backpack_rounded),
+            label: 'Вещи',
+          ),
+          NavigationDestination(
+            key: const Key('nav-shop'),
+            icon: _ShopNavigationIcon(
+              showPromotion: showShopPromotion,
+              badgeText: badgeText,
             ),
-            const NavigationDestination(
-              key: Key('nav-things'),
-              icon: Icon(Icons.backpack_outlined),
-              selectedIcon: Icon(Icons.backpack_rounded),
-              label: 'Вещи',
+            selectedIcon: _ShopNavigationIcon(
+              showPromotion: showShopPromotion,
+              badgeText: badgeText,
+              selected: true,
             ),
-            NavigationDestination(
-              key: const Key('nav-shop'),
-              icon: _ShopNavigationIcon(
-                showPromotion: showShopPromotion,
-                badgeText: badgeText,
-              ),
-              selectedIcon: _ShopNavigationIcon(
-                showPromotion: showShopPromotion,
-                badgeText: badgeText,
-                selected: true,
-              ),
-              label: 'Магазин',
-            ),
-            const NavigationDestination(
-              key: Key('nav-tasks'),
-              icon: Icon(Icons.assignment_outlined),
-              selectedIcon: Icon(Icons.assignment_rounded),
-              label: 'Задания',
-            ),
-            const NavigationDestination(
-              key: Key('nav-savings'),
-              icon: Icon(Icons.savings_outlined),
-              selectedIcon: Icon(Icons.savings_rounded),
-              label: 'Накопления',
-            ),
-          ],
-        ),
+            label: 'Магазин',
+          ),
+          const NavigationDestination(
+            key: Key('nav-tasks'),
+            icon: Icon(Icons.assignment_outlined),
+            selectedIcon: Icon(Icons.assignment_rounded),
+            label: 'Задания',
+          ),
+          const NavigationDestination(
+            key: Key('nav-savings'),
+            icon: Icon(Icons.savings_outlined),
+            selectedIcon: Icon(Icons.savings_rounded),
+            label: 'Накопления',
+          ),
+        ],
       ),
+    );
+    return Scaffold(
+      backgroundColor: isHome ? Colors.transparent : null,
+      extendBody: isHome,
+      body: widget.navigationShell,
+      bottomNavigationBar: isHome
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: ClipRRect(
+                  key: const Key('home-floating-navigation'),
+                  borderRadius: BorderRadius.circular(28),
+                  child: navigation,
+                ),
+              ),
+            )
+          : navigation,
     );
   }
 }

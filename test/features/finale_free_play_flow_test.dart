@@ -16,6 +16,7 @@ import 'package:finny/repositories/free_play_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/services/free_play_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -200,7 +201,7 @@ void main() {
       await tapVisible(tester, find.text('Назад'));
       await waitFor(tester, find.text('История завершена'));
       await tapVisible(tester, find.text('Продолжить играть'));
-      await waitFor(tester, find.text('Свободный день'));
+      await waitFor(tester, find.text('Свободный режим'));
       expect(find.byType(HomeWallet), findsOneWidget);
       expect(find.byType(FinnyRoomScene), findsOneWidget);
       expect(find.byKey(const Key('home-finny-stage-3')), findsOneWidget);
@@ -209,18 +210,18 @@ void main() {
       expect(find.text('Уложить Финни спать'), findsNothing);
       expect(find.text('Сегодня'), findsNothing);
       expect(find.text('Погладить'), findsOneWidget);
-      await tapVisible(tester, find.text('Посмотреть итоги'));
+      await tapVisible(tester, find.text('Итоги'));
       await waitFor(tester, find.text('Вернуться к Финни'));
       expect(find.text('Завершить историю'), findsNothing);
       await tapVisible(tester, find.text('Вернуться к Финни'));
-      await waitFor(tester, find.text('Свободный день'));
+      await waitFor(tester, find.text('Свободный режим'));
       await tester.pumpWidget(const SizedBox.shrink());
       scope.dispose();
       scope = container(database, content, games);
       await tester.pumpWidget(
         UncontrolledProviderScope(container: scope, child: const FinnyApp()),
       );
-      await waitFor(tester, find.text('Свободный день'));
+      await waitFor(tester, find.text('Свободный режим'));
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 200)),
@@ -240,7 +241,13 @@ void main() {
     );
     await waitFor(tester, find.text('5 дней вместе!'));
     await tapVisible(tester, find.text('Продолжить с Финни'));
-    await waitFor(tester, find.text('Свободный день'));
+    await waitFor(tester, find.text('Свободный режим'));
+    expect(
+      (tester.renderObject(
+        find.text('Свободный режим'),
+      ) as RenderParagraph).didExceedMaxLines,
+      isFalse,
+    );
     await tester.tap(find.text('Задания').first);
     await waitFor(tester, find.text('Все задания выполнены!'));
     expect(find.text('5 / 5 дней ✓'), findsOneWidget);
@@ -274,11 +281,27 @@ void main() {
     );
     await waitFor(tester, find.text('5 дней вместе!'));
     await tapVisible(tester, find.text('Продолжить с Финни'));
-    await waitFor(tester, find.text('Свободный день'));
+    await waitFor(tester, find.text('Свободный режим'));
+    expect(find.byKey(const Key('home-floating-header')), findsOneWidget);
+    expect(find.byKey(const Key('home-floating-navigation')), findsOneWidget);
+    expect(find.byKey(const Key('home-settings')), findsOneWidget);
     expect(find.byType(HomeWallet), findsOneWidget);
     expect(find.byType(FinnyRoomScene), findsOneWidget);
+    expect(find.byKey(const Key('home-finny-stage-3')), findsOneWidget);
     expect(find.byType(HomeSceneBackdrop), findsOneWidget);
     expect(find.byKey(const Key('home-room-background')), findsOneWidget);
+    expect(find.byKey(const Key('free-play-collection')), findsOneWidget);
+    expect(find.text('Твоя коллекция'), findsOneWidget);
+    expect(find.byKey(const Key('free-play-recap')), findsOneWidget);
+    expect(find.byKey(const Key('home-pet-name')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.byType(FinnyRoomScene)).dy -
+          tester.getBottomRight(find.byKey(const Key('home-stats'))).dy,
+      greaterThan(72),
+    );
+    expect(find.text('Сытость'), findsOneWidget);
+    expect(find.text('Уход'), findsOneWidget);
+    expect(find.text('Настроение'), findsOneWidget);
     expect(tester.getBottomRight(find.text('Погладить')).dy, lessThan(730));
     expect(find.text('Накоплено: 73'), findsOneWidget);
     expect(
@@ -292,11 +315,28 @@ void main() {
       tester.getBottomRight(find.byKey(const Key('home-savings-goal'))).dy,
       lessThan(tester.getTopLeft(find.byKey(const Key('nav-home'))).dy),
     );
+    expect(
+      tester.getBottomRight(find.byKey(const Key('free-play-collection'))).dy,
+      lessThan(
+        tester.getTopLeft(find.byKey(const Key('home-floating-navigation'))).dy,
+      ),
+    );
+    expect(
+      tester.getBottomRight(find.byKey(const Key('home-room-background'))).dy,
+      greaterThanOrEqualTo(
+        tester
+            .getBottomRight(find.byKey(const Key('home-floating-navigation')))
+            .dy,
+      ),
+    );
     final noGoal = tester.widget<Text>(find.text('Цель не выбрана'));
     expect(noGoal.style?.color, AppColors.textPrimary);
     expect(find.byKey(const Key('home-saved-without-goal')), findsOneWidget);
     expect(find.text('Уложить Финни спать'), findsNothing);
     expect(find.text('Начать следующий день'), findsNothing);
+    expect(find.text('День 6'), findsNothing);
+    expect(find.byKey(const Key('home-required-actions')), findsNothing);
+    expect(find.byKey(const Key('home-next-task')), findsNothing);
     for (final key in [
       'nav-home',
       'nav-things',
