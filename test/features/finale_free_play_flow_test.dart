@@ -275,8 +275,13 @@ void main() {
     await waitFor(tester, find.text('Свободный день'));
     expect(find.byType(HomeWallet), findsOneWidget);
     expect(find.byType(FinnyRoomScene), findsOneWidget);
+    expect(find.byType(HomeSceneBackdrop), findsOneWidget);
+    expect(find.byKey(const Key('home-room-background')), findsOneWidget);
+    expect(tester.getBottomRight(find.text('Погладить')).dy, lessThan(730));
     expect(find.text('Накоплено: 73'), findsOneWidget);
     expect(find.byKey(const Key('home-saved-without-goal')), findsOneWidget);
+    expect(find.text('Уложить Финни спать'), findsNothing);
+    expect(find.text('Начать следующий день'), findsNothing);
     for (final key in [
       'nav-home',
       'nav-things',

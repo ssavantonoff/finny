@@ -66,10 +66,60 @@ class HomeWallet extends StatelessWidget {
   );
 }
 
+class HomeSceneBackdrop extends StatelessWidget {
+  const HomeSceneBackdrop({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      Image.asset(
+        'assets/images/home/room_base.png',
+        key: const Key('home-room-background'),
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+      ),
+      const ColoredBox(color: Color(0x1FFFFFFF)),
+      child,
+    ],
+  );
+}
+
+class FinnyNameBadge extends StatelessWidget {
+  const FinnyNameBadge({super.key, required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: AppColors.surface.withValues(alpha: 0.88),
+      borderRadius: BorderRadius.circular(100),
+      border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      child: Text(
+        name,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.titleLarge
+            ?.copyWith(color: AppColors.textPrimary),
+      ),
+    ),
+  );
+}
+
 class FinnyRoomScene extends StatelessWidget {
-  const FinnyRoomScene({super.key, required this.pet});
+  const FinnyRoomScene({
+    super.key,
+    required this.pet,
+    this.showBackground = true,
+  });
 
   final Pet pet;
+  final bool showBackground;
 
   static String assetForStage(int stage) => switch (stage.clamp(1, 3)) {
     1 => 'assets/images/home/finny_stage1_neutral.png',
@@ -100,12 +150,13 @@ class FinnyRoomScene extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.asset(
-              'assets/images/home/room_base.png',
-              key: const Key('home-room-background'),
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-            ),
+            if (showBackground)
+              Image.asset(
+                'assets/images/home/room_base.png',
+                key: const Key('home-room-background'),
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
             Align(
               alignment: const Alignment(0, 0.87),
               child: SizedBox(
@@ -140,8 +191,9 @@ class HomeGoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-savings-goal'),
+    color: AppColors.surface.withValues(alpha: 0.9),
     child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
+      padding: const EdgeInsets.all(AppSpacing.compact),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -202,8 +254,9 @@ class HomeNoGoalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-savings-goal'),
+    color: AppColors.surface.withValues(alpha: 0.9),
     child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
+      padding: const EdgeInsets.all(AppSpacing.compact),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -225,7 +225,7 @@ void main() {
         child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
       ),
     );
-    await waitFor(tester, find.byKey(const Key('home-day-status')));
+    await waitFor(tester, find.byKey(const Key('home-room-background')));
     expect(container.read(homeControllerProvider), isA<HomeReady>());
     expect(tester.takeException(), isNull);
     return _HomeFixture(container, router);
@@ -304,7 +304,7 @@ void main() {
       final fixture = await mountHome(tester, planning: true);
       expect(find.byKey(const Key('home-continue-plan')), findsOneWidget);
       expect(find.text('Продолжить план'), findsOneWidget);
-      expect(find.byKey(const Key('home-today-card')), findsOneWidget);
+      expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
       expect(find.text('Задание дня'), findsOneWidget);
       expect(find.text('Накопления'), findsOneWidget);
       for (final key in [
@@ -465,7 +465,7 @@ void main() {
     tester,
   ) async {
     await mountHome(tester, required: ['changed_circumstance'], bedtime: true);
-    expect(find.byKey(const Key('home-today-card')), findsNothing);
+    expect(find.byKey(const Key('home-required-actions')), findsNothing);
     expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
     expect(find.textContaining('сломается миска'), findsNothing);
     await tapVisible(tester, 'home-finish-day');

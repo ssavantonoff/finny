@@ -340,7 +340,7 @@ void main() {
       database: database,
     );
 
-    expect(find.text('Первый день с Финни'), findsOneWidget);
+    expect(find.text('Первый день'), findsOneWidget);
     expect(find.text('Начать день'), findsOneWidget);
     expect(tester.widget<HomeWallet>(find.byType(HomeWallet)).balance, 40);
     expect(find.text('Пушок'), findsOneWidget);
@@ -352,7 +352,7 @@ void main() {
       harness.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('План ещё не готов'), findsOneWidget);
+    expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
     expect(find.text('Продолжить план'), findsOneWidget);
 
     period = (await tester.runAsync(
@@ -366,7 +366,7 @@ void main() {
       harness.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('План готов'), findsOneWidget);
+    expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
     expect(find.text('Выполнить задание'), findsOneWidget);
 
     final periods = PeriodService(games, content);
@@ -386,8 +386,7 @@ void main() {
       harness.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Все важные решения приняты'), findsOneWidget);
-    expect(find.text('День почти завершён.'), findsOneWidget);
+    expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
     expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
 
     await tester.runAsync(
@@ -544,8 +543,7 @@ void main() {
         database: database,
       );
       expect(find.text('Первый день с Финни'), findsNothing);
-      expect(find.text('День 1 завершён'), findsOneWidget);
-      expect(find.text('Можно начать день 2.'), findsOneWidget);
+      expect(find.byKey(const Key('home-day-status')), findsNothing);
       expect(find.text('Начать следующий день'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('home-start-day')));
@@ -631,8 +629,8 @@ void main() {
         await harness.container.read(homeControllerProvider.notifier).load();
       });
       await tester.pumpAndSettle();
-      expect(find.text('День 2 завершён'), findsOneWidget);
-      expect(find.text('Можно начать день 3.'), findsOneWidget);
+      expect(find.byKey(const Key('home-day-status')), findsNothing);
+      expect(find.text('Начать следующий день'), findsOneWidget);
 
       final day3 = (await tester.runAsync(
         harness.container.read(homeControllerProvider.notifier).startDay,
@@ -1444,7 +1442,7 @@ void main() {
       );
       await reload();
       expectCard(enabled: true, message: '');
-      expect(find.byKey(const Key('home-today-card')), findsOneWidget);
+      expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
 
       await tester.runAsync(() async {
         for (final checkpoint in day4.requiredCheckpoints) {

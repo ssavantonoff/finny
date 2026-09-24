@@ -210,8 +210,8 @@ void main() {
       final ready = container.read(homeControllerProvider) as HomeReady;
       expect(ready.completedDays, 5);
       expect(ready.allDaysCompleted, isTrue);
-      expect(find.byKey(const Key('home-day-status')), findsOneWidget);
-      expect(find.text('Все 5 дней завершены'), findsOneWidget);
+      expect(find.byKey(const Key('home-day-status')), findsNothing);
+      expect(find.textContaining('Все 5 дней завершены'), findsOneWidget);
       expect(find.text('Можно начать день 6.'), findsNothing);
       final renderedText = tester
           .widgetList<Text>(find.byType(Text))
@@ -531,18 +531,40 @@ void main() {
         expect(find.byKey(const Key('home-day-sky')), findsOneWidget);
         expect(find.byKey(const Key('home-finny-stage-1')), findsOneWidget);
         expect(find.byKey(const Key('home-room-background')), findsOneWidget);
+        expect(find.byType(HomeSceneBackdrop), findsOneWidget);
+        final room = tester.widget<Image>(
+          find.byKey(const Key('home-room-background')),
+        );
+        expect(room.fit, BoxFit.cover);
+        final name = tester.widget<Text>(
+          find.descendant(
+            of: find.byKey(const Key('home-pet-name')),
+            matching: find.text('Финни'),
+          ),
+        );
+        expect(name.style?.color, AppColors.textPrimary);
+        expect(
+          tester.getBottomRight(find.byKey(const Key('home-free-pet'))).dy,
+          lessThan(730),
+        );
+        expect(
+          tester.getTopLeft(find.byKey(const Key('home-free-pet'))).dy,
+          lessThan(
+            tester.getTopLeft(find.byKey(const Key('home-next-savings'))).dy,
+          ),
+        );
         expect(find.text('Утро'), findsNothing);
         expect(find.text('День'), findsNothing);
         expect(find.text('Вечер'), findsNothing);
 
-        // Day status card and the next unresolved action.
-        expect(find.byKey(const Key('home-day-status')), findsOneWidget);
+        // One main action and a compact summary of required decisions.
+        expect(find.byKey(const Key('home-day-status')), findsNothing);
         expect(find.byKey(const Key('home-next-savings')), findsOneWidget);
         expect(find.text('Решить про накопления'), findsOneWidget);
 
-        // Today card with checkpoints
-        expect(find.byKey(const Key('home-today-card')), findsOneWidget);
-        expect(find.text('Сегодня'), findsOneWidget);
+        expect(find.byKey(const Key('home-today-card')), findsNothing);
+        expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
+        expect(find.text('Сегодня'), findsNothing);
         expect(find.text('Задание дня'), findsOneWidget);
         expect(find.text('Накопления'), findsOneWidget);
         expect(find.text('Готово'), findsOneWidget);
