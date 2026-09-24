@@ -75,8 +75,10 @@ void main() {
   }
 
   Future<(AppDatabase, TestContentRepository, _DisplayGames)> completedSave(
-    WidgetTester tester,
-  ) async => (await tester.runAsync(() async {
+    WidgetTester tester, {
+    bool clearActiveGoal = false,
+    int savedAmount = 0,
+  }) async => (await tester.runAsync(() async {
     final database = createTestDatabase();
     final db = await database.database;
     const profileId = 1;
@@ -126,7 +128,10 @@ void main() {
       _DisplayGames(
         database,
         await games.getPeriods(profileId),
-        (await games.getGameState(profileId))!,
+        (await games.getGameState(profileId))!.copyWith(
+          clearActiveGoal: clearActiveGoal,
+          savedAmount: savedAmount,
+        ),
         (await games.getPet(profileId))!,
       ),
     );
@@ -255,7 +260,11 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    final (database, content, games) = await completedSave(tester);
+    final (database, content, games) = await completedSave(
+      tester,
+      clearActiveGoal: true,
+      savedAmount: 73,
+    );
     addTearDown(database.close);
     final scope = container(database, content, games);
     await tester.pumpWidget(
@@ -266,6 +275,8 @@ void main() {
     await waitFor(tester, find.text('Свободный день'));
     expect(find.byType(HomeWallet), findsOneWidget);
     expect(find.byType(FinnyRoomScene), findsOneWidget);
+    expect(find.text('Накоплено: 73'), findsOneWidget);
+    expect(find.byKey(const Key('home-saved-without-goal')), findsOneWidget);
     for (final key in [
       'nav-home',
       'nav-things',

@@ -224,7 +224,7 @@ void main() {
 
   group('HomeScreen atmosphere and interactions', () {
     Future<({ProviderContainer container, _AtmosphereGames games})>
-    controllerHarness() async {
+    controllerHarness({int savedAmount = 0}) async {
       final database = createTestDatabase();
       addTearDown(database.close);
       final profile = Profile(
@@ -249,7 +249,7 @@ void main() {
         profileId: 1,
         walletBalance: 500,
         currentPeriod: 1,
-        savedAmount: 0,
+        savedAmount: savedAmount,
         updatedAt: DateTime.utc(2026),
       );
       final period = GamePeriod(
@@ -375,6 +375,35 @@ void main() {
 
       expect(harness.games.pet.toMap(), beforePet);
       expect(harness.games.period?.toMap(), beforePeriod);
+    });
+
+    testWidgets('Campaign Home shows savings when no goal is selected', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await controllerHarness(savedAmount: 73);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: MaterialApp(theme: AppTheme.light, home: const HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Цель не выбрана'), findsOneWidget);
+      expect(find.text('Накоплено: 73'), findsOneWidget);
+      expect(find.byKey(const Key('home-saved-without-goal')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('home-savings-goal')),
+          matching: find.byType(FinnyCoin),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets(

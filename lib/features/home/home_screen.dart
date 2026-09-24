@@ -502,26 +502,21 @@ class _FreePlayHome extends ConsumerWidget {
               price: goal.price,
             )
           else
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.medium),
-                child: FutureBuilder(
-                  future: _collection(ref),
-                  builder: (context, snapshot) =>
-                      snapshot.hasData && snapshot.data!.$1 == snapshot.data!.$2
-                      ? const Text('Все цели достигнуты! ✓')
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Выбери новую цель для Финни'),
-                            TextButton(
-                              onPressed: () => context.go('/savings'),
-                              child: const Text('Выбрать цель'),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
+            FutureBuilder(
+              future: _collection(ref),
+              builder: (context, snapshot) {
+                final allGoalsReached =
+                    snapshot.hasData && snapshot.data!.$1 == snapshot.data!.$2;
+                return HomeNoGoalCard(
+                  saved: state.gameState.savedAmount,
+                  title: allGoalsReached
+                      ? 'Все цели достигнуты! ✓'
+                      : 'Цель не выбрана',
+                  onSelect: allGoalsReached
+                      ? null
+                      : () => context.go('/savings'),
+                );
+              },
             ),
           const SizedBox(height: AppSpacing.small),
           FutureBuilder(
@@ -795,6 +790,12 @@ class _HomeContent extends StatelessWidget {
                       name: goal.name,
                       saved: state.gameState.savedAmount,
                       price: goal.price,
+                    ),
+                  ] else ...[
+                    const SizedBox(height: AppSpacing.medium),
+                    HomeNoGoalCard(
+                      saved: state.gameState.savedAmount,
+                      onSelect: () => context.go('/savings'),
                     ),
                   ],
                   const SizedBox(height: AppSpacing.small),

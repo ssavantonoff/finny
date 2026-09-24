@@ -186,3 +186,64 @@ class HomeGoalCard extends StatelessWidget {
     ),
   );
 }
+
+class HomeNoGoalCard extends StatelessWidget {
+  const HomeNoGoalCard({
+    super.key,
+    required this.saved,
+    this.title = 'Цель не выбрана',
+    this.onSelect,
+  });
+
+  final int saved;
+  final String title;
+  final VoidCallback? onSelect;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    key: const Key('home-savings-goal'),
+    child: Padding(
+      padding: const EdgeInsets.all(AppSpacing.medium),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.savings_rounded, color: AppColors.savings),
+              const SizedBox(width: AppSpacing.small),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.small),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Накоплено: $saved',
+                  key: const Key('home-saved-without-goal'),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              const FinnyCoin(size: 18),
+            ],
+          ),
+          if (onSelect != null) ...[
+            const SizedBox(height: AppSpacing.tiny),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: onSelect,
+                child: const Text('Выбрать цель'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
