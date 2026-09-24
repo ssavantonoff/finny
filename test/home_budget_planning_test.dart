@@ -1301,6 +1301,10 @@ void main() {
   testWidgets(
     'postponed bowl remains visible between days and after campaign',
     (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final definitions = testPeriodDefinitions(count: 5);
       definitions[2] = PeriodDefinition(
         id: 'period_3',

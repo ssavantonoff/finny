@@ -289,6 +289,20 @@ void main() {
     expect(find.byType(FinnyRoomScene), findsOneWidget);
     expect(find.byKey(const Key('home-finny-stage-3')), findsOneWidget);
     expect(find.byType(HomeSceneBackdrop), findsOneWidget);
+    expect(
+      tester.widget<HomeSceneBackdrop>(find.byType(HomeSceneBackdrop)).phase,
+      isNull,
+    );
+    final neutralTint = tester.widget<DecoratedBox>(
+      find.byKey(const Key('home-room-phase-tint')),
+    );
+    expect((neutralTint.decoration as BoxDecoration).gradient!.colors, const [
+      Color(0x1FFFFFFF),
+      Color(0x1FFFFFFF),
+    ]);
+    for (final phase in ['morning', 'daytime', 'evening']) {
+      expect(find.byKey(Key('home-phase-$phase')), findsNothing);
+    }
     expect(find.byKey(const Key('home-room-background')), findsOneWidget);
     expect(find.byKey(const Key('free-play-collection')), findsOneWidget);
     expect(find.text('Твоя коллекция'), findsOneWidget);

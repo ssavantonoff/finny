@@ -103,11 +103,27 @@ class _HomeFloatingHeader extends StatelessWidget {
     required this.title,
     required this.balance,
     required this.freePlay,
+    this.phase,
   });
 
   final String title;
   final int balance;
   final bool freePlay;
+  final VirtualDayPhase? phase;
+
+  String get _phaseLabel => switch (phase) {
+    VirtualDayPhase.morning => 'Утро',
+    VirtualDayPhase.daytime => 'День',
+    VirtualDayPhase.evening => 'Вечер',
+    null => '',
+  };
+
+  IconData get _phaseIcon => switch (phase) {
+    VirtualDayPhase.morning => Icons.wb_twilight_rounded,
+    VirtualDayPhase.daytime => Icons.wb_sunny_rounded,
+    VirtualDayPhase.evening => Icons.nights_stay_rounded,
+    null => Icons.wb_sunny_rounded,
+  };
 
   @override
   Widget build(BuildContext context) => Row(
@@ -153,6 +169,18 @@ class _HomeFloatingHeader extends StatelessWidget {
                               ),
                     ),
                   ),
+                  if (phase != null) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      key: Key('home-phase-${phase!.name}'),
+                      message: _phaseLabel,
+                      child: Icon(
+                        _phaseIcon,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -884,6 +912,9 @@ class _HomeContent extends StatelessWidget {
     final activeActionPeriod =
         period?.status == GamePeriodStatus.active ||
         period?.status == GamePeriodStatus.readyToFinish;
+    final phase = activeActionPeriod && period != null
+        ? VirtualDayRules.phaseAt(period.dayProgress)
+        : null;
     final primaryCheckpoint =
         activeActionPeriod &&
             period != null &&
@@ -898,6 +929,7 @@ class _HomeContent extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: HomeSceneBackdrop(
+        phase: phase,
         child: SafeArea(
           child: Padding(
             padding: EdgeInsets.symmetric(
@@ -914,6 +946,7 @@ class _HomeContent extends StatelessWidget {
                       title: title,
                       balance: state.gameState.walletBalance,
                       freePlay: false,
+                      phase: phase,
                     ),
                     SizedBox(
                       height: MediaQuery.sizeOf(context).height < 700
@@ -927,7 +960,9 @@ class _HomeContent extends StatelessWidget {
                       campaignKeys: true,
                     ),
                     const SizedBox(height: 2),
-                    const Spacer(),
+                    SizedBox(
+                      height: MediaQuery.sizeOf(context).height < 700 ? 2 : 6,
+                    ),
                     FinnyRoomScene(
                       key: const Key('home-day-sky'),
                       pet: state.pet,
@@ -974,7 +1009,7 @@ class _HomeContent extends StatelessWidget {
                     SizedBox(
                       height: MediaQuery.sizeOf(context).height < 700
                           ? 2
-                          : AppSpacing.small,
+                          : AppSpacing.tiny,
                     ),
                     if (state.allDaysCompleted)
                       _Notice(
@@ -1034,7 +1069,7 @@ class _HomeContent extends StatelessWidget {
                       SizedBox(
                         height: MediaQuery.sizeOf(context).height < 700
                             ? 2
-                            : AppSpacing.small,
+                            : AppSpacing.tiny,
                       ),
                       HomeGoalCard(
                         name: goal.name,
@@ -1045,14 +1080,23 @@ class _HomeContent extends StatelessWidget {
                       SizedBox(
                         height: MediaQuery.sizeOf(context).height < 700
                             ? 2
-                            : AppSpacing.small,
+                            : AppSpacing.tiny,
                       ),
                       HomeNoGoalCard(
                         saved: state.gameState.savedAmount,
                         onSelect: () => context.go('/savings'),
                       ),
                     ],
-                    if (period != null &&
+                    if (period == null &&
+                        state.completedDays > 0 &&
+                        !state.allDaysCompleted) ...[
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height < 700
+                            ? 2
+                            : AppSpacing.tiny,
+                      ),
+                      const _BetweenDaysStatus(),
+                    ] else if (period != null &&
                         period.requiredCheckpoints.any(
                           (id) =>
                               id == 'financial_task' ||
@@ -1061,7 +1105,7 @@ class _HomeContent extends StatelessWidget {
                       SizedBox(
                         height: MediaQuery.sizeOf(context).height < 700
                             ? 2
-                            : AppSpacing.small,
+                            : AppSpacing.tiny,
                       ),
                       _RequiredActionsSummary(
                         period: period,
@@ -1115,12 +1159,7 @@ class _RequiredActionsSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final checkpoints = period.requiredCheckpoints
-        .where(
-          (id) =>
-              (id == 'financial_task' || id == 'savings_decision') &&
-              (primaryCheckpoint != id ||
-                  (id == 'financial_task' && dayFiveTaskCompletion != null)),
-        )
+        .where((id) => id == 'financial_task' || id == 'savings_decision')
         .toList(growable: false);
 
     if (checkpoints.isEmpty) return const SizedBox.shrink();
@@ -1131,7 +1170,7 @@ class _RequiredActionsSummary extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.small,
-          vertical: 2,
+          vertical: 0,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1167,6 +1206,29 @@ class _RequiredActionsSummary extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BetweenDaysStatus extends StatelessWidget {
+  const _BetweenDaysStatus();
+
+  @override
+  Widget build(BuildContext context) => Card(
+    key: const Key('home-between-days-status'),
+    color: AppColors.surface.withValues(alpha: 0.93),
+    child: const SizedBox(
+      height: 48,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: AppSpacing.small),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle, size: 20, color: AppColors.primary),
+            SizedBox(width: AppSpacing.small),
+            Text('День завершён'),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _BowlObligationCard extends StatelessWidget {
@@ -1259,8 +1321,8 @@ class _RequiredActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+    return SizedBox(
+      height: 48,
       child: Row(
         children: [
           Icon(
@@ -1272,9 +1334,12 @@ class _RequiredActionRow extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleSmall?.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -1284,6 +1349,8 @@ class _RequiredActionRow extends StatelessWidget {
                     (!isPrimary || showPrimaryDetail))
                   Text(
                     pendingText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -1291,6 +1358,8 @@ class _RequiredActionRow extends StatelessWidget {
                 if (resolved && resolvedText != null)
                   Text(
                     resolvedText!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -1304,6 +1373,13 @@ class _RequiredActionRow extends StatelessWidget {
               'Готово',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
+              ),
+            )
+          else if (actionsEnabled && isPrimary)
+            Text(
+              actionText,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.primaryDark,
               ),
             )
           else if (actionsEnabled && !isPrimary)

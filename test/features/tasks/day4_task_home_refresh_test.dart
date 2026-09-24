@@ -72,6 +72,10 @@ void main() {
   testWidgets(
     'Day 4 task returns through persistent shell without promotion popup',
     (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final database = createTestDatabase();
       final profiles = SqliteProfileRepository(database);
       final games = SqliteGameRepository(database);

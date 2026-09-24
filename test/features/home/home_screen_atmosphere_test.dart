@@ -15,6 +15,7 @@ import 'package:finny/models/savings_goal.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/models/story_event.dart';
+import 'package:finny/models/virtual_day_rules.dart';
 import 'package:finny/services/story_event_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -302,6 +303,89 @@ void main() {
       return (container: container, games: games);
     }
 
+    test('campaign phase boundaries use canonical VirtualDayRules', () {
+      expect(VirtualDayRules.phaseAt(0), VirtualDayPhase.morning);
+      expect(VirtualDayRules.phaseAt(34), VirtualDayPhase.morning);
+      expect(VirtualDayRules.phaseAt(35), VirtualDayPhase.daytime);
+      expect(VirtualDayRules.phaseAt(69), VirtualDayPhase.daytime);
+      expect(VirtualDayRules.phaseAt(70), VirtualDayPhase.evening);
+    });
+
+    testWidgets('Campaign Home icon and room lighting follow canonical phase', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final harness = await controllerHarness();
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: MaterialApp(theme: AppTheme.light, home: const HomeScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final colors = <VirtualDayPhase, List<Color>>{};
+      for (final (progress, phase, label, icon) in [
+        (0, VirtualDayPhase.morning, 'Утро', Icons.wb_twilight_rounded),
+        (34, VirtualDayPhase.morning, 'Утро', Icons.wb_twilight_rounded),
+        (35, VirtualDayPhase.daytime, 'День', Icons.wb_sunny_rounded),
+        (69, VirtualDayPhase.daytime, 'День', Icons.wb_sunny_rounded),
+        (70, VirtualDayPhase.evening, 'Вечер', Icons.nights_stay_rounded),
+      ]) {
+        harness.games.period = harness.games.period!.copyWith(
+          dayProgress: progress,
+        );
+        await harness.container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.byKey(Key('home-phase-${phase.name}')), findsOneWidget);
+        expect(find.byTooltip(label), findsOneWidget);
+        expect(
+          tester
+              .widget<Icon>(
+                find.descendant(
+                  of: find.byKey(Key('home-phase-${phase.name}')),
+                  matching: find.byType(Icon),
+                ),
+              )
+              .icon,
+          icon,
+        );
+        expect(
+          tester
+              .widget<HomeSceneBackdrop>(find.byType(HomeSceneBackdrop))
+              .phase,
+          phase,
+        );
+        final tint = tester.widget<DecoratedBox>(
+          find.byKey(const Key('home-room-phase-tint')),
+        );
+        colors[phase] = (tint.decoration as BoxDecoration).gradient!.colors;
+        expect(tester.takeException(), isNull);
+      }
+      expect(
+        colors[VirtualDayPhase.morning],
+        isNot(colors[VirtualDayPhase.daytime]),
+      );
+      expect(
+        colors[VirtualDayPhase.daytime],
+        isNot(colors[VirtualDayPhase.evening]),
+      );
+
+      harness.games.period = null;
+      await harness.container.read(homeControllerProvider.notifier).load();
+      await tester.pumpAndSettle();
+      for (final phase in VirtualDayPhase.values) {
+        expect(find.byKey(Key('home-phase-${phase.name}')), findsNothing);
+      }
+      expect(
+        tester.widget<HomeSceneBackdrop>(find.byType(HomeSceneBackdrop)).phase,
+        isNull,
+      );
+    });
+
     for (final interaction in FreePetInteraction.values) {
       test(
         'usage read error for ${interaction.name} produces HomeFailure',
@@ -483,6 +567,13 @@ void main() {
               baseIncome: 500,
               requiredCheckpoints: ['financial_task', 'savings_decision'],
             ),
+            const PeriodDefinition(
+              id: 'period_2',
+              number: 2,
+              title: 'День 2',
+              baseIncome: 500,
+              requiredCheckpoints: ['financial_task', 'savings_decision'],
+            ),
           ],
           goals: [goal],
         );
@@ -575,10 +666,71 @@ void main() {
         expect(find.byKey(const Key('home-required-actions')), findsOneWidget);
         expect(find.text('Сегодня'), findsNothing);
         expect(find.text('Задание дня'), findsOneWidget);
-        expect(find.text('Накопления'), findsNothing);
+        expect(find.text('Накопления'), findsOneWidget);
         expect(find.text('Готово'), findsOneWidget);
         expect(find.text('Событие'), findsNothing);
         expect(find.text('Скидка'), findsNothing);
+
+        final finnyTop = tester.getTopLeft(find.byType(FinnyRoomScene)).dy;
+        final ctaTop = tester
+            .getTopLeft(find.byKey(const Key('home-next-savings')))
+            .dy;
+        final goalTop = tester
+            .getTopLeft(find.byKey(const Key('home-savings-goal')))
+            .dy;
+        final statusTop = tester
+            .getTopLeft(find.byKey(const Key('home-required-actions')))
+            .dy;
+        void expectStableLayout(String ctaKey, String statusKey) {
+          expect(
+            (tester.getTopLeft(find.byType(FinnyRoomScene)).dy - finnyTop)
+                .abs(),
+            lessThan(2),
+          );
+          expect(
+            (tester.getTopLeft(find.byKey(Key(ctaKey))).dy - ctaTop).abs(),
+            lessThan(2),
+          );
+          expect(
+            (tester.getTopLeft(find.byKey(const Key('home-savings-goal'))).dy -
+                    goalTop)
+                .abs(),
+            lessThan(2),
+          );
+          expect(
+            (tester.getTopLeft(find.byKey(Key(statusKey))).dy - statusTop)
+                .abs(),
+            lessThan(2),
+          );
+          expect(
+            find.descendant(
+              of: find.byType(HomeScreen),
+              matching: find.byType(Scrollable),
+            ),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        }
+
+        games.period = period.copyWith(resolvedCheckpoints: const []);
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.text('Задание дня'), findsOneWidget);
+        expect(find.text('Накопления'), findsOneWidget);
+        expectStableLayout('home-next-task', 'home-required-actions');
+
+        games.period = period.copyWith(
+          resolvedCheckpoints: const ['financial_task', 'savings_decision'],
+        );
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.text('Готово'), findsNWidgets(2));
+        expectStableLayout('home-view-plan', 'home-required-actions');
+
+        games.period = period;
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expectStableLayout('home-next-savings', 'home-required-actions');
 
         // Active savings goal card
         expect(find.byKey(const Key('home-savings-goal')), findsOneWidget);
@@ -616,6 +768,20 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('home-finish-day')), findsNothing);
         expect(find.byKey(const Key('home-view-plan')), findsOneWidget);
+
+        games.periodsOverride = [
+          period.copyWith(
+            status: GamePeriodStatus.completed,
+            resolvedCheckpoints: const ['financial_task', 'savings_decision'],
+            completedAt: DateTime.utc(2026, 1, 2),
+          ),
+        ];
+        games.period = null;
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.text('Начать следующий день'), findsOneWidget);
+        expect(find.text('День завершён'), findsOneWidget);
+        expectStableLayout('home-start-day', 'home-between-days-status');
       },
     );
 

@@ -346,7 +346,7 @@ void main() {
   ) async {
     await mountHome(tester);
     expect(find.text('Выполнить задание'), findsOneWidget);
-    expect(find.text('Задание дня'), findsNothing);
+    expect(find.text('Задание дня'), findsOneWidget);
     expect(find.text('Накопления'), findsOneWidget);
     expect(find.text('Нужно решить'), findsOneWidget);
     for (final key in ['home-next-task', 'home-today-savings-action']) {

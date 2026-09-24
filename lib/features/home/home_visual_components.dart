@@ -1,5 +1,6 @@
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -67,9 +68,17 @@ class HomeWallet extends StatelessWidget {
 }
 
 class HomeSceneBackdrop extends StatelessWidget {
-  const HomeSceneBackdrop({super.key, required this.child});
+  const HomeSceneBackdrop({super.key, required this.child, this.phase});
 
   final Widget child;
+  final VirtualDayPhase? phase;
+
+  List<Color> get _tintColors => switch (phase) {
+    VirtualDayPhase.morning => const [Color(0x14FFE1EE), Color(0x0CFFE8DE)],
+    VirtualDayPhase.daytime => const [Color(0x14FFFFFF), Color(0x0AFFFFFF)],
+    VirtualDayPhase.evening => const [Color(0x287773B4), Color(0x168A78AE)],
+    null => const [Color(0x1FFFFFFF), Color(0x1FFFFFFF)],
+  };
 
   @override
   Widget build(BuildContext context) => Stack(
@@ -81,7 +90,16 @@ class HomeSceneBackdrop extends StatelessWidget {
         fit: BoxFit.cover,
         alignment: Alignment.topCenter,
       ),
-      const ColoredBox(color: Color(0x1FFFFFFF)),
+      DecoratedBox(
+        key: const Key('home-room-phase-tint'),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: _tintColors,
+          ),
+        ),
+      ),
       child,
     ],
   );
