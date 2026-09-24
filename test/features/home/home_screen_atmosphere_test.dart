@@ -684,7 +684,7 @@ void main() {
         final navTop = tester
             .getTopLeft(find.byKey(const Key('test-bottom-nav')))
             .dy;
-        expect(finnyTop, closeTo(148, 1));
+        expect(finnyTop, closeTo(168, 1));
         void expectStableLayout(String ctaKey, String statusKey) {
           expect(
             (tester.getTopLeft(find.byType(FinnyRoomScene)).dy - finnyTop)
@@ -765,7 +765,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('home-room-background')), findsOneWidget);
         expect(find.byKey(const Key('home-finish-day')), findsOneWidget);
-        expect(tester.takeException(), isNull);
+        expectStableLayout('home-finish-day', 'home-required-actions');
 
         games.period = period.copyWith(
           status: GamePeriodStatus.readyToFinish,
@@ -799,6 +799,14 @@ void main() {
         expect(
           tester.getTopLeft(find.byType(FinnyRoomScene)).dy,
           closeTo(finnyTop, 1),
+        );
+        expect(
+          tester.getTopLeft(find.byKey(const Key('home-start-day'))).dy,
+          closeTo(ctaTop, 1),
+        );
+        expect(
+          tester.getTopLeft(find.byKey(const Key('home-savings-goal'))).dy,
+          closeTo(goalTop, 1),
         );
         expect(
           tester.getBottomRight(find.byKey(const Key('home-savings-goal'))).dy,

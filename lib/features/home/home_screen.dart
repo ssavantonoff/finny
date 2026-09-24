@@ -890,7 +890,7 @@ class _HomeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final period = state.period;
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final sceneOffset = ((screenHeight - 700) * 0.32).clamp(0.0, 32.0);
+    final sceneOffset = ((screenHeight - 700) * 0.52).clamp(0.0, 52.0);
     final title = period == null
         ? state.completedDays == 0
               ? 'Первый день'
