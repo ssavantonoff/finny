@@ -681,6 +681,10 @@ void main() {
         final statusTop = tester
             .getTopLeft(find.byKey(const Key('home-required-actions')))
             .dy;
+        final navTop = tester
+            .getTopLeft(find.byKey(const Key('test-bottom-nav')))
+            .dy;
+        expect(finnyTop, closeTo(148, 1));
         void expectStableLayout(String ctaKey, String statusKey) {
           expect(
             (tester.getTopLeft(find.byType(FinnyRoomScene)).dy - finnyTop)
@@ -701,6 +705,10 @@ void main() {
             (tester.getTopLeft(find.byKey(Key(statusKey))).dy - statusTop)
                 .abs(),
             lessThan(2),
+          );
+          expect(
+            tester.getBottomRight(find.byKey(Key(statusKey))).dy,
+            lessThan(navTop - 24),
           );
           expect(
             find.descendant(
@@ -782,6 +790,28 @@ void main() {
         expect(find.text('Начать следующий день'), findsOneWidget);
         expect(find.text('День завершён'), findsOneWidget);
         expectStableLayout('home-start-day', 'home-between-days-status');
+
+        games.periodsOverride = const [];
+        await container.read(homeControllerProvider.notifier).load();
+        await tester.pumpAndSettle();
+        expect(find.text('Начать день'), findsOneWidget);
+        expect(find.byKey(const Key('home-start-day')), findsOneWidget);
+        expect(
+          tester.getTopLeft(find.byType(FinnyRoomScene)).dy,
+          closeTo(finnyTop, 1),
+        );
+        expect(
+          tester.getBottomRight(find.byKey(const Key('home-savings-goal'))).dy,
+          lessThan(navTop - 24),
+        );
+        expect(
+          find.descendant(
+            of: find.byType(HomeScreen),
+            matching: find.byType(Scrollable),
+          ),
+          findsNothing,
+        );
+        expect(tester.takeException(), isNull);
       },
     );
 

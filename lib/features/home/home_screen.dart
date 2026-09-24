@@ -889,6 +889,8 @@ class _HomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final period = state.period;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final sceneOffset = ((screenHeight - 700) * 0.32).clamp(0.0, 32.0);
     final title = period == null
         ? state.completedDays == 0
               ? 'Первый день'
@@ -961,7 +963,7 @@ class _HomeContent extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     SizedBox(
-                      height: MediaQuery.sizeOf(context).height < 700 ? 2 : 6,
+                      height: (screenHeight < 700 ? 2 : 6) + sceneOffset,
                     ),
                     FinnyRoomScene(
                       key: const Key('home-day-sky'),

@@ -235,7 +235,7 @@ void main() {
         tester
             .getBottomRight(find.byKey(const Key('home-required-actions')))
             .dy,
-        lessThan(tester.getTopLeft(navigation).dy),
+        lessThan(tester.getTopLeft(navigation).dy - 24),
       );
       for (final key in [
         'home-free-pet',
