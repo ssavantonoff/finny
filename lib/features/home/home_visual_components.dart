@@ -118,10 +118,12 @@ class FinnyRoomScene extends StatelessWidget {
     super.key,
     required this.pet,
     this.showBackground = true,
+    this.compactOnShortScreen = false,
   });
 
   final Pet pet;
   final bool showBackground;
+  final bool compactOnShortScreen;
 
   static String assetForStage(int stage) => switch (stage.clamp(1, 3)) {
     1 => 'assets/images/home/finny_stage1_neutral.png',
@@ -132,10 +134,10 @@ class FinnyRoomScene extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stage = pet.developmentStage.clamp(1, 3);
-    final roomHeight = (MediaQuery.sizeOf(context).height * 0.43).clamp(
-      300.0,
-      420.0,
-    );
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final roomHeight = screenHeight < 700 && compactOnShortScreen
+        ? (screenHeight * 0.33).clamp(180.0, 230.0)
+        : (screenHeight * 0.43).clamp(300.0, 420.0);
     final finnyHeight =
         roomHeight *
         switch (stage) {

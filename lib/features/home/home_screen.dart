@@ -560,6 +560,13 @@ class _FreePlayHome extends ConsumerWidget {
   final HomeReady state;
   final HomeController controller;
 
+  Future<void> _openFinnyCatch(BuildContext context, WidgetRef ref) async {
+    await context.push('/finny-catch');
+    if (context.mounted) {
+      await ref.read(homeControllerProvider.notifier).load();
+    }
+  }
+
   Future<(int, int, int, int)> _collection(WidgetRef ref) async {
     final id = state.profile.id!;
     final content = ref.read(contentRepositoryProvider);
@@ -623,6 +630,7 @@ class _FreePlayHome extends ConsumerWidget {
                     key: const Key('free-play-daylight'),
                     pet: state.pet,
                     showBackground: false,
+                    compactOnShortScreen: true,
                   ),
                   Center(
                     child: FinnyNameBadge(
@@ -653,6 +661,8 @@ class _FreePlayHome extends ConsumerWidget {
                         ? 2
                         : AppSpacing.tiny,
                   ),
+                  _FinnyCatchCard(onPlay: () => _openFinnyCatch(context, ref)),
+                  const SizedBox(height: AppSpacing.tiny),
                   if (state.activeGoal case final goal?)
                     HomeGoalCard(
                       name: goal.name,
@@ -837,6 +847,72 @@ class _FreePlayHome extends ConsumerWidget {
               ),
             ),
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _FinnyCatchCard extends StatelessWidget {
+  const _FinnyCatchCard({required this.onPlay});
+
+  final VoidCallback onPlay;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: AppColors.primary,
+    borderRadius: BorderRadius.circular(AppRadii.card),
+    child: InkWell(
+      key: const Key('free-play-finny-catch-play'),
+      onTap: onPlay,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: MediaQuery.sizeOf(context).height < 700 ? 4 : 8,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const FinnyCoin(size: 32),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Лови монеты',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall
+                        ?.copyWith(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    child: Text(
+                      'Играть',
+                      style: TextStyle(color: AppColors.primaryDark),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Играй с Финни и зарабатывай монеты',
+              maxLines: MediaQuery.sizeOf(context).height < 700 ? 1 : 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Colors.white),
+            ),
+          ],
         ),
       ),
     ),

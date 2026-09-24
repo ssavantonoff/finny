@@ -1,0 +1,197 @@
+import 'package:finny/features/minigames/finny_catch/finny_catch_controller.dart';
+import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
+import 'package:finny/features/minigames/finny_catch/finny_catch_screen.dart';
+import 'package:finny/models/game_state.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late DateTime clock;
+  late FinnyCatchController controller;
+  late GoRouter router;
+  var runNumber = 0;
+  var rewardCount = 0;
+
+  setUp(() {
+    clock = DateTime.utc(2026, 9, 24);
+    runNumber = 0;
+    rewardCount = 0;
+    controller = FinnyCatchController(
+      profileId: 1,
+      grantReward:
+          ({required profileId, required amount, required runId}) async {
+            rewardCount++;
+            return GameState(
+              profileId: profileId,
+              walletBalance: amount,
+              currentPeriod: 5,
+              savedAmount: 0,
+              updatedAt: clock,
+            );
+          },
+      now: () => clock,
+      runIdFactory: () => 'widget-run-${runNumber++}',
+      seedFactory: () => 42,
+      autoTick: false,
+    );
+    router = GoRouter(
+      initialLocation: '/finny-catch',
+      routes: [
+        GoRoute(
+          path: '/home',
+          builder: (_, _) => const Scaffold(body: Text('Home')),
+        ),
+        GoRoute(
+          path: '/finny-catch',
+          builder: (_, _) => FinnyCatchScreen(controller: controller),
+        ),
+      ],
+    );
+  });
+  tearDown(() {
+    router.dispose();
+    controller.dispose();
+  });
+
+  Future<void> mount(WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    );
+    await tester.pump();
+  }
+
+  Future<void> elapse(WidgetTester tester, Duration duration) async {
+    clock = clock.add(duration);
+    controller.tick();
+    await tester.pump();
+  }
+
+  testWidgets(
+    'prepare reference content fits 360dp and has no falling objects or nav',
+    (tester) async {
+      await mount(tester);
+      expect(find.text('Лови монеты'), findsOneWidget);
+      expect(find.text('Очки'), findsOneWidget);
+      expect(find.text('30 сек'), findsOneWidget);
+      expect(find.text('Приготовься!'), findsOneWidget);
+      expect(
+        find.text('Двигай Финни пальцем\nи лови полезные предметы'),
+        findsOneWidget,
+      );
+      expect(find.text('+1'), findsOneWidget);
+      expect(find.text('+3'), findsOneWidget);
+      expect(find.text('Избегай'), findsOneWidget);
+      expect(find.text('Начать игру'), findsOneWidget);
+      expect(find.byType(BottomNavigationBar), findsNothing);
+      expect(controller.state.objects, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'countdown holds HUD then gameplay accepts direct drag within bounds',
+    (tester) async {
+      await mount(tester);
+      await tester.tap(find.text('Начать игру'));
+      await tester.pump();
+      expect(find.text('3'), findsOneWidget);
+      await elapse(tester, const Duration(milliseconds: 1500));
+      expect(find.text('Старт!'), findsOneWidget);
+      expect(find.text('30 сек'), findsOneWidget);
+      expect(controller.state.objects, isEmpty);
+      await elapse(tester, const Duration(milliseconds: 500));
+      expect(controller.state.phase, FinnyCatchPhase.playing);
+      await elapse(tester, const Duration(seconds: 1));
+      expect(find.text('29 сек'), findsOneWidget);
+      final before = controller.state.finnyX;
+      await tester.dragFrom(const Offset(180, 500), const Offset(170, 0));
+      await tester.pump();
+      expect(controller.state.finnyX, greaterThan(before));
+      expect(controller.state.finnyX, lessThan(1));
+      expect(find.byType(BottomNavigationBar), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'result freezes HUD, shows reward and replay resets on same route',
+    (tester) async {
+      await mount(tester);
+      await tester.tap(find.text('Начать игру'));
+      await tester.pump();
+      await elapse(tester, const Duration(seconds: 2));
+      await elapse(tester, const Duration(seconds: 30));
+      await tester.pump();
+      expect(find.text('0 сек'), findsOneWidget);
+      expect(find.text('Отличная игра!'), findsOneWidget);
+      expect(find.text('Награда'), findsOneWidget);
+      expect(find.text('+10'), findsOneWidget);
+      expect(rewardCount, 1);
+      expect(find.text('Сыграть ещё'), findsOneWidget);
+      expect(find.text('Вернуться к Финни'), findsOneWidget);
+      await tester.tap(find.text('Сыграть ещё'));
+      await tester.pump();
+      expect(controller.state.runId, 'widget-run-1');
+      expect(controller.state.phase, FinnyCatchPhase.prepare);
+      expect(controller.state.score, 0);
+      expect(find.text('30 сек'), findsOneWidget);
+      expect(find.text('Начать игру'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'back leaves prepare; active back pauses and requires confirmation',
+    (tester) async {
+      await mount(tester);
+      await tester.tap(find.byTooltip('Назад'));
+      await tester.pumpAndSettle();
+      expect(find.text('Home'), findsOneWidget);
+      expect(rewardCount, 0);
+    },
+  );
+
+  testWidgets('active back shows pause confirmation without granting reward', (
+    tester,
+  ) async {
+    await mount(tester);
+    await tester.tap(find.text('Начать игру'));
+    await tester.pump();
+    await elapse(tester, const Duration(seconds: 2));
+    await tester.tap(find.byTooltip('Назад'));
+    await tester.pumpAndSettle();
+    expect(controller.state.phase, FinnyCatchPhase.paused);
+    expect(find.text('Выйти из игры?'), findsOneWidget);
+    expect(find.text('Награда за этот раунд не сохранится.'), findsOneWidget);
+    expect(rewardCount, 0);
+    await tester.tap(find.text('Продолжить').last);
+    await tester.pumpAndSettle();
+    expect(controller.state.phase, FinnyCatchPhase.playing);
+  });
+
+  testWidgets(
+    'background pauses and does not silently finish or grant reward',
+    (tester) async {
+      await mount(tester);
+      await tester.tap(find.text('Начать игру'));
+      await tester.pump();
+      await elapse(tester, const Duration(seconds: 2));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump();
+      clock = clock.add(const Duration(seconds: 40));
+      controller.tick();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(controller.state.phase, FinnyCatchPhase.paused);
+      expect(find.text('Пауза'), findsOneWidget);
+      expect(controller.state.remainingSeconds, 30);
+      expect(rewardCount, 0);
+    },
+  );
+}

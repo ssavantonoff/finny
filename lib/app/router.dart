@@ -6,6 +6,7 @@ import 'package:finny/features/finale/finale_screen.dart';
 import 'package:finny/features/budget/budget_screen.dart';
 import 'package:finny/features/help/help_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
+import 'package:finny/features/minigames/finny_catch/finny_catch_screen.dart';
 import 'package:finny/features/onboarding/onboarding_screen.dart';
 import 'package:finny/features/period_summary/period_summary_screen.dart';
 import 'package:finny/features/pet_creation/pet_creation_screen.dart';
@@ -24,8 +25,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/startup',
     redirect: (_, state) async {
       const shellPaths = {'/home', '/things', '/shop', '/tasks', '/savings'};
+      final isFinnyCatch = state.uri.path == '/finny-catch';
       if (!shellPaths.contains(state.uri.path) &&
-          state.uri.path != '/campaign-complete') {
+          state.uri.path != '/campaign-complete' &&
+          !isFinnyCatch) {
         return null;
       }
       final profileId = ref.read(activeProfileIdProvider);
@@ -33,6 +36,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final mode =
           (await ref.read(campaignLifecycleServiceProvider).load(profileId))
               .mode;
+      if (isFinnyCatch) {
+        return switch (mode) {
+          CampaignMode.campaign => '/home',
+          CampaignMode.finalePending => '/finale',
+          CampaignMode.campaignFinished => '/campaign-complete',
+          CampaignMode.freePlay => null,
+        };
+      }
       if (state.uri.path == '/campaign-complete') {
         return switch (mode) {
           CampaignMode.campaignFinished => null,
@@ -50,6 +61,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', redirect: (_, _) => '/startup'),
       GoRoute(path: '/startup', builder: (_, _) => const BootstrapScreen()),
       GoRoute(path: '/finale', builder: (_, _) => const FinaleScreen()),
+      GoRoute(
+        path: '/finny-catch',
+        builder: (_, _) => const FinnyCatchScreen(),
+      ),
       GoRoute(
         path: '/campaign-complete',
         builder: (_, _) => const CampaignCompleteScreen(),

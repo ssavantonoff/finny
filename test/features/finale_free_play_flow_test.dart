@@ -5,6 +5,7 @@ import 'package:finny/core/database/app_database.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_visual_components.dart';
+import 'package:finny/features/minigames/finny_catch/finny_catch_screen.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
@@ -19,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import '../helpers/test_content_repository.dart';
 import '../helpers/test_database.dart';
@@ -26,7 +28,7 @@ import '../helpers/test_database.dart';
 class _DisplayGames extends SqliteGameRepository {
   _DisplayGames(super.database, this.periods, this.state, this.pet);
   final List<GamePeriod> periods;
-  final GameState state;
+  GameState state;
   final Pet pet;
   @override
   Future<GameState> ensureInitialState(int profileId) async => state;
@@ -294,10 +296,23 @@ void main() {
     expect(find.text('Твоя коллекция'), findsOneWidget);
     expect(find.byKey(const Key('free-play-recap')), findsOneWidget);
     expect(find.byKey(const Key('home-pet-name')), findsOneWidget);
+    expect(find.text('Лови монеты'), findsOneWidget);
+    expect(find.text('Играй с Финни и зарабатывай монеты'), findsOneWidget);
+    expect(
+      (tester.renderObject(
+        find.text('Играй с Финни и зарабатывай монеты'),
+      ) as RenderParagraph).didExceedMaxLines,
+      isFalse,
+    );
+    expect(find.byKey(const Key('free-play-finny-catch-play')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Лови монеты')).dy,
+      greaterThan(tester.getBottomRight(find.text('Погладить')).dy),
+    );
     expect(
       tester.getTopLeft(find.byType(FinnyRoomScene)).dy -
           tester.getBottomRight(find.byKey(const Key('home-stats'))).dy,
-      greaterThan(72),
+      greaterThan(40),
     );
     expect(find.text('Сытость'), findsOneWidget);
     expect(find.text('Уход'), findsOneWidget);
@@ -351,6 +366,131 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 200)),
     );
+    scope.dispose();
+  });
+
+  testWidgets('Finny Catch returns to Free Play Home with reloaded wallet', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final (database, content, games) = await completedSave(tester);
+    addTearDown(database.close);
+    final scope = container(database, content, games);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+    );
+    await waitFor(tester, find.text('5 дней вместе!'));
+    await tapVisible(tester, find.text('Продолжить с Финни'));
+    await waitFor(tester, find.text('Свободный режим'));
+    final before = games.state.walletBalance;
+    expect(tester.widget<HomeWallet>(find.byType(HomeWallet)).balance, before);
+
+    await tester.tap(find.byKey(const Key('free-play-finny-catch-play')));
+    await waitFor(tester, find.text('Приготовься!'));
+    expect(
+      GoRouterState.of(tester.element(find.byType(FinnyCatchScreen))).uri.path,
+      '/finny-catch',
+    );
+    expect(find.byKey(const Key('home-floating-navigation')), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+
+    // Simulate a persisted reward; the game and repository cover its grant.
+    games.state = games.state.copyWith(walletBalance: before + 33);
+    await tester.tap(find.byTooltip('Назад'));
+    await waitFor(tester, find.text('Свободный режим'));
+    for (var i = 0; i < 100; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 4)),
+      );
+      await tester.pump();
+      if (tester.widget<HomeWallet>(find.byType(HomeWallet)).balance ==
+          before + 33) {
+        break;
+      }
+    }
+    expect(
+      scope.read(routerProvider).routeInformationProvider.value.uri.path,
+      '/home',
+    );
+    expect(
+      tester.widget<HomeWallet>(find.byType(HomeWallet)).balance,
+      before + 33,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    scope.dispose();
+  });
+
+  testWidgets('direct Finny Catch route follows campaign lifecycle guard', (
+    tester,
+  ) async {
+    final (database, content, games) = await completedSave(tester);
+    addTearDown(database.close);
+    final scope = container(database, content, games);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+    );
+    await waitFor(tester, find.text('5 дней вместе!'));
+    final router = scope.read(routerProvider);
+
+    await tester.runAsync(() async {
+      router.go('/finny-catch');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(router.routeInformationProvider.value.uri.path, '/finale');
+
+    await tester.runAsync(() async {
+      await scope.read(campaignLifecycleServiceProvider).finishStory(1);
+      router.go('/finny-catch');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/campaign-complete',
+    );
+
+    await tester.runAsync(() async {
+      await scope.read(campaignLifecycleServiceProvider).startFreePlay(1);
+      router.go('/finny-catch');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    await waitFor(tester, find.text('Приготовься!'));
+    expect(router.routeInformationProvider.value.uri.path, '/finny-catch');
+    expect(find.byType(NavigationBar), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    scope.dispose();
+  });
+
+  testWidgets('campaign cannot open direct Finny Catch route', (tester) async {
+    final (database, content, games) = await completedSave(tester);
+    addTearDown(database.close);
+    await tester.runAsync(() async {
+      final db = await database.database;
+      await db.delete(
+        'game_periods',
+        where: 'profile_id = ? AND period_number = 5',
+        whereArgs: [1],
+      );
+    });
+    final scope = container(database, content, games);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+    );
+    await waitFor(tester, find.byType(HomeScreen));
+    final router = scope.read(routerProvider);
+    await tester.runAsync(() async {
+      router.go('/finny-catch');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(router.routeInformationProvider.value.uri.path, '/home');
+    await tester.pumpWidget(const SizedBox.shrink());
     scope.dispose();
   });
 }
