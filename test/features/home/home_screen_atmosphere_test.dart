@@ -373,6 +373,14 @@ void main() {
         colors[VirtualDayPhase.daytime],
         isNot(colors[VirtualDayPhase.evening]),
       );
+      expect(
+        colors[VirtualDayPhase.evening]!.first.a,
+        greaterThan(colors[VirtualDayPhase.daytime]!.first.a),
+      );
+      expect(
+        colors[VirtualDayPhase.evening]!.last.a,
+        greaterThan(colors[VirtualDayPhase.daytime]!.last.a),
+      );
 
       harness.games.period = null;
       await harness.container.read(homeControllerProvider.notifier).load();

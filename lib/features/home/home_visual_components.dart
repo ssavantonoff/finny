@@ -76,7 +76,7 @@ class HomeSceneBackdrop extends StatelessWidget {
   List<Color> get _tintColors => switch (phase) {
     VirtualDayPhase.morning => const [Color(0x14FFE1EE), Color(0x0CFFE8DE)],
     VirtualDayPhase.daytime => const [Color(0x14FFFFFF), Color(0x0AFFFFFF)],
-    VirtualDayPhase.evening => const [Color(0x287773B4), Color(0x168A78AE)],
+    VirtualDayPhase.evening => const [Color(0x46665FB5), Color(0x38736DB3)],
     null => const [Color(0x1FFFFFFF), Color(0x1FFFFFFF)],
   };
 
