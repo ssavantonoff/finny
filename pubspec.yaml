@@ -65,6 +65,7 @@ flutter:
   assets:
     - assets/content/
     - assets/images/home/
+    - assets/images/things/
     - assets/minigames/finny_catch/
     - assets/minigames/ball/
 
