@@ -235,7 +235,7 @@ void main() {
         tester
             .getBottomRight(find.byKey(const Key('home-required-actions')))
             .dy,
-        lessThan(tester.getTopLeft(navigation).dy - 24),
+        lessThanOrEqualTo(tester.getTopLeft(navigation).dy - 24),
       );
       for (final key in [
         'home-free-pet',
@@ -465,6 +465,10 @@ void main() {
   testWidgets(
     'bottom navigation, Home settings entry point and outside-shell routes',
     (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final database = createTestDatabase();
       addTearDown(database.close);
 

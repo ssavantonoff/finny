@@ -22,11 +22,13 @@ class PetStatIndicator extends StatelessWidget {
     required this.label,
     required this.value,
     this.barKey,
+    this.compact = false,
   });
 
   final String label;
   final int value;
   final Key? barKey;
+  final bool compact;
 
   static Color accentFor(String label) => switch (label) {
     'Сытость' => AppColors.satiety,
@@ -58,11 +60,11 @@ class PetStatIndicator extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: SizedBox(
-                  width: MediaQuery.sizeOf(context).height < 700 ? 20 : 24,
-                  height: MediaQuery.sizeOf(context).height < 700 ? 20 : 24,
+                  width: compact ? 20 : 24,
+                  height: compact ? 20 : 24,
                   child: Icon(
                     iconFor(label),
-                    size: MediaQuery.sizeOf(context).height < 700 ? 14 : 16,
+                    size: compact ? 14 : 16,
                     color: color,
                   ),
                 ),
@@ -79,7 +81,7 @@ class PetStatIndicator extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.tiny),
+          SizedBox(height: compact ? 2 : AppSpacing.tiny),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: SizedBox(
@@ -104,12 +106,14 @@ class _HomeFloatingHeader extends StatelessWidget {
     required this.balance,
     required this.freePlay,
     this.phase,
+    this.compact = false,
   });
 
   final String title;
   final int balance;
   final bool freePlay;
   final VirtualDayPhase? phase;
+  final bool compact;
 
   String get _phaseLabel => switch (phase) {
     VirtualDayPhase.morning => 'Утро',
@@ -134,26 +138,30 @@ class _HomeFloatingHeader extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.93),
+              color: AppColors.surface.withValues(alpha: 0.84),
               borderRadius: BorderRadius.circular(100),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.55),
+              ),
             ),
             child: Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: MediaQuery.sizeOf(context).height < 700 ? 5 : 10,
+                horizontal: compact ? 8 : 10,
+                vertical: compact ? 4 : 6,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    freePlay
-                        ? Icons.sports_esports_rounded
-                        : Icons.calendar_month_rounded,
-                    size: 20,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 6),
+                  if (!(compact && freePlay)) ...[
+                    Icon(
+                      freePlay
+                          ? Icons.sports_esports_rounded
+                          : Icons.calendar_month_rounded,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   Flexible(
                     child: Text(
                       title,
@@ -166,18 +174,29 @@ class _HomeFloatingHeader extends StatelessWidget {
                               ?.copyWith(
                                 color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w800,
+                                fontSize: compact && freePlay ? 12 : null,
                               ),
                     ),
                   ),
                   if (phase != null) ...[
-                    const SizedBox(width: 6),
+                    SizedBox(width: compact ? 4 : 6),
                     Tooltip(
                       key: Key('home-phase-${phase!.name}'),
                       message: _phaseLabel,
-                      child: Icon(
-                        _phaseIcon,
-                        size: 18,
-                        color: AppColors.primary,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight.withValues(alpha: 0.8),
+                          shape: BoxShape.circle,
+                        ),
+                        child: SizedBox(
+                          width: compact ? 20 : 22,
+                          height: compact ? 20 : 22,
+                          child: Icon(
+                            _phaseIcon,
+                            size: compact ? 14 : 16,
+                            color: AppColors.primary,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -188,13 +207,17 @@ class _HomeFloatingHeader extends StatelessWidget {
         ),
       ),
       const SizedBox(width: AppSpacing.small),
-      HomeWallet(key: const Key('home-wallet'), balance: balance),
+      HomeWallet(
+        key: const Key('home-wallet'),
+        balance: balance,
+        compact: compact,
+      ),
       const SizedBox(width: AppSpacing.small),
       DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.surface.withValues(alpha: 0.93),
+          color: AppColors.surface.withValues(alpha: 0.84),
           borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.55)),
         ),
         child: IconButton(
           key: const Key('home-settings'),
@@ -208,15 +231,16 @@ class _HomeFloatingHeader extends StatelessWidget {
   );
 }
 
-ButtonStyle _petActionStyle(BuildContext context) => FilledButton.styleFrom(
-  minimumSize: Size(144, MediaQuery.sizeOf(context).height < 700 ? 36 : 40),
-  padding: const EdgeInsets.symmetric(horizontal: 18),
-  backgroundColor: AppColors.surface.withValues(alpha: 0.94),
-  foregroundColor: AppColors.primaryDark,
-  disabledBackgroundColor: AppColors.surface.withValues(alpha: 0.9),
-  disabledForegroundColor: AppColors.textSecondary,
-  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-);
+ButtonStyle _petActionStyle(BuildContext context, {bool compact = false}) =>
+    FilledButton.styleFrom(
+      minimumSize: Size(144, compact ? 36 : 40),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 18),
+      backgroundColor: AppColors.surface.withValues(alpha: 0.88),
+      foregroundColor: AppColors.primaryDark,
+      disabledBackgroundColor: AppColors.surface.withValues(alpha: 0.9),
+      disabledForegroundColor: AppColors.textSecondary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+    );
 
 class _HomeStatsBar extends StatelessWidget {
   const _HomeStatsBar({
@@ -224,21 +248,23 @@ class _HomeStatsBar extends StatelessWidget {
     required this.care,
     required this.mood,
     this.campaignKeys = false,
+    this.compact = false,
   });
 
   final int satiety;
   final int care;
   final int mood;
   final bool campaignKeys;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-stats'),
-    color: AppColors.surface.withValues(alpha: 0.93),
+    color: AppColors.surface.withValues(alpha: 0.84),
     child: Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: MediaQuery.sizeOf(context).height < 700 ? 6 : 8,
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 4 : 6,
       ),
       child: Row(
         children: [
@@ -248,6 +274,7 @@ class _HomeStatsBar extends StatelessWidget {
               barKey: campaignKeys ? const Key('home-stat-satiety-bar') : null,
               label: 'Сытость',
               value: satiety,
+              compact: compact,
             ),
           ),
           const SizedBox(width: AppSpacing.small),
@@ -257,6 +284,7 @@ class _HomeStatsBar extends StatelessWidget {
               barKey: campaignKeys ? const Key('home-stat-care-bar') : null,
               label: 'Уход',
               value: care,
+              compact: compact,
             ),
           ),
           const SizedBox(width: AppSpacing.small),
@@ -266,10 +294,55 @@ class _HomeStatsBar extends StatelessWidget {
               barKey: campaignKeys ? const Key('home-stat-mood-bar') : null,
               label: 'Настроение',
               value: mood,
+              compact: compact,
             ),
           ),
         ],
       ),
+    ),
+  );
+}
+
+class _HomeViewport extends StatelessWidget {
+  const _HomeViewport({required this.builder});
+
+  final Widget Function(
+    BuildContext context,
+    bool compact,
+    bool stableCampaignLayout,
+  )
+  builder;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    bottom: false,
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final navigationClearance =
+            AppTheme.homeContentNavigationClearance +
+            MediaQuery.viewPaddingOf(context).bottom;
+        final usableHeight = constraints.maxHeight - navigationClearance;
+        final compact =
+            usableHeight < AppTheme.compactHomeContentHeight ||
+            constraints.maxWidth < 400;
+        final stableCampaignLayout =
+            usableHeight >= AppTheme.stableHomeCompositionHeight;
+        return Padding(
+          key: const Key('home-content-viewport'),
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.medium,
+            compact ? 2 : 4,
+            AppSpacing.medium,
+            navigationClearance,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: builder(context, compact, stableCampaignLayout),
+            ),
+          ),
+        );
+      },
     ),
   );
 }
@@ -614,257 +687,206 @@ class _FreePlayHome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     backgroundColor: Colors.transparent,
     body: HomeSceneBackdrop(
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.medium,
-            vertical: 2,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _HomeFloatingHeader(
-                    title: 'Свободный режим',
-                    balance: state.gameState.walletBalance,
-                    freePlay: true,
-                  ),
-                  SizedBox(
-                    height: MediaQuery.sizeOf(context).height < 700
-                        ? 4
-                        : AppSpacing.small,
-                  ),
-                  _HomeStatsBar(
-                    satiety: state.pet.satiety,
-                    care: state.pet.care,
-                    mood: state.pet.mood,
-                  ),
-                  SizedBox(
-                    height: MediaQuery.sizeOf(context).height < 700
-                        ? 2
-                        : AppSpacing.tiny,
-                  ),
-                  const Spacer(),
-                  FinnyRoomScene(
-                    key: const Key('free-play-daylight'),
-                    pet: state.pet,
-                    showBackground: false,
-                  ),
-                  Center(
-                    child: FinnyNameBadge(
-                      key: const Key('home-pet-name'),
-                      name: state.pet.name,
+      child: _HomeViewport(
+        builder: (context, compact, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _HomeFloatingHeader(
+              title: 'Свободный режим',
+              balance: state.gameState.walletBalance,
+              freePlay: true,
+              compact: compact,
+            ),
+            SizedBox(height: compact ? 4 : AppSpacing.small),
+            _HomeStatsBar(
+              satiety: state.pet.satiety,
+              care: state.pet.care,
+              mood: state.pet.mood,
+              compact: compact,
+            ),
+            SizedBox(height: compact ? 2 : AppSpacing.tiny),
+            const Spacer(),
+            FinnyRoomScene(
+              key: const Key('free-play-daylight'),
+              pet: state.pet,
+              showBackground: false,
+            ),
+            Center(
+              child: FinnyNameBadge(
+                key: const Key('home-pet-name'),
+                name: state.pet.name,
+                compact: compact,
+              ),
+            ),
+            SizedBox(height: compact ? 2 : AppSpacing.tiny),
+            Center(
+              child: FilledButton.icon(
+                key: const Key('home-free-pet'),
+                style: _petActionStyle(context, compact: compact),
+                onPressed: state.interacting
+                    ? null
+                    : () => controller.performFreeInteraction(
+                        FreePetInteraction.pet,
+                      ),
+                icon: const Icon(Icons.favorite_outline),
+                label: const Text('Погладить'),
+              ),
+            ),
+            SizedBox(height: compact ? 2 : AppSpacing.tiny),
+            if (state.activeGoal case final goal?)
+              HomeGoalCard(
+                name: goal.name,
+                saved: state.gameState.savedAmount,
+                price: goal.price,
+                compact: compact,
+              )
+            else
+              FutureBuilder(
+                future: _collection(ref),
+                builder: (context, snapshot) {
+                  final allGoalsReached =
+                      snapshot.hasData &&
+                      snapshot.data!.$1 == snapshot.data!.$2;
+                  return HomeNoGoalCard(
+                    saved: state.gameState.savedAmount,
+                    title: allGoalsReached
+                        ? 'Все цели достигнуты! ✓'
+                        : 'Цель не выбрана',
+                    onSelect: allGoalsReached
+                        ? null
+                        : () => context.go('/savings'),
+                    compact: compact,
+                  );
+                },
+              ),
+            SizedBox(height: compact ? 2 : AppSpacing.tiny),
+            FutureBuilder(
+              future: Future.wait<Object?>([
+                _collection(ref),
+                ref.read(freePlayServiceProvider).equipped(state.profile.id!),
+                ref.read(contentRepositoryProvider).loadShopItems(),
+                ref
+                    .read(gameRepositoryProvider)
+                    .getCompletedGoals(state.profile.id!),
+                ref.read(contentRepositoryProvider).loadGoals(),
+              ]),
+              builder: (context, snapshot) {
+                String? collectionLabel;
+                String? inventoryLabel;
+                var collectionComplete = false;
+                if (snapshot.hasData) {
+                  final collection = snapshot.data![0] as (int, int, int, int);
+                  final (goalCount, totalGoals, ownedCount, totalItems) =
+                      collection;
+                  final equipped =
+                      snapshot.data![1] as Map<ShopEquipSlot, String>;
+                  final items = snapshot.data![2] as List<ShopItem>;
+                  final completed = snapshot.data![3] as List<CompletedGoal>;
+                  final goals = snapshot.data![4] as List<SavingsGoal>;
+                  final worn = items
+                      .where((item) => equipped.values.contains(item.id))
+                      .map((item) => item.name)
+                      .toList();
+                  final rewards = goals
+                      .where(
+                        (goal) =>
+                            completed.any((done) => done.goalId == goal.id),
+                      )
+                      .map((goal) => goal.name)
+                      .toList();
+                  collectionLabel =
+                      'Цели $goalCount/$totalGoals · Предметы $ownedCount/$totalItems';
+                  inventoryLabel = [
+                    if (worn.isNotEmpty) 'На Финни: ${worn.join(', ')}',
+                    if (rewards.isNotEmpty) 'В доме: ${rewards.join(', ')}',
+                  ].join(' · ');
+                  collectionComplete =
+                      goalCount == totalGoals && ownedCount == totalItems;
+                }
+                return Card(
+                  key: const Key('free-play-collection'),
+                  color: AppColors.surface.withValues(alpha: 0.84),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 8 : AppSpacing.compact,
+                      vertical: compact ? 4 : AppSpacing.small,
                     ),
-                  ),
-                  SizedBox(
-                    height: MediaQuery.sizeOf(context).height < 700
-                        ? 2
-                        : AppSpacing.tiny,
-                  ),
-                  Center(
-                    child: FilledButton.icon(
-                      key: const Key('home-free-pet'),
-                      style: _petActionStyle(context),
-                      onPressed: state.interacting
-                          ? null
-                          : () => controller.performFreeInteraction(
-                              FreePetInteraction.pet,
-                            ),
-                      icon: const Icon(Icons.favorite_outline),
-                      label: const Text('Погладить'),
-                    ),
-                  ),
-                  SizedBox(
-                    height: MediaQuery.sizeOf(context).height < 700
-                        ? 2
-                        : AppSpacing.tiny,
-                  ),
-                  if (state.activeGoal case final goal?)
-                    HomeGoalCard(
-                      name: goal.name,
-                      saved: state.gameState.savedAmount,
-                      price: goal.price,
-                    )
-                  else
-                    FutureBuilder(
-                      future: _collection(ref),
-                      builder: (context, snapshot) {
-                        final allGoalsReached =
-                            snapshot.hasData &&
-                            snapshot.data!.$1 == snapshot.data!.$2;
-                        return HomeNoGoalCard(
-                          saved: state.gameState.savedAmount,
-                          title: allGoalsReached
-                              ? 'Все цели достигнуты! ✓'
-                              : 'Цель не выбрана',
-                          onSelect: allGoalsReached
-                              ? null
-                              : () => context.go('/savings'),
-                        );
-                      },
-                    ),
-                  const SizedBox(height: AppSpacing.tiny),
-                  FutureBuilder(
-                    future: Future.wait<Object?>([
-                      _collection(ref),
-                      ref
-                          .read(freePlayServiceProvider)
-                          .equipped(state.profile.id!),
-                      ref.read(contentRepositoryProvider).loadShopItems(),
-                      ref
-                          .read(gameRepositoryProvider)
-                          .getCompletedGoals(state.profile.id!),
-                      ref.read(contentRepositoryProvider).loadGoals(),
-                    ]),
-                    builder: (context, snapshot) {
-                      String? collectionLabel;
-                      String? inventoryLabel;
-                      var collectionComplete = false;
-                      if (snapshot.hasData) {
-                        final collection =
-                            snapshot.data![0] as (int, int, int, int);
-                        final (goalCount, totalGoals, ownedCount, totalItems) =
-                            collection;
-                        final equipped =
-                            snapshot.data![1] as Map<ShopEquipSlot, String>;
-                        final items = snapshot.data![2] as List<ShopItem>;
-                        final completed =
-                            snapshot.data![3] as List<CompletedGoal>;
-                        final goals = snapshot.data![4] as List<SavingsGoal>;
-                        final worn = items
-                            .where((item) => equipped.values.contains(item.id))
-                            .map((item) => item.name)
-                            .toList();
-                        final rewards = goals
-                            .where(
-                              (goal) => completed.any(
-                                (done) => done.goalId == goal.id,
-                              ),
-                            )
-                            .map((goal) => goal.name)
-                            .toList();
-                        collectionLabel =
-                            'Цели $goalCount/$totalGoals · Предметы $ownedCount/$totalItems';
-                        inventoryLabel = [
-                          if (worn.isNotEmpty) 'На Финни: ${worn.join(', ')}',
-                          if (rewards.isNotEmpty)
-                            'В доме: ${rewards.join(', ')}',
-                        ].join(' · ');
-                        collectionComplete =
-                            goalCount == totalGoals && ownedCount == totalItems;
-                      }
-                      return Card(
-                        key: const Key('free-play-collection'),
-                        color: AppColors.surface.withValues(alpha: 0.93),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: AppSpacing.compact,
-                            vertical: MediaQuery.sizeOf(context).height < 700
-                                ? 2
-                                : AppSpacing.small,
+                    child: Row(
+                      children: [
+                        DecoratedBox(
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryLight,
+                            shape: BoxShape.circle,
                           ),
-                          child: Row(
+                          child: SizedBox(
+                            width: compact ? 40 : 44,
+                            height: compact ? 40 : 44,
+                            child: Icon(
+                              Icons.inventory_2_rounded,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.small),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              DecoratedBox(
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const SizedBox(
-                                  width: 44,
-                                  height: 44,
-                                  child: Icon(
-                                    Icons.inventory_2_rounded,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
+                              Text(
+                                'Твоя коллекция',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(color: AppColors.textPrimary),
                               ),
-                              const SizedBox(width: AppSpacing.small),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'Твоя коллекция',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleSmall
-                                          ?.copyWith(
-                                            color: AppColors.textPrimary,
-                                          ),
-                                    ),
-                                    Text(
-                                      collectionLabel ?? 'Загружаем коллекцию…',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: AppColors.textSecondary,
-                                          ),
-                                    ),
-                                    if (MediaQuery.sizeOf(context).height >=
-                                            700 &&
-                                        inventoryLabel?.isNotEmpty == true)
-                                      Text(
-                                        inventoryLabel!,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: AppColors.textSecondary,
-                                            ),
+                              Text(
+                                collectionLabel ?? 'Загружаем коллекцию…',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.textSecondary),
+                              ),
+                              if (!compact &&
+                                  inventoryLabel?.isNotEmpty == true)
+                                Text(
+                                  inventoryLabel!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.textSecondary,
                                       ),
-                                    if (MediaQuery.sizeOf(context).height >=
-                                            700 &&
-                                        collectionComplete)
-                                      Text(
-                                        'Всё для Финни собрано! ✓',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: AppColors.textPrimary,
-                                            ),
-                                      ),
-                                  ],
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.tiny),
-                              TextButton(
-                                key: const Key('free-play-recap'),
-                                style: TextButton.styleFrom(
-                                  minimumSize: const Size(0, 40),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                  ),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
+                              if (!compact && collectionComplete)
+                                Text(
+                                  'Всё для Финни собрано! ✓',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: AppColors.textPrimary),
                                 ),
-                                onPressed: () =>
-                                    context.go('/finale?mode=recap'),
-                                child: const Text('Итоги'),
-                              ),
                             ],
                           ),
                         ),
-                      );
-                    },
+                        const SizedBox(width: AppSpacing.tiny),
+                        TextButton(
+                          key: const Key('free-play-recap'),
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => context.go('/finale?mode=recap'),
+                          child: const Text('Итоги'),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
-          ),
+          ],
         ),
       ),
     ),
@@ -886,11 +908,34 @@ class _HomeContent extends StatelessWidget {
   final VoidCallback onFinishDay;
   final VoidCallback onOpenBowl;
 
+  Widget _buildStatusContent(
+    bool compact,
+    GamePeriod? period,
+    String? primaryCheckpoint,
+  ) {
+    if (period == null && state.completedDays > 0 && !state.allDaysCompleted) {
+      return _BetweenDaysStatus(compact: compact);
+    }
+    if (period != null &&
+        period.requiredCheckpoints.any(
+          (id) => id == 'financial_task' || id == 'savings_decision',
+        )) {
+      return _RequiredActionsSummary(
+        period: period,
+        dayFiveTaskCompletion: state.dayFiveTaskCompletion,
+        primaryCheckpoint: primaryCheckpoint,
+        compact: compact,
+        actionsEnabled:
+            period.status == GamePeriodStatus.active ||
+            period.status == GamePeriodStatus.readyToFinish,
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
     final period = state.period;
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final sceneOffset = ((screenHeight - 700) * 0.60).clamp(0.0, 60.0);
     final title = period == null
         ? state.completedDays == 0
               ? 'Первый день'
@@ -927,217 +972,173 @@ class _HomeContent extends StatelessWidget {
               ? 'savings_decision'
               : null
         : null;
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: HomeSceneBackdrop(
         phase: phase,
-        child: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.medium,
-              vertical: MediaQuery.sizeOf(context).height < 700 ? 1 : 2,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _HomeFloatingHeader(
-                      title: title,
-                      balance: state.gameState.walletBalance,
-                      freePlay: false,
-                      phase: phase,
-                    ),
-                    SizedBox(
-                      height: MediaQuery.sizeOf(context).height < 700
-                          ? 2
-                          : AppSpacing.small,
-                    ),
-                    _HomeStatsBar(
-                      satiety: state.pet.satiety,
-                      care: state.pet.care,
-                      mood: state.pet.mood,
-                      campaignKeys: true,
-                    ),
-                    const SizedBox(height: 2),
-                    SizedBox(
-                      height: (screenHeight < 700 ? 2 : 6) + sceneOffset,
-                    ),
-                    FinnyRoomScene(
-                      key: const Key('home-day-sky'),
-                      pet: state.pet,
-                      showBackground: false,
-                    ),
-                    Center(
-                      child: FinnyNameBadge(
-                        key: const Key('home-pet-name'),
-                        name: state.pet.name,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Center(
-                      child: FilledButton.tonalIcon(
-                        key: const Key('home-free-pet'),
-                        style: _petActionStyle(context),
-                        onPressed: canPet
-                            ? () => controller.performFreeInteraction(
-                                FreePetInteraction.pet,
-                              )
-                            : null,
-                        icon: const Icon(Icons.favorite_outline),
-                        label: Text(
-                          state.petUsageCount > 0 ? 'Погладить ✓' : 'Погладить',
-                        ),
-                      ),
-                    ),
-                    if (state.interactionNotice case final notice?) ...[
-                      const SizedBox(height: AppSpacing.tiny),
-                      _Notice(notice),
-                    ],
-                    if (state.startFailed) ...[
-                      const SizedBox(height: AppSpacing.tiny),
-                      const _Notice(
-                        'Не получилось начать день. Попробуй ещё раз.',
-                      ),
-                    ],
-                    if (state.finishFailed) ...[
-                      const SizedBox(height: AppSpacing.tiny),
-                      const _Notice(
-                        'Не получилось завершить день. Попробуй ещё раз.',
-                      ),
-                    ],
-                    SizedBox(
-                      height: MediaQuery.sizeOf(context).height < 700
-                          ? 2
-                          : AppSpacing.tiny,
-                    ),
-                    if (state.allDaysCompleted)
-                      _Notice(
-                        'Все 5 дней завершены • Финни — этап '
-                        '${state.pet.developmentStage}',
-                      )
-                    else if (period == null)
-                      FilledButton(
-                        key: const Key('home-start-day'),
-                        onPressed: state.startingDay ? null : onStartDay,
-                        child: Text(
-                          state.startingDay
-                              ? 'Начинаем…'
-                              : state.completedDays == 0
-                              ? 'Начать день'
-                              : 'Начать следующий день',
-                        ),
-                      )
-                    else if (period.status == GamePeriodStatus.planning)
-                      FilledButton(
-                        key: const Key('home-continue-plan'),
-                        onPressed: () => context.go('/budget'),
-                        child: const Text('Продолжить план'),
-                      )
-                    else if ((period.status == GamePeriodStatus.active ||
-                            period.status == GamePeriodStatus.readyToFinish) &&
-                        VirtualDayRules.bedtimeReached(period.dayProgress))
-                      FilledButton(
-                        key: const Key('home-finish-day'),
-                        onPressed: state.finishingDay ? null : onFinishDay,
-                        child: Text(
-                          state.finishingDay
-                              ? 'Укладываем…'
-                              : 'Уложить Финни спать',
-                        ),
-                      )
-                    else if (period.status == GamePeriodStatus.active ||
-                        period.status == GamePeriodStatus.readyToFinish)
-                      taskUnresolved
-                          ? FilledButton(
-                              key: const Key('home-next-task'),
-                              onPressed: () => context.go('/tasks'),
-                              child: const Text('Выполнить задание'),
-                            )
-                          : savingsUnresolved
-                          ? FilledButton(
-                              key: const Key('home-next-savings'),
-                              onPressed: () => context.go('/savings'),
-                              child: const Text('Решить про накопления'),
-                            )
-                          : FilledButton(
-                              key: const Key('home-view-plan'),
-                              onPressed: () => context.go('/budget'),
-                              child: const Text('Посмотреть план'),
-                            ),
-                    if (state.activeGoal case final goal?) ...[
-                      SizedBox(
-                        height: MediaQuery.sizeOf(context).height < 700
-                            ? 2
-                            : AppSpacing.tiny,
-                      ),
-                      HomeGoalCard(
-                        name: goal.name,
-                        saved: state.gameState.savedAmount,
-                        price: goal.price,
-                      ),
-                    ] else ...[
-                      SizedBox(
-                        height: MediaQuery.sizeOf(context).height < 700
-                            ? 2
-                            : AppSpacing.tiny,
-                      ),
-                      HomeNoGoalCard(
-                        saved: state.gameState.savedAmount,
-                        onSelect: () => context.go('/savings'),
-                      ),
-                    ],
-                    if (period == null &&
-                        state.completedDays > 0 &&
-                        !state.allDaysCompleted) ...[
-                      SizedBox(
-                        height: MediaQuery.sizeOf(context).height < 700
-                            ? 2
-                            : AppSpacing.tiny,
-                      ),
-                      const _BetweenDaysStatus(),
-                    ] else if (period != null &&
-                        period.requiredCheckpoints.any(
-                          (id) =>
-                              id == 'financial_task' ||
-                              id == 'savings_decision',
-                        )) ...[
-                      SizedBox(
-                        height: MediaQuery.sizeOf(context).height < 700
-                            ? 2
-                            : AppSpacing.tiny,
-                      ),
-                      _RequiredActionsSummary(
-                        period: period,
-                        dayFiveTaskCompletion: state.dayFiveTaskCompletion,
-                        primaryCheckpoint: primaryCheckpoint,
-                        actionsEnabled:
-                            period.status == GamePeriodStatus.active ||
-                            period.status == GamePeriodStatus.readyToFinish,
-                      ),
-                    ],
-                    if (state.bowlEvent?.isOutstanding == true) ...[
-                      const SizedBox(height: 2),
-                      _BowlObligationCard(
-                        event: state.bowlEvent!,
-                        onPressed:
-                            period?.status == GamePeriodStatus.active ||
-                                period?.status == GamePeriodStatus.readyToFinish
-                            ? onOpenBowl
-                            : null,
-                        unavailableText: state.completedDays >= 5
-                            ? 'Кампания завершена. Покупка осталась отложенной.'
-                            : period == null
-                            ? 'Купить можно после начала следующего дня.'
-                            : 'Купить можно после подтверждения плана дня.',
-                      ),
-                    ],
-                  ],
+        child: _HomeViewport(
+          builder: (context, compact, stableCampaignLayout) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _HomeFloatingHeader(
+                title: title,
+                balance: state.gameState.walletBalance,
+                freePlay: false,
+                phase: phase,
+                compact: compact,
+              ),
+              SizedBox(height: compact ? 4 : AppSpacing.small),
+              _HomeStatsBar(
+                satiety: state.pet.satiety,
+                care: state.pet.care,
+                mood: state.pet.mood,
+                campaignKeys: true,
+                compact: compact,
+              ),
+              SizedBox(height: compact ? 2 : AppSpacing.tiny),
+              const Spacer(),
+              FinnyRoomScene(
+                key: const Key('home-day-sky'),
+                pet: state.pet,
+                showBackground: false,
+              ),
+              Center(
+                child: FinnyNameBadge(
+                  key: const Key('home-pet-name'),
+                  name: state.pet.name,
+                  compact: compact,
                 ),
               ),
-            ),
+              SizedBox(height: compact ? 2 : AppSpacing.tiny),
+              Center(
+                child: FilledButton.tonalIcon(
+                  key: const Key('home-free-pet'),
+                  style: _petActionStyle(context, compact: compact),
+                  onPressed: canPet
+                      ? () => controller.performFreeInteraction(
+                          FreePetInteraction.pet,
+                        )
+                      : null,
+                  icon: const Icon(Icons.favorite_outline),
+                  label: Text(
+                    state.petUsageCount > 0 ? 'Погладить ✓' : 'Погладить',
+                  ),
+                ),
+              ),
+              if (state.interactionNotice case final notice?) ...[
+                const SizedBox(height: AppSpacing.tiny),
+                _Notice(notice),
+              ],
+              if (state.startFailed) ...[
+                const SizedBox(height: AppSpacing.tiny),
+                const _Notice('Не получилось начать день. Попробуй ещё раз.'),
+              ],
+              if (state.finishFailed) ...[
+                const SizedBox(height: AppSpacing.tiny),
+                const _Notice(
+                  'Не получилось завершить день. Попробуй ещё раз.',
+                ),
+              ],
+              SizedBox(height: compact ? 2 : AppSpacing.tiny),
+              if (state.allDaysCompleted)
+                _Notice(
+                  'Все 5 дней завершены • Финни — этап '
+                  '${state.pet.developmentStage}',
+                )
+              else if (period == null)
+                FilledButton(
+                  key: const Key('home-start-day'),
+                  onPressed: state.startingDay ? null : onStartDay,
+                  child: Text(
+                    state.startingDay
+                        ? 'Начинаем…'
+                        : state.completedDays == 0
+                        ? 'Начать день'
+                        : 'Начать следующий день',
+                  ),
+                )
+              else if (period.status == GamePeriodStatus.planning)
+                FilledButton(
+                  key: const Key('home-continue-plan'),
+                  onPressed: () => context.go('/budget'),
+                  child: const Text('Продолжить план'),
+                )
+              else if ((period.status == GamePeriodStatus.active ||
+                      period.status == GamePeriodStatus.readyToFinish) &&
+                  VirtualDayRules.bedtimeReached(period.dayProgress))
+                FilledButton(
+                  key: const Key('home-finish-day'),
+                  onPressed: state.finishingDay ? null : onFinishDay,
+                  child: Text(
+                    state.finishingDay ? 'Укладываем…' : 'Уложить Финни спать',
+                  ),
+                )
+              else if (period.status == GamePeriodStatus.active ||
+                  period.status == GamePeriodStatus.readyToFinish)
+                taskUnresolved
+                    ? FilledButton(
+                        key: const Key('home-next-task'),
+                        onPressed: () => context.go('/tasks'),
+                        child: const Text('Выполнить задание'),
+                      )
+                    : savingsUnresolved
+                    ? FilledButton(
+                        key: const Key('home-next-savings'),
+                        onPressed: () => context.go('/savings'),
+                        child: const Text('Решить про накопления'),
+                      )
+                    : FilledButton(
+                        key: const Key('home-view-plan'),
+                        onPressed: () => context.go('/budget'),
+                        child: const Text('Посмотреть план'),
+                      ),
+              if (state.activeGoal case final goal?) ...[
+                HomeGoalCard(
+                  name: goal.name,
+                  saved: state.gameState.savedAmount,
+                  price: goal.price,
+                  compact: compact,
+                ),
+              ] else ...[
+                HomeNoGoalCard(
+                  saved: state.gameState.savedAmount,
+                  onSelect: () => context.go('/savings'),
+                  compact: compact,
+                ),
+              ],
+              SizedBox(height: compact ? 2 : AppSpacing.tiny),
+              if (stableCampaignLayout)
+                SizedBox(
+                  height: 104,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: _buildStatusContent(
+                      compact,
+                      period,
+                      primaryCheckpoint,
+                    ),
+                  ),
+                )
+              else
+                _buildStatusContent(compact, period, primaryCheckpoint),
+              if (state.bowlEvent?.isOutstanding == true) ...[
+                const SizedBox(height: 2),
+                _BowlObligationCard(
+                  event: state.bowlEvent!,
+                  compact: compact,
+                  onPressed:
+                      period?.status == GamePeriodStatus.active ||
+                          period?.status == GamePeriodStatus.readyToFinish
+                      ? onOpenBowl
+                      : null,
+                  unavailableText: state.completedDays >= 5
+                      ? 'Кампания завершена. Покупка осталась отложенной.'
+                      : period == null
+                      ? 'Купить можно после начала следующего дня.'
+                      : 'Купить можно после подтверждения плана дня.',
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -1151,12 +1152,14 @@ class _RequiredActionsSummary extends StatelessWidget {
     required this.actionsEnabled,
     required this.primaryCheckpoint,
     this.dayFiveTaskCompletion,
+    this.compact = false,
   });
 
   final GamePeriod period;
   final bool actionsEnabled;
   final String? primaryCheckpoint;
   final DayFiveTaskCompletion? dayFiveTaskCompletion;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1168,11 +1171,10 @@ class _RequiredActionsSummary extends StatelessWidget {
 
     return Card(
       key: const Key('home-required-actions'),
-      color: AppColors.surface.withValues(alpha: 0.93),
+      color: AppColors.surface.withValues(alpha: 0.82),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.small,
-          vertical: 0,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : AppSpacing.small,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1211,17 +1213,19 @@ class _RequiredActionsSummary extends StatelessWidget {
 }
 
 class _BetweenDaysStatus extends StatelessWidget {
-  const _BetweenDaysStatus();
+  const _BetweenDaysStatus({this.compact = false});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-between-days-status'),
-    color: AppColors.surface.withValues(alpha: 0.93),
-    child: const SizedBox(
-      height: 48,
+    color: AppColors.surface.withValues(alpha: 0.82),
+    child: SizedBox(
+      height: compact ? 36 : 48,
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: AppSpacing.small),
-        child: Row(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.small),
+        child: const Row(
           children: [
             Icon(Icons.check_circle, size: 20, color: AppColors.primary),
             SizedBox(width: AppSpacing.small),
@@ -1238,20 +1242,22 @@ class _BowlObligationCard extends StatelessWidget {
     required this.event,
     required this.onPressed,
     required this.unavailableText,
+    this.compact = false,
   });
 
   final StoryEventSnapshot event;
   final VoidCallback? onPressed;
   final String unavailableText;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-bowl-obligation'),
-    color: AppColors.surface.withValues(alpha: 0.93),
+    color: AppColors.surface.withValues(alpha: 0.84),
     child: Padding(
-      padding: const EdgeInsets.symmetric(
+      padding: EdgeInsets.symmetric(
         horizontal: AppSpacing.small,
-        vertical: AppSpacing.tiny,
+        vertical: compact ? 1 : AppSpacing.tiny,
       ),
       child: Row(
         children: [

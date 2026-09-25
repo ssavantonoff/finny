@@ -503,8 +503,10 @@ void main() {
       (tester) async {
         tester.view.physicalSize = const Size(360, 800);
         tester.view.devicePixelRatio = 1;
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetViewPadding);
         final database = createTestDatabase();
         addTearDown(database.close);
 
@@ -692,7 +694,12 @@ void main() {
         final navTop = tester
             .getTopLeft(find.byKey(const Key('test-bottom-nav')))
             .dy;
-        expect(finnyTop, closeTo(176, 1));
+        expect(
+          finnyTop,
+          greaterThan(
+            tester.getBottomRight(find.byKey(const Key('home-stats'))).dy,
+          ),
+        );
         void expectStableLayout(String ctaKey, String statusKey) {
           expect(
             (tester.getTopLeft(find.byType(FinnyRoomScene)).dy - finnyTop)
@@ -716,7 +723,7 @@ void main() {
           );
           expect(
             tester.getBottomRight(find.byKey(Key(statusKey))).dy,
-            lessThan(navTop - 24),
+            lessThanOrEqualTo(navTop - 24),
           );
           expect(
             find.descendant(

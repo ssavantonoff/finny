@@ -33,9 +33,10 @@ class FinnyCoin extends StatelessWidget {
 }
 
 class HomeWallet extends StatelessWidget {
-  const HomeWallet({super.key, required this.balance});
+  const HomeWallet({super.key, required this.balance, this.compact = false});
 
   final int balance;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Semantics(
@@ -43,21 +44,27 @@ class HomeWallet extends StatelessWidget {
     child: ExcludeSemantics(
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.surface.withValues(alpha: 0.93),
+          color: AppColors.surface.withValues(alpha: 0.86),
           borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 8 : 10,
+            vertical: compact ? 4 : 7,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const FinnyCoin(),
-              const SizedBox(width: AppSpacing.small),
+              FinnyCoin(size: compact ? 18 : 22),
+              SizedBox(width: compact ? AppSpacing.tiny : AppSpacing.small),
               Text(
                 '$balance',
-                style: Theme.of(context).textTheme.titleLarge
-                    ?.copyWith(color: AppColors.textPrimary),
+                style:
+                    (compact
+                            ? Theme.of(context).textTheme.bodyLarge
+                            : Theme.of(context).textTheme.titleLarge)
+                        ?.copyWith(color: AppColors.textPrimary),
               ),
             ],
           ),
@@ -106,16 +113,17 @@ class HomeSceneBackdrop extends StatelessWidget {
 }
 
 class FinnyNameBadge extends StatelessWidget {
-  const FinnyNameBadge({super.key, required this.name});
+  const FinnyNameBadge({super.key, required this.name, this.compact = false});
 
   final String name;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: AppColors.surface.withValues(alpha: 0.93),
+      color: AppColors.surface.withValues(alpha: 0.86),
       borderRadius: BorderRadius.circular(100),
-      border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+      border: Border.all(color: AppColors.border.withValues(alpha: 0.55)),
     ),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -124,8 +132,11 @@ class FinnyNameBadge extends StatelessWidget {
         textAlign: TextAlign.center,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.bodyLarge
-            ?.copyWith(color: AppColors.textPrimary),
+        style:
+            (compact
+                    ? Theme.of(context).textTheme.bodyMedium
+                    : Theme.of(context).textTheme.bodyLarge)
+                ?.copyWith(color: AppColors.textPrimary),
       ),
     ),
   );
@@ -204,30 +215,30 @@ class HomeGoalCard extends StatelessWidget {
     required this.name,
     required this.saved,
     required this.price,
+    this.compact = false,
   });
 
   final String name;
   final int saved;
   final int price;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-savings-goal'),
-    color: AppColors.surface.withValues(alpha: 0.93),
+    color: AppColors.surface.withValues(alpha: 0.84),
     child: Padding(
-      padding: EdgeInsets.all(
-        MediaQuery.sizeOf(context).height < 700 ? 6 : AppSpacing.small,
-      ),
+      padding: EdgeInsets.all(compact ? 4 : AppSpacing.small),
       child: Row(
         children: [
-          const _GoalIcon(),
+          _GoalIcon(compact: compact),
           const SizedBox(width: AppSpacing.small),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (MediaQuery.sizeOf(context).height >= 700)
+                if (!compact)
                   Text(
                     'Текущая цель',
                     style: Theme.of(context).textTheme.bodySmall
@@ -251,12 +262,12 @@ class HomeGoalCard extends StatelessWidget {
                     const FinnyCoin(size: 16),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.tiny),
+                SizedBox(height: compact ? 2 : AppSpacing.tiny),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(100),
                   child: LinearProgressIndicator(
                     value: price > 0 ? (saved / price).clamp(0.0, 1.0) : 0,
-                    minHeight: 6,
+                    minHeight: compact ? 4 : 6,
                     color: AppColors.primary,
                     backgroundColor: AppColors.primaryLight,
                   ),
@@ -266,7 +277,7 @@ class HomeGoalCard extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.small),
           TextButton(
-            style: _goalActionStyle(),
+            style: _goalActionStyle(compact),
             onPressed: () => context.go('/savings'),
             child: const Text('К цели'),
           ),
@@ -277,27 +288,29 @@ class HomeGoalCard extends StatelessWidget {
 }
 
 class _GoalIcon extends StatelessWidget {
-  const _GoalIcon();
+  const _GoalIcon({this.compact = false});
+
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
       color: AppColors.primaryLight,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(compact ? 14 : 16),
     ),
-    child: const SizedBox(
-      width: 48,
-      height: 48,
-      child: Icon(Icons.savings_rounded, color: AppColors.primary),
+    child: SizedBox(
+      width: compact ? 40 : 48,
+      height: compact ? 40 : 48,
+      child: const Icon(Icons.savings_rounded, color: AppColors.primary),
     ),
   );
 }
 
-ButtonStyle _goalActionStyle() => TextButton.styleFrom(
+ButtonStyle _goalActionStyle(bool compact) => TextButton.styleFrom(
   backgroundColor: AppColors.primaryLight,
   foregroundColor: AppColors.primaryDark,
-  minimumSize: const Size(0, 40),
-  padding: const EdgeInsets.symmetric(horizontal: 8),
+  minimumSize: Size(0, compact ? 36 : 40),
+  padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8),
   textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
   shape: const StadiumBorder(),
@@ -309,23 +322,23 @@ class HomeNoGoalCard extends StatelessWidget {
     required this.saved,
     this.title = 'Цель не выбрана',
     this.onSelect,
+    this.compact = false,
   });
 
   final int saved;
   final String title;
   final VoidCallback? onSelect;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Card(
     key: const Key('home-savings-goal'),
-    color: AppColors.surface.withValues(alpha: 0.93),
+    color: AppColors.surface.withValues(alpha: 0.84),
     child: Padding(
-      padding: EdgeInsets.all(
-        MediaQuery.sizeOf(context).height < 700 ? 6 : AppSpacing.small,
-      ),
+      padding: EdgeInsets.all(compact ? 4 : AppSpacing.small),
       child: Row(
         children: [
-          const _GoalIcon(),
+          _GoalIcon(compact: compact),
           const SizedBox(width: AppSpacing.small),
           Expanded(
             child: Column(
@@ -361,7 +374,7 @@ class HomeNoGoalCard extends StatelessWidget {
           if (onSelect != null) ...[
             const SizedBox(width: AppSpacing.small),
             TextButton(
-              style: _goalActionStyle(),
+              style: _goalActionStyle(compact),
               onPressed: onSelect,
               child: const Text('Выбрать цель'),
             ),

@@ -125,6 +125,10 @@ Future<_Harness> _pumpFeature(
   PeriodService? periods,
   BudgetService? budgets,
 }) async {
+  tester.view.physicalSize = const Size(360, 800);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   final container = ProviderContainer(
     overrides: [
       appDatabaseProvider.overrideWithValue(database),

@@ -89,7 +89,8 @@ class _ScaffoldWithNestedNavigationState
     final navigation = NavigationBarTheme(
       data: isHome
           ? AppTheme.navigation.copyWith(
-              backgroundColor: AppColors.surface.withValues(alpha: 0.93),
+              backgroundColor: AppColors.surface.withValues(alpha: 0.82),
+              height: AppTheme.homeNavigationHeight,
             )
           : AppTheme.navigation,
       child: NavigationBar(
@@ -144,11 +145,24 @@ class _ScaffoldWithNestedNavigationState
           ? SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                padding: const EdgeInsets.fromLTRB(
+                  12,
+                  0,
+                  12,
+                  AppTheme.homeNavigationBottomPadding,
+                ),
                 child: ClipRRect(
                   key: const Key('home-floating-navigation'),
                   borderRadius: BorderRadius.circular(28),
-                  child: navigation,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: AppColors.border.withValues(alpha: 0.55),
+                      ),
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                    child: navigation,
+                  ),
                 ),
               ),
             )
