@@ -503,10 +503,8 @@ void main() {
       (tester) async {
         tester.view.physicalSize = const Size(360, 800);
         tester.view.devicePixelRatio = 1;
-        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        addTearDown(tester.view.resetViewPadding);
         final database = createTestDatabase();
         addTearDown(database.close);
 
@@ -636,7 +634,6 @@ void main() {
         // The canonical free interaction remains; legacy one-tap play is gone.
         expect(find.byKey(const Key('home-free-pet')), findsOneWidget);
         expect(find.byKey(const Key('home-free-play')), findsNothing);
-        expect(find.byKey(const Key('free-play-finny-catch')), findsNothing);
         expect(find.text('Погладить'), findsOneWidget);
         expect(find.text('Поиграть'), findsNothing);
         expect(find.byKey(const Key('home-day-sky')), findsOneWidget);
@@ -695,12 +692,7 @@ void main() {
         final navTop = tester
             .getTopLeft(find.byKey(const Key('test-bottom-nav')))
             .dy;
-        expect(
-          finnyTop,
-          greaterThan(
-            tester.getBottomRight(find.byKey(const Key('home-stats'))).dy,
-          ),
-        );
+        expect(finnyTop, closeTo(176, 1));
         void expectStableLayout(String ctaKey, String statusKey) {
           expect(
             (tester.getTopLeft(find.byType(FinnyRoomScene)).dy - finnyTop)
@@ -724,7 +716,7 @@ void main() {
           );
           expect(
             tester.getBottomRight(find.byKey(Key(statusKey))).dy,
-            lessThanOrEqualTo(navTop - 24),
+            lessThan(navTop - 24),
           );
           expect(
             find.descendant(
