@@ -12,9 +12,15 @@ class ShopItemArt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (item.id == 'toy_ball') {
+    final standaloneAsset = switch (item.id) {
+      'toy_ball' => 'assets/minigames/ball/ball.png',
+      'accessory_bow' => 'assets/images/things/headphones.png',
+      'care_shampoo' => 'assets/images/things/shampoo.png',
+      _ => null,
+    };
+    if (standaloneAsset != null) {
       return Image.asset(
-        'assets/minigames/ball/ball.png',
+        standaloneAsset,
         fit: BoxFit.contain,
         semanticLabel: item.name,
       );

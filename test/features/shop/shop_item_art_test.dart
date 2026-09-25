@@ -1,7 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:finny/features/shop/shop_item_art.dart';
 import 'package:finny/features/shop/shop_widgets.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -28,11 +31,7 @@ void main() {
       'assets/images/things/care_sheet.png',
       Alignment.centerLeft,
     ),
-    'care_shampoo': (
-      'Шампунь',
-      'assets/images/things/care_sheet.png',
-      Alignment.center,
-    ),
+    'care_shampoo': ('Шампунь', 'assets/images/things/shampoo.png', null),
     'care_comb': (
       'Полотенце',
       'assets/images/things/care_sheet.png',
@@ -49,11 +48,7 @@ void main() {
       'assets/images/things/toys_sheet.png',
       Alignment.centerRight,
     ),
-    'accessory_bow': (
-      'Наушники',
-      'assets/images/things/accessories_sheet.png',
-      Alignment.centerLeft,
-    ),
+    'accessory_bow': ('Наушники', 'assets/images/things/headphones.png', null),
     'accessory_collar': (
       'Очки',
       'assets/images/things/accessories_sheet.png',
@@ -109,4 +104,31 @@ void main() {
       }
     },
   );
+
+  test('standalone headphones and shampoo keep transparent pixels', () async {
+    for (final asset in [
+      'assets/images/things/headphones.png',
+      'assets/images/things/shampoo.png',
+    ]) {
+      final data = await rootBundle.load(asset);
+      final codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+      final frame = await codec.getNextFrame();
+      final pixels = (await frame.image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!.buffer.asUint8List();
+      var hasTransparentPixel = false;
+      var hasOpaquePixel = false;
+      for (var index = 3; index < pixels.length; index += 4) {
+        hasTransparentPixel |= pixels[index] == 0;
+        hasOpaquePixel |= pixels[index] == 255;
+        if (hasTransparentPixel && hasOpaquePixel) break;
+      }
+      expect(hasTransparentPixel, isTrue, reason: asset);
+      expect(hasOpaquePixel, isTrue, reason: asset);
+      frame.image.dispose();
+      codec.dispose();
+    }
+  });
 }
