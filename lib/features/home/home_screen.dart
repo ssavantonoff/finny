@@ -5,7 +5,6 @@ import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/completed_goal.dart';
-import 'package:finny/models/day_five_task.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/savings_goal.dart';
@@ -908,11 +907,7 @@ class _HomeContent extends StatelessWidget {
   final VoidCallback onFinishDay;
   final VoidCallback onOpenBowl;
 
-  Widget _buildStatusContent(
-    bool compact,
-    GamePeriod? period,
-    String? primaryCheckpoint,
-  ) {
+  Widget _buildStatusContent(bool compact, GamePeriod? period) {
     if (period == null && state.completedDays > 0 && !state.allDaysCompleted) {
       return _BetweenDaysStatus(compact: compact);
     }
@@ -920,15 +915,7 @@ class _HomeContent extends StatelessWidget {
         period.requiredCheckpoints.any(
           (id) => id == 'financial_task' || id == 'savings_decision',
         )) {
-      return _RequiredActionsSummary(
-        period: period,
-        dayFiveTaskCompletion: state.dayFiveTaskCompletion,
-        primaryCheckpoint: primaryCheckpoint,
-        compact: compact,
-        actionsEnabled:
-            period.status == GamePeriodStatus.active ||
-            period.status == GamePeriodStatus.readyToFinish,
-      );
+      return _RequiredActionsSummary(period: period, compact: compact);
     }
     return const SizedBox.shrink();
   }
@@ -961,16 +948,6 @@ class _HomeContent extends StatelessWidget {
         period?.status == GamePeriodStatus.readyToFinish;
     final phase = activeActionPeriod && period != null
         ? VirtualDayRules.phaseAt(period.dayProgress)
-        : null;
-    final primaryCheckpoint =
-        activeActionPeriod &&
-            period != null &&
-            !VirtualDayRules.bedtimeReached(period.dayProgress)
-        ? taskUnresolved
-              ? 'financial_task'
-              : savingsUnresolved
-              ? 'savings_decision'
-              : null
         : null;
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -1112,15 +1089,11 @@ class _HomeContent extends StatelessWidget {
                   height: 104,
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: _buildStatusContent(
-                      compact,
-                      period,
-                      primaryCheckpoint,
-                    ),
+                    child: _buildStatusContent(compact, period),
                   ),
                 )
               else
-                _buildStatusContent(compact, period, primaryCheckpoint),
+                _buildStatusContent(compact, period),
               if (state.bowlEvent?.isOutstanding == true) ...[
                 const SizedBox(height: 2),
                 _BowlObligationCard(
@@ -1147,18 +1120,9 @@ class _HomeContent extends StatelessWidget {
 }
 
 class _RequiredActionsSummary extends StatelessWidget {
-  const _RequiredActionsSummary({
-    required this.period,
-    required this.actionsEnabled,
-    required this.primaryCheckpoint,
-    this.dayFiveTaskCompletion,
-    this.compact = false,
-  });
+  const _RequiredActionsSummary({required this.period, this.compact = false});
 
   final GamePeriod period;
-  final bool actionsEnabled;
-  final String? primaryCheckpoint;
-  final DayFiveTaskCompletion? dayFiveTaskCompletion;
   final bool compact;
 
   @override
@@ -1183,27 +1147,9 @@ class _RequiredActionsSummary extends StatelessWidget {
               _RequiredActionRow(
                 title: cp == 'financial_task' ? 'Задание дня' : 'Накопления',
                 pendingText: cp == 'financial_task'
-                    ? dayFiveTaskCompletion == null
-                          ? 'Нужно выполнить'
-                          : 'Задания: ${dayFiveTaskCompletion!.completedCount} из 2'
+                    ? 'Нужно выполнить'
                     : 'Нужно решить',
-                resolvedText:
-                    cp == 'financial_task' &&
-                        dayFiveTaskCompletion?.completedCount == 2
-                    ? 'Задания выполнены'
-                    : null,
-                actionText: cp == 'financial_task' ? 'Выполнить' : 'Решить',
-                actionKey: Key(
-                  cp == 'financial_task'
-                      ? 'home-today-task-action'
-                      : 'home-today-savings-action',
-                ),
-                route: cp == 'financial_task' ? '/tasks' : '/savings',
                 resolved: period.resolvedCheckpoints.contains(cp),
-                actionsEnabled: actionsEnabled,
-                isPrimary: primaryCheckpoint == cp,
-                showPrimaryDetail:
-                    cp == 'financial_task' && dayFiveTaskCompletion != null,
               ),
           ],
         ),
@@ -1305,26 +1251,12 @@ class _RequiredActionRow extends StatelessWidget {
   const _RequiredActionRow({
     required this.title,
     required this.pendingText,
-    this.resolvedText,
-    required this.actionText,
-    required this.actionKey,
-    required this.route,
     required this.resolved,
-    required this.actionsEnabled,
-    required this.isPrimary,
-    required this.showPrimaryDetail,
   });
 
   final String title;
   final String pendingText;
-  final String? resolvedText;
-  final String actionText;
-  final Key actionKey;
-  final String route;
   final bool resolved;
-  final bool actionsEnabled;
-  final bool isPrimary;
-  final bool showPrimaryDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -1352,20 +1284,9 @@ class _RequiredActionRow extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                if (!resolved &&
-                    (actionsEnabled || showPrimaryDetail) &&
-                    (!isPrimary || showPrimaryDetail))
+                if (!resolved)
                   Text(
                     pendingText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                if (resolved && resolvedText != null)
-                  Text(
-                    resolvedText!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -1382,19 +1303,6 @@ class _RequiredActionRow extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(
                 color: AppColors.textSecondary,
               ),
-            )
-          else if (actionsEnabled && isPrimary)
-            Text(
-              actionText,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppColors.primaryDark,
-              ),
-            )
-          else if (actionsEnabled && !isPrimary)
-            TextButton(
-              key: actionKey,
-              onPressed: () => context.go(route),
-              child: Text(actionText),
             ),
         ],
       ),
