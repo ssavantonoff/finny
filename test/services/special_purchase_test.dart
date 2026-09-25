@@ -31,7 +31,7 @@ const promotion = ShopPromotion(
 );
 const treat = ShopItem(
   id: 'food_treat',
-  name: 'Лакомство',
+  name: 'Звёздное печенье',
   category: ShopItemCategory.want,
   price: 60,
   persistent: false,

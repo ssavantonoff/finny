@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 
 // Supplied production images have three square panels in one 3:1 PNG.
 // Paint-time clipping keeps the source files unmodified.
-class ThingsItemArt extends StatelessWidget {
-  const ThingsItemArt({required this.item, super.key});
+class ShopItemArt extends StatelessWidget {
+  const ShopItemArt({required this.item, super.key});
 
   final ShopItem item;
 
@@ -21,11 +21,16 @@ class ThingsItemArt extends StatelessWidget {
     }
     final (sheet, panel) = switch (item.id) {
       'toy_frisbee' => ('assets/images/things/toys_sheet.png', 1),
+      'toy_plush' => ('assets/images/things/toys_sheet.png', 2),
       'food_apple' => ('assets/images/things/food_sheet.png', 0),
       'food_feed' => ('assets/images/things/food_sheet.png', 1),
       'food_treat' => ('assets/images/things/food_sheet.png', 2),
       'care_toothbrush' => ('assets/images/things/care_sheet.png', 0),
       'care_shampoo' => ('assets/images/things/care_sheet.png', 1),
+      'care_comb' => ('assets/images/things/care_sheet.png', 2),
+      'accessory_bow' => ('assets/images/things/accessories_sheet.png', 0),
+      'accessory_collar' => ('assets/images/things/accessories_sheet.png', 1),
+      'accessory_hat' => ('assets/images/things/accessories_sheet.png', 2),
       _ => (null, -1),
     };
     if (sheet == null) return const SizedBox.expand();

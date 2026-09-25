@@ -85,14 +85,11 @@ class _ScaffoldWithNestedNavigationState
         (shop.isDayFiveSaleDay ||
             (treat != null && shop.isPromotionActiveFor(treat)));
     final badgeText = shop.isDayFiveSaleDay ? 'SALE' : 'АКЦИЯ';
-    final isHome = widget.navigationShell.currentIndex == 0;
     final navigation = NavigationBarTheme(
-      data: isHome
-          ? AppTheme.navigation.copyWith(
-              backgroundColor: AppColors.surface.withValues(alpha: 0.82),
-              height: AppTheme.homeNavigationHeight,
-            )
-          : AppTheme.navigation,
+      data: AppTheme.navigation.copyWith(
+        backgroundColor: AppColors.surface.withValues(alpha: 0.82),
+        height: AppTheme.homeNavigationHeight,
+      ),
       child: NavigationBar(
         selectedIndex: widget.navigationShell.currentIndex,
         onDestinationSelected: (index) => _onTap(context, ref, index),
@@ -138,35 +135,34 @@ class _ScaffoldWithNestedNavigationState
       ),
     );
     return Scaffold(
-      backgroundColor: isHome ? Colors.transparent : null,
-      extendBody: isHome,
+      key: const Key('main-navigation-shell'),
+      backgroundColor: Colors.transparent,
+      extendBody: true,
       body: widget.navigationShell,
-      bottomNavigationBar: isHome
-          ? SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  12,
-                  0,
-                  12,
-                  AppTheme.homeNavigationBottomPadding,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            12,
+            0,
+            12,
+            AppTheme.homeNavigationBottomPadding,
+          ),
+          child: ClipRRect(
+            key: const Key('home-floating-navigation'),
+            borderRadius: BorderRadius.circular(28),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.55),
                 ),
-                child: ClipRRect(
-                  key: const Key('home-floating-navigation'),
-                  borderRadius: BorderRadius.circular(28),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: AppColors.border.withValues(alpha: 0.55),
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: navigation,
-                  ),
-                ),
+                borderRadius: BorderRadius.circular(28),
               ),
-            )
-          : navigation,
+              child: navigation,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

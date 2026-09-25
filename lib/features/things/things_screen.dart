@@ -1,7 +1,7 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/things/things_controller.dart';
-import 'package:finny/features/things/things_item_art.dart';
+import 'package:finny/features/shop/shop_item_art.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,6 +76,7 @@ class _ThingsScreenState extends ConsumerState<ThingsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF2F0FF),
       body: SafeArea(
+        bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -305,7 +306,13 @@ class _ReadyBody extends StatelessWidget {
                 )
               : GridView.builder(
                   key: const Key('things-grid'),
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    0,
+                    16,
+                    AppTheme.homeContentNavigationClearance +
+                        MediaQuery.viewPaddingOf(context).bottom,
+                  ),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
@@ -383,7 +390,7 @@ class _ItemCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: ThingsItemArt(item: item)),
+          Expanded(child: ShopItemArt(item: item)),
           Text(
             item.name,
             maxLines: 2,
@@ -449,7 +456,7 @@ class _ItemCard extends StatelessWidget {
                 : FilledButton(
                     key: Key('things-use-${item.id}'),
                     style: _thingsActionStyle,
-                    onPressed: canUse && !state.mutating
+                    onPressed: !isToy && canUse && !state.mutating
                         ? () => controller.use(item)
                         : null,
                     child: state.mutating && state.pending?.item.id == item.id

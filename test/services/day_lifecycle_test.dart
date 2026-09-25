@@ -44,7 +44,7 @@ const _shampoo = ShopItem(
 
 const _comb = ShopItem(
   id: 'care_comb',
-  name: 'Расчёска',
+  name: 'Полотенце',
   category: ShopItemCategory.need,
   price: 70,
   persistent: true,
@@ -68,7 +68,7 @@ const _toothbrush = ShopItem(
 
 const _accessory = ShopItem(
   id: 'accessory_hat',
-  name: 'Шапочка',
+  name: 'Крылья',
   category: ShopItemCategory.want,
   price: 1,
   persistent: true,

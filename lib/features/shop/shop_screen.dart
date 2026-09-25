@@ -53,6 +53,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     ref.read(shopControllerProvider.notifier).clearResult();
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (_) => ShopItemDetails(item: item, profileId: state.profileId),
@@ -180,6 +181,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
         ],
       ),
       body: SafeArea(
+        bottom: false,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
@@ -282,8 +284,12 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                     ),
                   ),
                 ],
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: AppSpacing.large),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height:
+                        AppTheme.homeContentNavigationClearance +
+                        MediaQuery.viewPaddingOf(context).bottom,
+                  ),
                 ),
               ],
             ),

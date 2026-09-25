@@ -29,7 +29,7 @@ const apple = ShopItem(
 
 const treat = ShopItem(
   id: 'food_treat',
-  name: 'Лакомство',
+  name: 'Звёздное печенье',
   category: ShopItemCategory.want,
   price: 60,
   persistent: false,
@@ -42,7 +42,7 @@ const treat = ShopItem(
 
 const comb = ShopItem(
   id: 'care_comb',
-  name: 'Расчёска',
+  name: 'Полотенце',
   category: ShopItemCategory.need,
   price: 70,
   persistent: true,
@@ -107,7 +107,7 @@ const frisbee = ShopItem(
 
 const plush = ShopItem(
   id: 'toy_plush',
-  name: 'Плюшевая игрушка',
+  name: 'Машинка',
   category: ShopItemCategory.want,
   price: 160,
   persistent: true,

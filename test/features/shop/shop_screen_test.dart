@@ -5,6 +5,7 @@ import 'package:finny/features/shop/shop_screen.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/repositories/content_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -145,6 +146,22 @@ void main() {
         const Key('shop-item-accessory_bow').toString(),
       ]),
     );
+  });
+
+  testWidgets('Shop shows all 12 final product identities', (tester) async {
+    h.content.items = await AssetContentRepository().loadShopItems();
+    await mount(tester);
+    expect(h.content.items, hasLength(12));
+    for (final item in h.content.items) {
+      final card = find.byKey(Key('shop-item-${item.id}'));
+      expect(card, findsOneWidget, reason: item.id);
+      expect(
+        find.descendant(of: card, matching: find.text(item.name)),
+        findsOneWidget,
+        reason: item.id,
+      );
+    }
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(

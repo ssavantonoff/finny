@@ -64,7 +64,7 @@ const frisbee = ShopItem(
 );
 const brush = ShopItem(
   id: 'care_comb',
-  name: 'Расчёска',
+  name: 'Полотенце',
   category: ShopItemCategory.need,
   price: 70,
   persistent: true,
@@ -76,7 +76,7 @@ const brush = ShopItem(
 );
 const bow = ShopItem(
   id: 'accessory_bow',
-  name: 'Бантик',
+  name: 'Наушники',
   category: ShopItemCategory.want,
   price: 80,
   persistent: true,

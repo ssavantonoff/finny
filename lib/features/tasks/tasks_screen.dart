@@ -37,6 +37,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Задания')),
       body: SafeArea(
+        bottom: false,
         child: switch (state.load) {
           TasksLoad.loading => const Center(child: CircularProgressIndicator()),
           TasksLoad.noProfile => const Center(
@@ -108,7 +109,13 @@ class _TaskList extends StatelessWidget {
     final required = state.tasks.where((task) => task.requiredForCheckpoint);
     final optional = state.tasks.where((task) => !task.requiredForCheckpoint);
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.medium),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.medium,
+        AppSpacing.medium,
+        AppSpacing.medium,
+        AppTheme.homeContentNavigationClearance +
+            MediaQuery.viewPaddingOf(context).bottom,
+      ),
       children: [
         Text(
           'Задания дня ${state.period!.periodNumber}',

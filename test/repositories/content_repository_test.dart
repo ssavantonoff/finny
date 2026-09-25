@@ -112,10 +112,10 @@ Map<String, Object?> _validBudgetPriorityTaskJson() => {
       },
       <String, Object?>{
         'id': 'bow',
-        'label': 'Бантик',
+        'label': 'Наушники',
         'price': 80,
         'correctDecision': 'later',
-        'feedback': 'Бантик может подождать.',
+        'feedback': 'Наушники могут подождать.',
       },
     ],
     'incorrectExplanation': 'Проверь важность и бюджет.',
@@ -320,7 +320,7 @@ void main() {
             null,
           ),
           'food_treat': (
-            'Лакомство',
+            'Звёздное печенье',
             ShopDisplaySection.food,
             ShopItemCategory.want,
             60,
@@ -344,7 +344,7 @@ void main() {
             null,
           ),
           'care_comb': (
-            'Расчёска',
+            'Полотенце',
             ShopDisplaySection.care,
             ShopItemCategory.need,
             70,
@@ -392,7 +392,7 @@ void main() {
             null,
           ),
           'toy_plush': (
-            'Плюшевая игрушка',
+            'Машинка',
             ShopDisplaySection.toys,
             ShopItemCategory.want,
             160,
@@ -404,7 +404,7 @@ void main() {
             null,
           ),
           'accessory_bow': (
-            'Бантик',
+            'Наушники',
             ShopDisplaySection.accessories,
             ShopItemCategory.want,
             80,
@@ -416,7 +416,7 @@ void main() {
             ShopEquipSlot.head,
           ),
           'accessory_collar': (
-            'Ошейник',
+            'Очки',
             ShopDisplaySection.accessories,
             ShopItemCategory.want,
             150,
@@ -428,7 +428,7 @@ void main() {
             ShopEquipSlot.neck,
           ),
           'accessory_hat': (
-            'Шапочка',
+            'Крылья',
             ShopDisplaySection.accessories,
             ShopItemCategory.want,
             180,

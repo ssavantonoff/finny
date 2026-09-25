@@ -1,5 +1,6 @@
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/shop/shop_controller.dart';
+import 'package:finny/features/shop/shop_item_art.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,15 +9,8 @@ class ShopItemIcon extends StatelessWidget {
   const ShopItemIcon({super.key, required this.item});
   final ShopItem item;
   @override
-  Widget build(BuildContext context) => CircleAvatar(
-    radius: 28,
-    child: Icon(
-      item.category == ShopItemCategory.need
-          ? Icons.shopping_basket_outlined
-          : Icons.redeem_outlined,
-      size: 30,
-    ),
-  );
+  Widget build(BuildContext context) =>
+      SizedBox.square(dimension: 56, child: ShopItemArt(item: item));
 }
 
 class ShopPriceLabel extends StatelessWidget {
