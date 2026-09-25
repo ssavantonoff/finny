@@ -238,12 +238,46 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('Day 5 Home shows 0/2, 1/2 and completed', (tester) async {
+  void expectRequiredActionsReadOnly(WidgetTester tester) {
+    final requiredActions = find.byKey(const Key('home-required-actions'));
+    expect(requiredActions, findsOneWidget);
+    for (final buttonType in [
+      TextButton,
+      FilledButton,
+      OutlinedButton,
+      IconButton,
+    ]) {
+      expect(
+        find.descendant(of: requiredActions, matching: find.byType(buttonType)),
+        findsNothing,
+      );
+    }
+    expect(
+      find.descendant(
+        of: requiredActions,
+        matching: find.byKey(const Key('home-today-task-action')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: requiredActions,
+        matching: find.byKey(const Key('home-today-savings-action')),
+      ),
+      findsNothing,
+    );
+  }
+
+  testWidgets('Day 5 status stays read-only as task progress changes', (
+    tester,
+  ) async {
     final fixture = await mountHome(tester, day: 5);
     final ready = fixture.container.read(homeControllerProvider) as HomeReady;
     final profileId = ready.profile.id!;
     final periodId = ready.period!.id!;
-    expect(find.text('Задания: 0 из 2'), findsOneWidget);
+    expect(find.text('Задание дня'), findsOneWidget);
+    expect(find.text('Нужно выполнить'), findsOneWidget);
+    expectRequiredActionsReadOnly(tester);
     await tester.runAsync(
       () => fixture.container
           .read(taskServiceProvider)
@@ -259,7 +293,7 @@ void main() {
       fixture.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Задания: 1 из 2'), findsOneWidget);
+    expect(find.text('Нужно выполнить'), findsOneWidget);
     await tester.runAsync(
       () => fixture.container
           .read(taskServiceProvider)
@@ -275,12 +309,14 @@ void main() {
       fixture.container.read(homeControllerProvider.notifier).load,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Задания выполнены'), findsOneWidget);
+    expect(find.text('Задание дня'), findsOneWidget);
+    expect(find.text('Готово'), findsOneWidget);
+    expectRequiredActionsReadOnly(tester);
   });
 
   testWidgets('Day 5 planning hides task CTA', (tester) async {
     await mountHome(tester, day: 5, planning: true);
-    expect(find.text('Задания: 0 из 2'), findsOneWidget);
+    expect(find.text('Нужно выполнить'), findsOneWidget);
     expect(find.byKey(const Key('home-today-task-action')), findsNothing);
   });
 
@@ -292,7 +328,9 @@ void main() {
       day: 5,
       legacyDayFiveCompleted: true,
     );
-    expect(find.text('Задания выполнены'), findsOneWidget);
+    expect(find.text('Задание дня'), findsOneWidget);
+    expect(find.text('Готово'), findsOneWidget);
+    expectRequiredActionsReadOnly(tester);
     final home = fixture.container.read(homeControllerProvider) as HomeReady;
     expect(home.dayFiveTaskCompletion?.legacyCompleted, isTrue);
     expect(home.dayFiveTaskCompletion?.completedTaskIds, isEmpty);
@@ -333,28 +371,24 @@ void main() {
       expect(find.byKey(const Key('home-continue-plan')), findsNothing);
       expect(find.byKey(const Key('home-next-task')), findsOneWidget);
       expect(find.byKey(const Key('home-today-task-action')), findsNothing);
-      expect(
-        find.byKey(const Key('home-today-savings-action')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('home-today-savings-action')), findsNothing);
+      expectRequiredActionsReadOnly(tester);
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('unresolved actions are visible and tappable at 360x800', (
+  testWidgets('required action statuses are read-only at 360x800', (
     tester,
   ) async {
     await mountHome(tester);
     expect(find.text('Выполнить задание'), findsOneWidget);
     expect(find.text('Задание дня'), findsOneWidget);
     expect(find.text('Накопления'), findsOneWidget);
+    expect(find.text('Нужно выполнить'), findsOneWidget);
     expect(find.text('Нужно решить'), findsOneWidget);
-    for (final key in ['home-next-task', 'home-today-savings-action']) {
-      final button = find.byKey(Key(key));
-      await tester.ensureVisible(button);
-      expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
-      expect(tester.getSize(button).width, greaterThanOrEqualTo(48));
-    }
+    expectRequiredActionsReadOnly(tester);
+    final mainCta = find.byKey(const Key('home-next-task'));
+    expect(tester.getSize(mainCta).height, greaterThanOrEqualTo(48));
     expect(
       find.descendant(
         of: find.byType(HomeScreen),

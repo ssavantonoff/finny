@@ -92,6 +92,15 @@ abstract final class AppTypography {
 
 abstract final class AppTheme {
   static const _seedColor = Color(0xFF4F7DF3);
+  static const homeNavigationHeight = 68.0;
+  static const homeNavigationBottomPadding = 8.0;
+  static const homeContentNavigationGap = 24.0;
+  static const homeContentNavigationClearance =
+      homeNavigationHeight +
+      homeNavigationBottomPadding +
+      homeContentNavigationGap;
+  static const compactHomeContentHeight = 680.0;
+  static const stableHomeCompositionHeight = 550.0;
 
   static ThemeData get light {
     final colorScheme = ColorScheme.fromSeed(
