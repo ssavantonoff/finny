@@ -636,6 +636,7 @@ void main() {
         // The canonical free interaction remains; legacy one-tap play is gone.
         expect(find.byKey(const Key('home-free-pet')), findsOneWidget);
         expect(find.byKey(const Key('home-free-play')), findsNothing);
+        expect(find.byKey(const Key('free-play-finny-catch')), findsNothing);
         expect(find.text('Погладить'), findsOneWidget);
         expect(find.text('Поиграть'), findsNothing);
         expect(find.byKey(const Key('home-day-sky')), findsOneWidget);

@@ -732,6 +732,8 @@ class _FreePlayHome extends ConsumerWidget {
               ),
             ),
             SizedBox(height: compact ? 2 : AppSpacing.tiny),
+            FreePlayCatchCard(onPlay: () => context.push('/finny-catch')),
+            SizedBox(height: compact ? 2 : AppSpacing.tiny),
             if (state.activeGoal case final goal?)
               HomeGoalCard(
                 name: goal.name,
