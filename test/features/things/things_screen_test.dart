@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../helpers/campaign_only_lifecycle_service.dart';
 
 import 'package:finny/app/providers.dart';
@@ -92,6 +94,15 @@ class _BrokenThingsContent extends TestContentRepository {
   Future<List<ShopItem>> loadShopItems() async => throw StateError('content');
 }
 
+class _PendingThingsContent extends TestContentRepository {
+  _PendingThingsContent(this.completer) : super(const []);
+
+  final Completer<List<ShopItem>> completer;
+
+  @override
+  Future<List<ShopItem>> loadShopItems() => completer.future;
+}
+
 class _ThingsProfiles implements ProfileRepository {
   _ThingsProfiles(this.profile);
   final Profile profile;
@@ -181,6 +192,44 @@ void main() {
     status: GamePeriodStatus.active,
     createdAt: DateTime.utc(2026, 1, 1),
   );
+
+  testWidgets('loading keeps the Things layout and settles to empty', (
+    tester,
+  ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final pending = Completer<List<ShopItem>>();
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(
+          _ThingsGames(database, activePeriod),
+        ),
+        contentRepositoryProvider.overrideWithValue(
+          _PendingThingsContent(pending),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Вещи'), findsOneWidget);
+    expect(find.byKey(const Key('things-filters')), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    pending.complete(const []);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('things-empty')), findsOneWidget);
+  });
 
   testWidgets(
     'empty state displays when no items are owned with go-to-shop button',
