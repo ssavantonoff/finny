@@ -16,6 +16,7 @@ class ShopItemArt extends StatelessWidget {
       'toy_ball' => 'assets/minigames/ball/ball.png',
       'accessory_bow' => 'assets/images/things/headphones.png',
       'care_shampoo' => 'assets/images/things/shampoo.png',
+      'care_comb' => 'assets/images/things/towel.png',
       _ => null,
     };
     if (standaloneAsset != null) {

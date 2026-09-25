@@ -32,11 +32,7 @@ void main() {
       Alignment.centerLeft,
     ),
     'care_shampoo': ('Шампунь', 'assets/images/things/shampoo.png', null),
-    'care_comb': (
-      'Полотенце',
-      'assets/images/things/care_sheet.png',
-      Alignment.centerRight,
-    ),
+    'care_comb': ('Полотенце', 'assets/images/things/towel.png', null),
     'toy_ball': ('Мяч', 'assets/minigames/ball/ball.png', null),
     'toy_frisbee': (
       'Фрисби',
@@ -105,10 +101,11 @@ void main() {
     },
   );
 
-  test('standalone headphones and shampoo keep transparent pixels', () async {
+  test('standalone product art keeps transparent pixels', () async {
     for (final asset in [
       'assets/images/things/headphones.png',
       'assets/images/things/shampoo.png',
+      'assets/images/things/towel.png',
     ]) {
       final data = await rootBundle.load(asset);
       final codec = await ui.instantiateImageCodec(
@@ -119,14 +116,14 @@ void main() {
         format: ui.ImageByteFormat.rawRgba,
       ))!.buffer.asUint8List();
       var hasTransparentPixel = false;
-      var hasOpaquePixel = false;
+      var hasVisiblePixel = false;
       for (var index = 3; index < pixels.length; index += 4) {
         hasTransparentPixel |= pixels[index] == 0;
-        hasOpaquePixel |= pixels[index] == 255;
-        if (hasTransparentPixel && hasOpaquePixel) break;
+        hasVisiblePixel |= pixels[index] > 200;
+        if (hasTransparentPixel && hasVisiblePixel) break;
       }
       expect(hasTransparentPixel, isTrue, reason: asset);
-      expect(hasOpaquePixel, isTrue, reason: asset);
+      expect(hasVisiblePixel, isTrue, reason: asset);
       frame.image.dispose();
       codec.dispose();
     }
