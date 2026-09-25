@@ -1,4 +1,5 @@
 import 'package:finny/core/database/app_database.dart';
+import 'package:finny/models/ball_reward.dart';
 import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/game_state.dart';
@@ -391,6 +392,9 @@ class FreePlayRepository {
     required List<PeriodDefinition> definitions,
     ShopItem? item,
   }) async {
+    if (actionId == 'item:toy_ball' || item?.id == 'toy_ball') {
+      throw PetItemNotUsableException('toy_ball');
+    }
     _checkOperation(operationId);
     if (effects.isEmpty ||
         effects.satiety < 0 ||
@@ -482,6 +486,117 @@ class FreePlayRepository {
         'created_at': DateTime.now().toUtc().toIso8601String(),
       });
       return FreePlayItemResult(updated);
+    });
+  }
+
+  Future<BallRewardResult> completeBall({
+    required int profileId,
+    required ShopItem item,
+    required String operationId,
+    required List<PeriodDefinition> definitions,
+    required bool Function() activeProfileMatches,
+  }) async {
+    _checkOperation(operationId);
+    if (item.id != 'toy_ball' ||
+        !item.persistent ||
+        item.usagePolicy != ItemUsagePolicy.oncePerPeriod ||
+        item.petEffects.mood <= 0 ||
+        item.petEffects.care != 0 ||
+        item.petEffects.satiety != 0) {
+      throw StateError('Invalid canonical Ball action.');
+    }
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      void requireActiveProfile() {
+        if (!activeProfileMatches()) {
+          throw StateError(
+            'The active profile changed during the Ball session.',
+          );
+        }
+      }
+
+      requireActiveProfile();
+      await _requireFreePlay(txn, profileId, definitions);
+      final owned = await txn.query(
+        'inventory',
+        columns: ['quantity'],
+        where: 'profile_id = ? AND item_id = ?',
+        whereArgs: [profileId, item.id],
+        limit: 1,
+      );
+      if (owned.isEmpty || (owned.single['quantity'] as int) <= 0) {
+        throw PetItemNotOwnedException(item.id);
+      }
+      final previous = await txn.query(
+        'free_play_pet_operations',
+        columns: ['action_id'],
+        where: 'profile_id = ? AND operation_id = ?',
+        whereArgs: [profileId, operationId],
+        limit: 1,
+      );
+      if (previous.isNotEmpty) {
+        if (previous.single['action_id'] != 'item:toy_ball') {
+          throw PetOperationConflictException(operationId);
+        }
+        requireActiveProfile();
+        return BallRewardResult(
+          status: BallRewardStatus.confirmedPreviously,
+          canonicalMoodEffect: item.petEffects.mood,
+          actualMoodDelta: 0,
+          pet: await _pet(txn, profileId),
+        );
+      }
+      final campaignPrevious = await txn.query(
+        'pet_action_operations',
+        columns: ['operation_id'],
+        where: 'profile_id = ? AND operation_id = ?',
+        whereArgs: [profileId, operationId],
+        limit: 1,
+      );
+      if (campaignPrevious.isNotEmpty) {
+        throw PetOperationConflictException(operationId);
+      }
+      final alreadyRewarded = await txn.query(
+        'free_play_pet_operations',
+        columns: ['operation_id'],
+        where: 'profile_id = ? AND action_id = ?',
+        whereArgs: [profileId, 'item:toy_ball'],
+        limit: 1,
+      );
+      final pet = await _pet(txn, profileId);
+      if (alreadyRewarded.isNotEmpty) {
+        requireActiveProfile();
+        return BallRewardResult(
+          status: BallRewardStatus.alreadyRewarded,
+          canonicalMoodEffect: item.petEffects.mood,
+          actualMoodDelta: 0,
+          pet: pet,
+        );
+      }
+      requireActiveProfile();
+      final updated = pet.copyWith(
+        mood: PetStateRules.clampStat(pet.mood + item.petEffects.mood),
+      );
+      await txn.update(
+        'pets',
+        updated.toMap()..remove('profile_id'),
+        where: 'profile_id = ?',
+        whereArgs: [profileId],
+      );
+      await txn.insert('free_play_pet_operations', {
+        'profile_id': profileId,
+        'operation_id': operationId,
+        'action_id': 'item:toy_ball',
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      requireActiveProfile();
+      final delta = updated.mood - pet.mood;
+      return BallRewardResult(
+        status: delta == 0 ? BallRewardStatus.capped : BallRewardStatus.applied,
+        canonicalMoodEffect: item.petEffects.mood,
+        actualMoodDelta: delta,
+        pet: updated,
+      );
     });
   }
 }

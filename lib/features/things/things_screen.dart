@@ -235,6 +235,15 @@ class _ItemCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (item.id == 'toy_ball' && status != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      status,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -259,6 +268,14 @@ class _ItemCard extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.outline,
                 ),
+              )
+            else if (item.id == 'toy_ball')
+              FilledButton(
+                key: const Key('things-play-toy_ball'),
+                onPressed: state.canPlayBall(item)
+                    ? () => context.push('/toy-ball')
+                    : null,
+                child: const Text('Играть'),
               )
             else if (status != null && !canUse)
               Text(

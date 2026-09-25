@@ -75,6 +75,22 @@ class ThingsState {
   int usageOf(String itemId, PetActionSlot slot) =>
       usageCounts['$itemId:${slot.storageValue}'] ?? 0;
 
+  /// Playing with the Ball is independent from receiving its mood reward.
+  bool canPlayBall(ShopItem item) {
+    if (item.id != 'toy_ball' ||
+        profileId == null ||
+        load != ThingsLoad.ready ||
+        mutating ||
+        pending != null ||
+        quantityOf(item.id) <= 0) {
+      return false;
+    }
+    if (freePlay) return true;
+    return period != null &&
+        (period!.status == GamePeriodStatus.active ||
+            period!.status == GamePeriodStatus.readyToFinish);
+  }
+
   bool canUse(ShopItem item) {
     if (profileId == null ||
         load != ThingsLoad.ready ||

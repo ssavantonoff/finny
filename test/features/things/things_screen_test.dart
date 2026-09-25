@@ -380,6 +380,13 @@ void main() {
       expect(find.text('Мяч'), findsOneWidget);
       expect(find.text('Сегодня использовано'), findsOneWidget);
       expect(find.byKey(const Key('things-use-toy_ball')), findsNothing);
+      expect(find.byKey(const Key('things-play-toy_ball')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('things-play-toy_ball')))
+            .onPressed,
+        isNotNull,
+      );
     },
   );
 }

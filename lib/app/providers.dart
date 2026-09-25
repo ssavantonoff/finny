@@ -8,6 +8,7 @@ import 'package:finny/repositories/free_play_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/repositories/profile_data_management_repository.dart';
 import 'package:finny/services/budget_service.dart';
+import 'package:finny/services/ball_reward_service.dart';
 import 'package:finny/services/campaign_lifecycle_service.dart';
 import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/item_use_service.dart';
@@ -97,6 +98,17 @@ final freePlayServiceProvider = Provider<FreePlayService>(
     FreePlayRepository(ref.watch(appDatabaseProvider)),
     ref.watch(contentRepositoryProvider),
     ref.watch(gameRepositoryProvider),
+  ),
+);
+
+final ballRewardServiceProvider = Provider<BallRewardService>(
+  (ref) => BallRewardService(
+    ref.watch(contentRepositoryProvider),
+    ref.watch(gameRepositoryProvider),
+    CampaignLifecycleRepository(ref.watch(appDatabaseProvider)),
+    SqliteBallRewardPort(ref.watch(appDatabaseProvider)),
+    FreePlayRepository(ref.watch(appDatabaseProvider)),
+    () => ref.read(activeProfileIdProvider),
   ),
 );
 

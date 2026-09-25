@@ -105,7 +105,20 @@ const frisbee = ShopItem(
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
 );
 
-const items = [apple, treat, comb, shampoo, toothbrush, ball, frisbee];
+const plush = ShopItem(
+  id: 'toy_plush',
+  name: 'Плюшевая игрушка',
+  category: ShopItemCategory.want,
+  price: 160,
+  persistent: true,
+  effectType: 'mood',
+  effectValue: 30,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+
+const items = [apple, treat, comb, shampoo, toothbrush, ball, frisbee, plush];
 
 typedef ActivePlayer = ({int profileId, GamePeriod period});
 
@@ -389,14 +402,14 @@ void main() {
 
   test('each toy has its own once-per-period usage identity', () async {
     final player = await createPlayer();
-    await grant(player.profileId, ball);
+    await grant(player.profileId, plush);
     await grant(player.profileId, frisbee);
 
     await service.useItem(
       profileId: player.profileId,
       periodId: player.period.id!,
-      itemId: ball.id,
-      operationId: 'ball-1',
+      itemId: plush.id,
+      operationId: 'plush-1',
     );
     await service.useItem(
       profileId: player.profileId,
@@ -409,8 +422,8 @@ void main() {
       service.useItem(
         profileId: player.profileId,
         periodId: player.period.id!,
-        itemId: ball.id,
-        operationId: 'ball-2',
+        itemId: plush.id,
+        operationId: 'plush-2',
       ),
       throwsA(isA<PetActionAlreadyUsedException>()),
     );
@@ -674,20 +687,20 @@ void main() {
   test('period ownership and profiles are isolated', () async {
     final normal = await createPlayer();
     final demo = await createPlayer(type: ProfileType.demo, mood: 60);
-    await grant(normal.profileId, ball);
+    await grant(normal.profileId, frisbee);
 
     await expectLater(
       service.useItem(
         profileId: normal.profileId,
         periodId: demo.period.id!,
-        itemId: ball.id,
+        itemId: frisbee.id,
         operationId: 'foreign-period',
       ),
       throwsStateError,
     );
     expect((await games.getPet(normal.profileId))?.mood, 39);
     expect((await games.getPet(demo.profileId))?.mood, 59);
-    expect(await games.getInventoryQuantity(normal.profileId, ball.id), 1);
+    expect(await games.getInventoryQuantity(normal.profileId, frisbee.id), 1);
   });
 
   test('storage failure rolls pet, inventory, usage and proof back', () async {
@@ -719,14 +732,14 @@ void main() {
 
   test('concurrent persistent uses allow exactly one new operation', () async {
     final player = await createPlayer();
-    await grant(player.profileId, ball);
+    await grant(player.profileId, frisbee);
 
     Future<Object> attempt(String operationId) async {
       try {
         return await service.useItem(
           profileId: player.profileId,
           periodId: player.period.id!,
-          itemId: ball.id,
+          itemId: frisbee.id,
           operationId: operationId,
         );
       } catch (error) {
@@ -735,12 +748,12 @@ void main() {
     }
 
     final results = await Future.wait([
-      attempt('ball-concurrent-a'),
-      attempt('ball-concurrent-b'),
+      attempt('frisbee-concurrent-a'),
+      attempt('frisbee-concurrent-b'),
     ]);
     expect(results.whereType<Pet>(), hasLength(1));
     expect(results.whereType<PetActionAlreadyUsedException>(), hasLength(1));
-    expect((await games.getPet(player.profileId))?.mood, 74);
+    expect((await games.getPet(player.profileId))?.mood, 79);
   });
 
   test('restart preserves quantity, usage and idempotent replay', () async {
