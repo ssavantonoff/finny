@@ -52,9 +52,9 @@ const _dayOneTask = FinancialTask(
       ),
       CategorizationTaskItem(
         id: 'comb',
-        label: 'Расчёска',
+        label: 'Полотенце',
         correctCategoryId: 'need',
-        feedback: 'Расчёска помогает ухаживать за Финни.',
+        feedback: 'Полотенце помогает ухаживать за Финни.',
       ),
       CategorizationTaskItem(
         id: 'ball',
@@ -64,9 +64,9 @@ const _dayOneTask = FinancialTask(
       ),
       CategorizationTaskItem(
         id: 'bow',
-        label: 'Бантик',
+        label: 'Наушники',
         correctCategoryId: 'want',
-        feedback: 'Бантик украшает Финни, но без него можно обойтись.',
+        feedback: 'Наушники радуют Финни, но без них можно обойтись.',
       ),
       CategorizationTaskItem(
         id: 'room_decoration',
@@ -314,9 +314,9 @@ void main() {
       for (final label in [
         'Корм',
         'Шампунь',
-        'Расчёска',
+        'Полотенце',
         'Мяч',
-        'Бантик',
+        'Наушники',
         'Украшение для комнаты',
       ]) {
         expect(find.text(label), findsOneWidget);

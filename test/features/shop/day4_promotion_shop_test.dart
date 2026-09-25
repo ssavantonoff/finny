@@ -185,7 +185,7 @@ void main() {
       await mount(tester);
       expect(find.byKey(const Key('shop-promo-banner')), findsOneWidget);
       expect(find.text('Акция дня'), findsWidgets);
-      expect(find.text('Лакомство · 60 → 35 монет'), findsOneWidget);
+      expect(find.text('Звёздное печенье · 60 → 35 монет'), findsOneWidget);
       expect(
         find.byKey(const Key('shop-promo-card-food_treat')),
         findsOneWidget,
@@ -255,7 +255,10 @@ void main() {
       final buy = find.byKey(const Key('shop-buy'));
       await tester.tap(buy);
       await tester.pump();
-      expect(find.text('Купить «Лакомство» за 35 монет?'), findsOneWidget);
+      expect(
+        find.text('Купить «Звёздное печенье» за 35 монет?'),
+        findsOneWidget,
+      );
       await tester.tap(buy);
       await pumpUntil(tester, find.text('Готово! Предмет куплен.'));
       final first = await tester.runAsync(
@@ -284,7 +287,10 @@ void main() {
       await openTreat(tester);
       await tester.tap(find.byKey(const Key('shop-buy')));
       await tester.pump();
-      expect(find.text('Купить «Лакомство» за 60 монет?'), findsOneWidget);
+      expect(
+        find.text('Купить «Звёздное печенье» за 60 монет?'),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('shop-buy')));
       for (
         var attempt = 0;
@@ -334,7 +340,10 @@ void main() {
       await openTreat(tester);
       await tester.tap(find.byKey(const Key('shop-buy')));
       await tester.pump();
-      expect(find.text('Купить «Лакомство» за 35 монет?'), findsOneWidget);
+      expect(
+        find.text('Купить «Звёздное печенье» за 35 монет?'),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('shop-buy')));
       await pumpUntil(tester, find.textContaining('Цена: 35'));
       final state = container.read(shopControllerProvider);

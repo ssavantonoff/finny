@@ -4,11 +4,19 @@ import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/app/router.dart';
 import 'package:finny/core/database/app_database.dart';
+import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/adult/adult_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/shop/shop_controller.dart';
+import 'package:finny/features/shop/shop_screen.dart';
+import 'package:finny/features/tasks/tasks_controller.dart';
+import 'package:finny/features/savings/savings_controller.dart';
 import 'package:finny/features/settings/settings_screen.dart';
+import 'package:finny/features/things/things_screen.dart';
+import 'package:finny/features/things/things_controller.dart';
+import 'package:finny/features/tasks/tasks_screen.dart';
+import 'package:finny/features/savings/savings_screen.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -20,6 +28,7 @@ import 'package:finny/services/special_purchase_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite/sqflite.dart';
 
 import '../helpers/test_content_repository.dart';
 import '../helpers/test_database.dart';
@@ -89,13 +98,19 @@ void main() {
     promoContent = TestContentRepository(
       testPeriodDefinitions(count: 5),
       shopItems: await assets.loadShopItems(),
+      goals: await assets.loadGoals(),
       tasks: await assets.loadTasks(),
       stories: await assets.loadStoryPurchases(),
       promotions: await assets.loadPromotions(),
     );
   });
 
-  Future<_PromoNavFixture> fixture(int day, {bool purchased = false}) async {
+  Future<_PromoNavFixture> fixture(
+    int day, {
+    bool purchased = false,
+    bool ownCatalog = false,
+    bool active = false,
+  }) async {
     final database = createTestDatabase();
     final games = SqliteGameRepository(database);
     final profile = await SqliteProfileRepository(database).create(
@@ -121,6 +136,17 @@ void main() {
         mood: 80,
       ),
     );
+    if (ownCatalog) {
+      final db = await database.database;
+      for (final item in promoContent.shopItems) {
+        await db.insert('inventory', {
+          'profile_id': profileId,
+          'item_id': item.id,
+          'quantity': 1,
+          'acquired_at': DateTime.utc(2026).toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    }
     if (day > 0) {
       final period = await games.startPeriod(
         profileId: profileId,
@@ -146,6 +172,13 @@ void main() {
           operationId: 'nav-promo-prepurchased',
         );
       }
+      if (active && !purchased) {
+        await confirmBudgetForTest(
+          games,
+          profileId: profileId,
+          periodId: period.id!,
+        );
+      }
     }
     final container = ProviderContainer(
       overrides: [
@@ -161,9 +194,10 @@ void main() {
 
   Future<void> mountPromoApp(
     WidgetTester tester,
-    _PromoNavFixture fixture,
-  ) async {
-    tester.view.physicalSize = const Size(360, 800);
+    _PromoNavFixture fixture, {
+    Size size = const Size(360, 800),
+  }) async {
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -251,6 +285,140 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('all five tabs share fixed floating navigation at $size', (
+      tester,
+    ) async {
+      final nav = (await tester.runAsync(
+        () => fixture(1, ownCatalog: true, active: true),
+      ))!;
+      addTearDown(nav.close);
+      useSingleLineNavigationLabels(tester);
+      await mountPromoApp(tester, nav, size: size);
+
+      final navigation = find.byKey(const Key('home-floating-navigation'));
+      final homeRect = tester.getRect(navigation);
+      expect(homeRect.left, greaterThan(0));
+      expect(homeRect.right, lessThan(size.width));
+      expect(homeRect.height, AppTheme.homeNavigationHeight);
+      final shell = tester.widget<Scaffold>(
+        find.byKey(const Key('main-navigation-shell')),
+      );
+      expect(shell.extendBody, isTrue);
+      expect(shell.backgroundColor, Colors.transparent);
+
+      for (final (index, label, screen) in [
+        (1, 'Вещи', ThingsScreen),
+        (2, 'Магазин', ShopScreen),
+        (3, 'Задания', TasksScreen),
+        (4, 'Накопления', SavingsScreen),
+        (0, 'Финни', HomeScreen),
+      ]) {
+        await tester.tap(
+          find.byKey(
+            Key(switch (index) {
+              0 => 'nav-home',
+              1 => 'nav-things',
+              2 => 'nav-shop',
+              3 => 'nav-tasks',
+              _ => 'nav-savings',
+            }),
+          ),
+        );
+        for (var attempt = 0; attempt < 300; attempt++) {
+          if (find.byType(screen).evaluate().isNotEmpty &&
+              (index != 1 ||
+                  nav.container.read(thingsControllerProvider).load ==
+                      ThingsLoad.ready) &&
+              (index != 2 ||
+                  nav.container.read(shopControllerProvider).load ==
+                      ShopLoad.ready) &&
+              (index != 3 ||
+                  nav.container.read(tasksControllerProvider).load ==
+                      TasksLoad.ready) &&
+              (index != 4 ||
+                  nav.container.read(savingsControllerProvider)
+                      is SavingsReady)) {
+            break;
+          }
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 3)),
+          );
+          await tester.pump(const Duration(milliseconds: 20));
+        }
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(find.byType(screen), findsOneWidget, reason: label);
+        expect(
+          tester
+              .widget<NavigationBar>(find.byType(NavigationBar))
+              .selectedIndex,
+          index,
+        );
+        expect(tester.getRect(navigation), homeRect);
+        expect(tester.takeException(), isNull);
+
+        if (index == 1) {
+          final grid = find.byKey(const Key('things-grid'));
+          expect(tester.getBottomRight(grid).dy, greaterThan(homeRect.top));
+          await tester.drag(grid, const Offset(0, -2500));
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(tester.getRect(navigation), homeRect);
+          expect(
+            tester
+                .getBottomRight(
+                  find.byKey(const Key('things-item-accessory_hat')),
+                )
+                .dy,
+            lessThanOrEqualTo(homeRect.top - 24),
+          );
+        }
+        if (index == 2) {
+          final catalog = find.descendant(
+            of: find.byType(ShopScreen),
+            matching: find.byType(CustomScrollView),
+          );
+          expect(tester.getBottomRight(catalog).dy, greaterThan(homeRect.top));
+          await tester.drag(catalog, const Offset(0, -6000));
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(tester.getRect(navigation), homeRect);
+          expect(
+            tester
+                .getBottomRight(
+                  find.byKey(const Key('shop-item-accessory_hat')),
+                )
+                .dy,
+            lessThanOrEqualTo(homeRect.top - 24),
+          );
+        }
+        if (index == 3 || index == 4) {
+          if (index == 4) {
+            expect(
+              nav.container.read(savingsControllerProvider),
+              isA<SavingsReady>(),
+            );
+          }
+          final list = find.descendant(
+            of: find.byType(screen),
+            matching: find.byType(ListView),
+          );
+          expect(list, findsOneWidget);
+          final padding = tester.widget<ListView>(list).padding! as EdgeInsets;
+          expect(
+            padding.bottom,
+            greaterThanOrEqualTo(AppTheme.homeContentNavigationClearance),
+          );
+          await tester.drag(list, const Offset(0, -1000));
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(tester.getRect(navigation), homeRect);
+        }
+      }
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+    });
+  }
 
   testWidgets('Day 1 Shop icon and label align without promotion', (
     tester,
@@ -558,7 +726,7 @@ void main() {
         tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
         1,
       );
-      expect(find.byKey(const Key('home-floating-navigation')), findsNothing);
+      expect(find.byKey(const Key('home-floating-navigation')), findsOneWidget);
 
       // Tap "Магазин" (index 2)
       await tester.tap(navItem('Магазин'));
@@ -583,7 +751,7 @@ void main() {
         tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
         4,
       );
-      expect(find.byKey(const Key('home-floating-navigation')), findsNothing);
+      expect(find.byKey(const Key('home-floating-navigation')), findsOneWidget);
 
       // Tap back to "Финни" (index 0)
       await tester.tap(navItem('Финни'));

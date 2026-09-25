@@ -204,8 +204,9 @@ void main() {
     await tester.tap(navItem('Вещи'));
     await tester.pumpAndSettle();
 
-    // Verify Things now shows the purchased apple ×1
+    // Verify Things now shows the purchased apple.
     expect(find.byKey(const Key('things-empty')), findsNothing);
-    expect(find.text('Яблоко ×1'), findsOneWidget);
+    expect(find.byKey(const Key('things-item-food_apple')), findsOneWidget);
+    expect(find.text('Яблоко'), findsOneWidget);
   });
 }

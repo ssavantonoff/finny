@@ -37,7 +37,7 @@ const _promotion = ShopPromotion(
 
 const _treat = ShopItem(
   id: 'food_treat',
-  name: 'Лакомство',
+  name: 'Звёздное печенье',
   category: ShopItemCategory.want,
   price: 60,
   persistent: false,

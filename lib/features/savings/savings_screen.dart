@@ -54,8 +54,15 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen> {
     }
     final active = state.activeGoal;
     return SafeArea(
+      bottom: false,
       child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.medium),
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.medium,
+          AppSpacing.medium,
+          AppSpacing.medium,
+          AppTheme.homeContentNavigationClearance +
+              MediaQuery.viewPaddingOf(context).bottom,
+        ),
         children: [
           _Balances(state: state),
           if (state.period != null) ...[
@@ -185,6 +192,7 @@ class _SavingsScreenState extends ConsumerState<SavingsScreen> {
         .toList(growable: false);
     final selected = await showModalBottomSheet<SavingsGoal>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,

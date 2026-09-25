@@ -123,7 +123,7 @@ FinancialTask testBudgetPriorityTask({
   period: period,
   requiredForCheckpoint: true,
   budgetPriorityScenario: const BudgetPriorityTaskScenario(
-    prompt: 'У Финни 150 монет на покупки.\nКорм закончился, шампунь почти закончился,\nа бантик очень понравился Финни.',
+    prompt: 'У Финни 150 монет на покупки.\nКорм закончился, шампунь почти закончился,\nа наушники очень понравился Финни.',
     budget: 150,
     buyNowLabel: 'Купить сейчас',
     buyNowDescription: 'То, что берём в этот раз.',
@@ -147,10 +147,10 @@ FinancialTask testBudgetPriorityTask({
       ),
       BudgetPriorityTaskItem(
         id: 'bow',
-        label: 'Бантик',
+        label: 'Наушники',
         price: 80,
         correctDecision: BudgetPriorityDecision.later,
-        feedback: 'Бантик хочется купить, но сейчас важнее корм и шампунь.',
+        feedback: 'Наушники хочется купить, но сейчас важнее корм и шампунь.',
       ),
     ],
     incorrectExplanation:

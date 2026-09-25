@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../helpers/campaign_only_lifecycle_service.dart';
 
 import 'package:finny/app/providers.dart';
@@ -9,11 +11,13 @@ import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/item_use_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../helpers/test_content_repository.dart';
 import '../../helpers/test_database.dart';
@@ -59,7 +63,7 @@ const itemBall = ShopItem(
 
 const itemBow = ShopItem(
   id: 'accessory_bow',
-  name: 'Бантик',
+  name: 'Наушники',
   category: ShopItemCategory.want,
   price: 80,
   persistent: true,
@@ -70,6 +74,35 @@ const itemBow = ShopItem(
   equipSlot: ShopEquipSlot.head,
   usagePolicy: ItemUsagePolicy.none,
 );
+
+const itemFrisbee = ShopItem(
+  id: 'toy_frisbee',
+  name: 'Фрисби',
+  category: ShopItemCategory.want,
+  price: 90,
+  persistent: true,
+  effectType: 'mood',
+  effectValue: 10,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+
+class _BrokenThingsContent extends TestContentRepository {
+  _BrokenThingsContent() : super(const []);
+
+  @override
+  Future<List<ShopItem>> loadShopItems() async => throw StateError('content');
+}
+
+class _PendingThingsContent extends TestContentRepository {
+  _PendingThingsContent(this.completer) : super(const []);
+
+  final Completer<List<ShopItem>> completer;
+
+  @override
+  Future<List<ShopItem>> loadShopItems() => completer.future;
+}
 
 class _ThingsProfiles implements ProfileRepository {
   _ThingsProfiles(this.profile);
@@ -131,6 +164,11 @@ class _ThingsMockItemUse extends ItemUseService {
 }
 
 void main() {
+  late List<ShopItem> canonicalItems;
+  setUpAll(() async {
+    canonicalItems = await AssetContentRepository().loadShopItems();
+  });
+
   final profile = Profile(
     id: 1,
     gameName: 'Игрок',
@@ -160,6 +198,44 @@ void main() {
     status: GamePeriodStatus.active,
     createdAt: DateTime.utc(2026, 1, 1),
   );
+
+  testWidgets('loading keeps the Things layout and settles to empty', (
+    tester,
+  ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final pending = Completer<List<ShopItem>>();
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(
+          _ThingsGames(database, activePeriod),
+        ),
+        contentRepositoryProvider.overrideWithValue(
+          _PendingThingsContent(pending),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Вещи'), findsOneWidget);
+    expect(find.byKey(const Key('things-filters')), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    pending.complete(const []);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('things-empty')), findsOneWidget);
+  });
 
   testWidgets(
     'empty state displays when no items are owned with go-to-shop button',
@@ -205,7 +281,7 @@ void main() {
   );
 
   testWidgets(
-    'inventory renders owned items with counts, effects and sections',
+    'inventory renders only owned items without prices or stat effects',
     (tester) async {
       final database = createTestDatabase();
       addTearDown(database.close);
@@ -247,30 +323,36 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Section headers
-      expect(find.byKey(const Key('things-section-food')), findsOneWidget);
-      expect(find.byKey(const Key('things-section-care')), findsOneWidget);
-      expect(find.byKey(const Key('things-section-toys')), findsOneWidget);
+      expect(find.byKey(const Key('things-grid')), findsOneWidget);
+      expect(find.byKey(const Key('things-item-food_apple')), findsOneWidget);
       expect(
-        find.byKey(const Key('things-section-accessories')),
+        find.byKey(const Key('things-item-care_toothbrush')),
         findsOneWidget,
       );
-
-      // Consumable count ×3 and effect
-      expect(find.text('Яблоко ×3'), findsOneWidget);
-      expect(find.text('Сытость +20'), findsOneWidget);
-
-      // Persistent toothbrush: label "Почистить зубы"
+      expect(find.byKey(const Key('things-item-toy_ball')), findsOneWidget);
+      expect(
+        find.byKey(const Key('things-item-accessory_bow')),
+        findsOneWidget,
+      );
+      expect(find.text('Яблоко'), findsOneWidget);
+      expect(find.text('Сытость +20'), findsNothing);
+      expect(find.text('40'), findsNothing);
       expect(find.text('Зубная щётка'), findsOneWidget);
-      expect(find.text('Почистить зубы'), findsOneWidget);
-
-      // Persistent ball: label "Использовать"
+      expect(
+        find.byKey(const Key('things-use-care_toothbrush')),
+        findsOneWidget,
+      );
       expect(find.text('Мяч'), findsOneWidget);
-
-      // Accessory: shows 'Аксессуар' without use button
-      expect(find.text('Бантик'), findsOneWidget);
-      expect(find.text('Аксессуар'), findsOneWidget);
+      expect(find.text('Наушники'), findsOneWidget);
       expect(find.byKey(const Key('things-use-accessory_bow')), findsNothing);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('things-equip-accessory_bow')),
+            )
+            .onPressed,
+        isNull,
+      );
     },
   );
 
@@ -327,7 +409,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Яблоко ×1'), findsOneWidget);
+    expect(find.text('Яблоко'), findsOneWidget);
     final useBtn = find.byKey(const Key('things-use-food_apple'));
     expect(useBtn, findsOneWidget);
 
@@ -336,7 +418,7 @@ void main() {
 
     // After use, quantity is 0, so empty state should show
     expect(find.byKey(const Key('things-empty')), findsOneWidget);
-    expect(find.text('Яблоко ×1'), findsNothing);
+    expect(find.text('Яблоко'), findsNothing);
   });
 
   testWidgets(
@@ -389,6 +471,341 @@ void main() {
       );
     },
   );
+
+  testWidgets('filters keep only owned items and room has an empty state', (
+    tester,
+  ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final games = _ThingsGames(database, activePeriod);
+    games.inventory = {
+      itemApple.id: 1,
+      itemBrush.id: 1,
+      itemBall.id: 1,
+      itemBow.id: 1,
+    };
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(games),
+        contentRepositoryProvider.overrideWithValue(
+          TestContentRepository(
+            const [],
+            shopItems: [itemApple, itemBrush, itemBall, itemBow, itemFrisbee],
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('things-item-toy_frisbee')), findsNothing);
+    for (final (filter, itemId) in [
+      ('food', itemApple.id),
+      ('care', itemBrush.id),
+      ('toys', itemBall.id),
+    ]) {
+      await tester.tap(find.byKey(Key('things-filter-$filter')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(Key('things-item-$itemId')), findsOneWidget);
+      expect(find.byKey(const Key('things-item-toy_frisbee')), findsNothing);
+      expect(
+        find.byKey(const Key('things-item-accessory_bow')),
+        filter == 'accessories' ? findsOneWidget : findsNothing,
+      );
+    }
+    await tester.drag(
+      find.byKey(const Key('things-filters')),
+      const Offset(-450, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('things-filter-room')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('В категории «Комната» пока нет твоих вещей.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('things-filter-accessories')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('things-item-accessory_bow')), findsOneWidget);
+    await tester.drag(
+      find.byKey(const Key('things-filters')),
+      const Offset(500, 0),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('things-filter-all')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('things-item-food_apple')), findsOneWidget);
+    expect(find.byKey(const Key('things-item-toy_ball')), findsOneWidget);
+  });
+
+  testWidgets('Ball opens its existing route even after systemic use', (
+    tester,
+  ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final games = _ThingsGames(database, activePeriod);
+    games.inventory = {itemBall.id: 1};
+    games.usages['item:${itemBall.id}:${PetActionSlot.defaultSlot.storageValue}'] =
+        1;
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(games),
+        contentRepositoryProvider.overrideWithValue(
+          TestContentRepository(const [], shopItems: [itemBall]),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final router = GoRouter(
+      initialLocation: '/things',
+      routes: [
+        GoRoute(path: '/things', builder: (_, _) => const ThingsScreen()),
+        GoRoute(
+          path: '/toy-ball',
+          builder: (_, _) => const Scaffold(body: Text('Ball route')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('things-play-toy_ball')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ball route'), findsOneWidget);
+  });
+
+  testWidgets('Frisbee and Car cannot grant instant play rewards', (
+    tester,
+  ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final games = _ThingsGames(database, activePeriod);
+    games.inventory = {'toy_ball': 1, 'toy_frisbee': 1, 'toy_plush': 1};
+    final toys = canonicalItems
+        .where((item) => item.displaySection == ShopDisplaySection.toys)
+        .toList();
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(games),
+        contentRepositoryProvider.overrideWithValue(
+          TestContentRepository(const [], shopItems: toys),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('things-play-toy_ball')))
+          .onPressed,
+      isNotNull,
+    );
+    for (final id in ['toy_frisbee', 'toy_plush']) {
+      final button = find.byKey(Key('things-use-$id'));
+      expect(button, findsOneWidget);
+      expect(tester.widget<FilledButton>(button).onPressed, isNull);
+    }
+    expect(games.usages, isEmpty);
+  });
+
+  testWidgets('owned catalog keeps all 12 final names across Things filters', (
+    tester,
+  ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final games = _ThingsGames(database, activePeriod);
+    final catalog = canonicalItems;
+    games.inventory = {for (final item in catalog) item.id: 1};
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(games),
+        contentRepositoryProvider.overrideWithValue(
+          TestContentRepository(const [], shopItems: catalog),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    for (final (filter, section) in [
+      ('food', ShopDisplaySection.food),
+      ('care', ShopDisplaySection.care),
+      ('toys', ShopDisplaySection.toys),
+      ('accessories', ShopDisplaySection.accessories),
+    ]) {
+      final chip = find.byKey(Key('things-filter-$filter'));
+      await tester.ensureVisible(chip);
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      final items = catalog.where((item) => item.displaySection == section);
+      expect(items, hasLength(3));
+      for (final item in items) {
+        final card = find.byKey(Key('things-item-${item.id}'));
+        expect(card, findsOneWidget, reason: item.id);
+        expect(
+          find.descendant(of: card, matching: find.text(item.name)),
+          findsOneWidget,
+          reason: item.id,
+        );
+      }
+    }
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('two-column Things grid fits ${size.width}x${size.height}', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final database = createTestDatabase();
+      addTearDown(database.close);
+      final games = _ThingsGames(database, activePeriod);
+      games.inventory = {
+        itemApple.id: 1,
+        itemBrush.id: 1,
+        itemBall.id: 1,
+        itemBow.id: 1,
+      };
+      final container = ProviderContainer(
+        overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
+          activeProfileIdProvider.overrideWith(
+            () => _ActiveThingsProfileMock(1),
+          ),
+          profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+          gameRepositoryProvider.overrideWithValue(games),
+          contentRepositoryProvider.overrideWithValue(
+            TestContentRepository(
+              const [],
+              shopItems: [itemApple, itemBrush, itemBall, itemBow],
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final grid = tester.widget<GridView>(
+        find.byKey(const Key('things-grid')),
+      );
+      expect(
+        (grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount)
+            .crossAxisCount,
+        2,
+      );
+      final useLabel = find.descendant(
+        of: find.byKey(const Key('things-use-food_apple')),
+        matching: find.text('Использовать'),
+      );
+      expect(tester.getSize(useLabel).height, lessThan(24));
+      await tester.drag(
+        find.byKey(const Key('things-grid')),
+        const Offset(0, -600),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('things-item-accessory_bow')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('content error offers a retry', (tester) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(
+          _ThingsGames(database, activePeriod),
+        ),
+        contentRepositoryProvider.overrideWithValue(_BrokenThingsContent()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Не получилось загрузить вещи. Попробуй ещё раз.'),
+      findsOneWidget,
+    );
+    expect(find.text('Попробовать снова'), findsOneWidget);
+    await tester.tap(find.text('Попробовать снова'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Не получилось загрузить вещи. Попробуй ещё раз.'),
+      findsOneWidget,
+    );
+  });
 }
 
 class _ActiveThingsProfileMock extends ActiveProfileIdController {
