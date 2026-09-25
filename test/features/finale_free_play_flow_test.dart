@@ -36,7 +36,6 @@ class _DisplayGames extends SqliteGameRepository {
     if (readPersistedWallet) return await super.getGameState(profileId);
     return state;
   }
-
   @override
   Future<Pet?> getPet(int profileId) async => pet;
   @override
@@ -163,6 +162,10 @@ void main() {
   testWidgets(
     'old completed save opens finale, finish survives restart and can enter Free Play',
     (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       final (database, content, games) = await completedSave(tester);
       addTearDown(database.close);
       var scope = container(database, content, games);
@@ -238,6 +241,10 @@ void main() {
   testWidgets('finale primary enters Free Play and Tasks has completed state', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final (database, content, games) = await completedSave(tester);
     addTearDown(database.close);
     final scope = container(database, content, games);
@@ -390,6 +397,57 @@ void main() {
     scope.dispose();
   });
 
+  testWidgets('Free Play Home fits at 360dp with Android system insets', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetViewPadding);
+    final (database, content, games) = await completedSave(
+      tester,
+      clearActiveGoal: true,
+      savedAmount: 73,
+    );
+    addTearDown(database.close);
+    final scope = container(database, content, games);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+    );
+    await waitFor(tester, find.text('5 дней вместе!'));
+    await tapVisible(tester, find.text('Продолжить с Финни'));
+    await waitFor(tester, find.text('Свободный режим'));
+
+    expect(find.byKey(const Key('home-finny-stage-3')), findsOneWidget);
+    expect(find.text('Погладить'), findsOneWidget);
+    expect(find.byKey(const Key('free-play-finny-catch')), findsOneWidget);
+    expect(find.byKey(const Key('free-play-finny-catch-play')), findsOneWidget);
+    expect(find.text('Накоплено: 73'), findsOneWidget);
+    expect(find.byKey(const Key('free-play-collection')), findsOneWidget);
+    expect(find.byKey(const Key('free-play-recap')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(HomeScreen),
+        matching: find.byType(Scrollable),
+      ),
+      findsNothing,
+    );
+    expect(
+      tester.getBottomRight(find.byKey(const Key('free-play-collection'))).dy,
+      lessThan(
+        tester.getTopLeft(find.byKey(const Key('home-floating-navigation'))).dy,
+      ),
+    );
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    scope.dispose();
+  });
   testWidgets('direct Finny Catch route follows campaign lifecycle guard', (
     tester,
   ) async {
@@ -519,4 +577,5 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     scope.dispose();
   });
+
 }
