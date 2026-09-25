@@ -1,4 +1,5 @@
 import 'package:finny/models/pet.dart';
+import 'package:finny/features/minigames/ball/ball_session.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/profile.dart';
@@ -9,6 +10,9 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/budget_service.dart';
+import 'package:finny/services/ball_reward_service.dart';
+import 'package:finny/repositories/campaign_lifecycle_repository.dart';
+import 'package:finny/repositories/free_play_repository.dart';
 import 'package:finny/services/day_lifecycle_service.dart';
 import 'package:finny/services/period_service.dart';
 import 'package:finny/services/item_use_service.dart';
@@ -64,6 +68,14 @@ void main() {
         ),
       );
       final profileId = profile.id!;
+      final ballReward = BallRewardService(
+        content,
+        games,
+        CampaignLifecycleRepository(database),
+        SqliteBallRewardPort(database),
+        FreePlayRepository(database),
+        () => profileId,
+      );
       await games.ensureInitialState(profileId);
       await games.savePet(
         Pet(
@@ -232,11 +244,14 @@ void main() {
             operationId: 'campaign-buy-toy-ball',
           );
         }
-        await itemUse.useItem(
-          profileId: profileId,
-          periodId: period.id!,
-          itemId: 'toy_ball',
-          operationId: 'campaign-day$day-use-toy-ball',
+        final ballSession = BallSession(
+          seed: day,
+          sessionId: 'campaign-day$day-ball',
+        )..start();
+        ballSession.advance(const Duration(seconds: 30));
+        await ballReward.completeSession(
+          access: await ballReward.checkAccess(profileId: profileId),
+          session: ballSession,
         );
         await itemUse.performFreeInteraction(
           profileId: profileId,

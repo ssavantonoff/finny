@@ -2,6 +2,7 @@ import 'dart:collection';
 import 'dart:math';
 
 import 'package:finny/core/database/app_database.dart';
+import 'package:finny/models/ball_reward.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/day_five_task.dart';
@@ -258,6 +259,24 @@ abstract interface class PetActionPort {
   });
 }
 
+abstract interface class BallRewardPort {
+  Future<BallRewardResult?> confirmBallOperation({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  });
+
+  Future<BallRewardResult> completeBall({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  });
+}
+
 abstract interface class DayLifecyclePort {
   Future<BedtimeDecision> evaluateBedtime({
     required int profileId,
@@ -359,7 +378,8 @@ class SqliteGameRepository implements GameRepository {
     );
   }
 
-  Future<Pet> _applyPetAction({
+  Future<({Pet pet, bool duplicateOperation, bool alreadyUsed, int moodDelta})>
+  _applyPetAction({
     required int profileId,
     required int periodId,
     required String actionId,
@@ -367,6 +387,8 @@ class SqliteGameRepository implements GameRepository {
     required PetActionSlot slot,
     required PetStatEffects effects,
     ShopItem? item,
+    bool ballCompletion = false,
+    bool Function()? activeProfileMatches,
   }) async {
     _validateOperationId(operationId);
     if (profileId <= 0 || periodId <= 0 || actionId.trim().isEmpty) {
@@ -380,6 +402,26 @@ class SqliteGameRepository implements GameRepository {
     }
     final db = await _appDatabase.database;
     return db.transaction((txn) async {
+      void requireActiveProfile() {
+        if (activeProfileMatches != null && !activeProfileMatches()) {
+          throw StateError(
+            'The active profile changed during the Ball session.',
+          );
+        }
+      }
+
+      requireActiveProfile();
+      if (ballCompletion) {
+        if (item?.id != 'toy_ball' ||
+            !item!.persistent ||
+            item.usagePolicy != ItemUsagePolicy.oncePerPeriod ||
+            item.petEffects != effects) {
+          throw StateError('Invalid canonical Ball action.');
+        }
+        if (await _readInventoryQuantity(txn, profileId, item.id) <= 0) {
+          throw PetItemNotOwnedException(item.id);
+        }
+      }
       final existing = await _readPetActionOperation(
         txn,
         profileId: profileId,
@@ -391,7 +433,14 @@ class SqliteGameRepository implements GameRepository {
             existing['usage_slot'] != slot.storageValue) {
           throw PetOperationConflictException(operationId);
         }
-        return _requirePet(txn, profileId);
+        final pet = await _requirePet(txn, profileId);
+        requireActiveProfile();
+        return (
+          pet: pet,
+          duplicateOperation: true,
+          alreadyUsed: false,
+          moodDelta: 0,
+        );
       }
 
       final period = await _requirePeriod(txn, profileId, periodId);
@@ -414,6 +463,15 @@ class SqliteGameRepository implements GameRepository {
         slot: slot,
       );
       if (usagePolicy != ItemUsagePolicy.unlimited && usageCount > 0) {
+        if (ballCompletion) {
+          requireActiveProfile();
+          return (
+            pet: pet,
+            duplicateOperation: false,
+            alreadyUsed: true,
+            moodDelta: 0,
+          );
+        }
         throw PetActionAlreadyUsedException(actionId: actionId, slot: slot);
       }
 
@@ -453,6 +511,7 @@ class SqliteGameRepository implements GameRepository {
         }
       }
 
+      requireActiveProfile();
       final transition = await _applyVirtualDayAction(
         txn,
         period: period,
@@ -506,7 +565,13 @@ class SqliteGameRepository implements GameRepository {
         'usage_slot': slot.storageValue,
         'created_at': now,
       });
-      return updatedPet;
+      requireActiveProfile();
+      return (
+        pet: updatedPet,
+        duplicateOperation: false,
+        alreadyUsed: false,
+        moodDelta: updatedPet.mood - pet.mood,
+      );
     });
   }
 
@@ -1708,15 +1773,19 @@ class SqlitePetActionPort implements PetActionPort {
     required ShopItem item,
     required String operationId,
     required PetActionSlot slot,
-  }) => _core._applyPetAction(
-    profileId: profileId,
-    periodId: periodId,
-    actionId: 'item:${item.id}',
-    operationId: operationId,
-    slot: slot,
-    effects: item.petEffects,
-    item: item,
-  );
+  }) async {
+    if (item.id == 'toy_ball') throw PetItemNotUsableException(item.id);
+    final result = await _core._applyPetAction(
+      profileId: profileId,
+      periodId: periodId,
+      actionId: 'item:${item.id}',
+      operationId: operationId,
+      slot: slot,
+      effects: item.petEffects,
+      item: item,
+    );
+    return result.pet;
+  }
 
   @override
   Future<Pet> performFreePetInteraction({
@@ -1724,14 +1793,101 @@ class SqlitePetActionPort implements PetActionPort {
     required int periodId,
     required FreePetInteraction interaction,
     required String operationId,
-  }) => _core._applyPetAction(
-    profileId: profileId,
-    periodId: periodId,
-    actionId: interaction.actionId,
-    operationId: operationId,
-    slot: PetActionSlot.defaultSlot,
-    effects: interaction.effects,
-  );
+  }) async {
+    final result = await _core._applyPetAction(
+      profileId: profileId,
+      periodId: periodId,
+      actionId: interaction.actionId,
+      operationId: operationId,
+      slot: PetActionSlot.defaultSlot,
+      effects: interaction.effects,
+    );
+    return result.pet;
+  }
+}
+
+class SqliteBallRewardPort implements BallRewardPort {
+  SqliteBallRewardPort(AppDatabase database)
+    : _core = SqliteGameRepository(database);
+
+  final SqliteGameRepository _core;
+
+  @override
+  Future<BallRewardResult?> confirmBallOperation({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  }) async {
+    if (!operationId.startsWith('toy-ball:$profileId:') ||
+        !activeProfileMatches()) {
+      throw StateError('The Ball operation identity or profile changed.');
+    }
+    final db = await _core._appDatabase.database;
+    return db.transaction((txn) async {
+      if (!activeProfileMatches()) {
+        throw StateError('The active profile changed during the Ball session.');
+      }
+      if (await _core._readInventoryQuantity(txn, profileId, item.id) <= 0) {
+        throw PetItemNotOwnedException(item.id);
+      }
+      final previous = await _core._readPetActionOperation(
+        txn,
+        profileId: profileId,
+        operationId: operationId,
+      );
+      if (previous == null) return null;
+      if (previous['period_id'] != periodId ||
+          previous['action_id'] != 'item:toy_ball' ||
+          previous['usage_slot'] != PetActionSlot.defaultSlot.storageValue) {
+        throw PetOperationConflictException(operationId);
+      }
+      final pet = await _core._requirePet(txn, profileId);
+      if (!activeProfileMatches()) {
+        throw StateError('The active profile changed during the Ball session.');
+      }
+      return BallRewardResult(
+        status: BallRewardStatus.confirmedPreviously,
+        canonicalMoodEffect: item.petEffects.mood,
+        actualMoodDelta: 0,
+        pet: pet,
+      );
+    });
+  }
+
+  @override
+  Future<BallRewardResult> completeBall({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  }) async {
+    final result = await _core._applyPetAction(
+      profileId: profileId,
+      periodId: periodId,
+      actionId: 'item:toy_ball',
+      operationId: operationId,
+      slot: PetActionSlot.defaultSlot,
+      effects: item.petEffects,
+      item: item,
+      ballCompletion: true,
+      activeProfileMatches: activeProfileMatches,
+    );
+    return BallRewardResult(
+      status: result.duplicateOperation
+          ? BallRewardStatus.confirmedPreviously
+          : result.alreadyUsed
+          ? BallRewardStatus.alreadyRewarded
+          : result.moodDelta == 0
+          ? BallRewardStatus.capped
+          : BallRewardStatus.applied,
+      canonicalMoodEffect: item.petEffects.mood,
+      actualMoodDelta: result.moodDelta,
+      pet: result.pet,
+    );
+  }
 }
 
 class SqliteDayLifecyclePort implements DayLifecyclePort {
