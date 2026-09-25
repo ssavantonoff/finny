@@ -120,6 +120,17 @@ void main() {
     await tester.pump();
   }
 
+  void expectProductionBall(WidgetTester tester) {
+    final image = tester.widget<Image>(find.byKey(const Key('ball-art')));
+    expect(
+      (image.image as AssetImage).assetName,
+      'assets/minigames/ball/ball.png',
+    );
+    expect(image.fit, BoxFit.contain);
+    expect(image.width, image.height);
+    expect(find.byKey(const Key('ball-placeholder-art')), findsNothing);
+  }
+
   testWidgets('start screen uses production room and Finny at 360x800', (
     tester,
   ) async {
@@ -132,7 +143,7 @@ void main() {
     );
     expect(find.byKey(const Key('ball-room-background')), findsOneWidget);
     expect(find.byKey(const Key('ball-finny-stage-3')), findsOneWidget);
-    expect(find.byKey(const Key('ball-placeholder-art')), findsOneWidget);
+    expectProductionBall(tester);
     expect(find.byKey(const Key('ball-start')), findsOneWidget);
     expect(
       tester.getTopLeft(find.byKey(const Key('ball-back'))).dy,
@@ -140,6 +151,34 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('floating header stays centered at ${size.width.toInt()}dp', (
+      tester,
+    ) async {
+      await mount(tester, size);
+      final header = find.byKey(const Key('ball-header'));
+      final headerRect = tester.getRect(header);
+      expect(headerRect.left, 16);
+      expect(size.width - headerRect.right, 16);
+      expect(headerRect.top, greaterThanOrEqualTo(24));
+      final decoration = tester.widget<Container>(header).decoration;
+      expect(
+        (decoration as BoxDecoration).borderRadius,
+        BorderRadius.circular(28),
+      );
+      final title = find.text('Игра с мячом');
+      final titleCenter = tester.getCenter(title).dx;
+      expect((titleCenter - size.width / 2).abs(), lessThan(1));
+
+      await tester.tap(find.byKey(const Key('ball-start')));
+      await tester.pump();
+      expect(find.text('1 / 8'), findsOneWidget);
+      expect(tester.getCenter(title).dx, titleCenter);
+      expectProductionBall(tester);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
     'active game shows timing zone and grants nothing before completion',
@@ -172,6 +211,7 @@ void main() {
     expect(rewardAttempts, 1);
     expect(find.byKey(const Key('ball-replay')), findsOneWidget);
     expect(find.byKey(const Key('ball-back-to-things')), findsOneWidget);
+    expectProductionBall(tester);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byKey(const Key('ball-replay')));

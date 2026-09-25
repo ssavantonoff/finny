@@ -210,11 +210,12 @@ final class BallSession {
   static List<BallOpportunity> _makeOpportunities(int seed) {
     final random = Random(seed);
     return List.generate(opportunityCount, (index) {
-      // The final pass is still comfortably over 1.5 seconds. Seeded jitter
-      // changes presentation without moving the forgiving timing windows.
+      // Seeded jitter changes presentation without moving the forgiving
+      // timing windows.
       final baseMs = 2200 - index * 80;
       final jitterMs = random.nextInt(151) - 75;
-      final durationMs = max(1550, baseMs + jitterMs);
+      final previousDurationMs = max(1550, baseMs + jitterMs);
+      final durationMs = (previousDurationMs * 0.8).round().clamp(1250, 1800);
       final offset = (random.nextDouble() * 0.24) - 0.12;
       return BallOpportunity(
         number: index + 1,

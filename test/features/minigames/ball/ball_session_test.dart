@@ -29,7 +29,7 @@ void main() {
         expect(first[index].horizontalOffset, second[index].horizontalOffset);
         expect(
           first[index].flightDuration.inMilliseconds,
-          inInclusiveRange(1550, 2275),
+          inInclusiveRange(1250, 1800),
         );
         expect(first[index].horizontalOffset, inInclusiveRange(-0.12, 0.12));
       }
@@ -187,7 +187,7 @@ void main() {
     }
     expect(session.phase, BallSessionPhase.completed);
     expect(session.elapsed, scheduledEnd);
-    expect(session.elapsed, greaterThan(const Duration(seconds: 20)));
+    expect(session.elapsed, greaterThan(const Duration(seconds: 16)));
     expect(session.accuratePasses, 0);
   });
 

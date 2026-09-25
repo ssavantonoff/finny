@@ -354,66 +354,85 @@ class _BallScreenState extends ConsumerState<BallScreen>
     );
   }
 
-  Widget _header(BallSession? session) => Container(
-    height: 76,
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    decoration: BoxDecoration(
-      color: AppColors.surface.withValues(alpha: 0.94),
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
-    ),
-    child: Row(
-      children: [
-        IconButton.filledTonal(
-          key: const Key('ball-back'),
-          tooltip: 'Вернуться к вещам',
-          onPressed: _goThings,
-          style: IconButton.styleFrom(
-            minimumSize: const Size(50, 50),
-            backgroundColor: AppColors.primaryLight,
-            foregroundColor: AppColors.primaryDark,
+  Widget _header(BallSession? session) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    child: Container(
+      key: const Key('ball-header'),
+      height: 68,
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x220F0C69),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
-          icon: const Icon(Icons.arrow_back_rounded, size: 28),
-        ),
-        const SizedBox(width: 8),
-        const Expanded(
-          child: Text(
-            'Игра с мячом',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primaryDark,
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Positioned.fill(
+            left: 76,
+            right: 76,
+            child: Center(
+              child: Text(
+                'Игра с мячом',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primaryDark,
+                ),
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 58,
-          child: session == null
-              ? const SizedBox.shrink()
-              : DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Text(
-                      '${session.opportunityNumber} / 8',
-                      key: const Key('ball-progress'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: AppColors.primaryDark,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
+          Positioned(
+            left: 10,
+            child: IconButton.filledTonal(
+              key: const Key('ball-back'),
+              tooltip: 'Вернуться к вещам',
+              onPressed: _goThings,
+              style: IconButton.styleFrom(
+                minimumSize: const Size(50, 50),
+                backgroundColor: AppColors.primaryLight,
+                foregroundColor: AppColors.primaryDark,
+              ),
+              icon: const Icon(Icons.arrow_back_rounded, size: 28),
+            ),
+          ),
+          Positioned(
+            right: 10,
+            child: SizedBox(
+              width: 58,
+              child: session == null
+                  ? const SizedBox.shrink()
+                  : DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(
+                          '${session.opportunityNumber} / 8',
+                          key: const Key('ball-progress'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.primaryDark,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-        ),
-      ],
+            ),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -424,11 +443,7 @@ class _BallScreenState extends ConsumerState<BallScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.sports_baseball_rounded,
-              size: 56,
-              color: AppColors.primary,
-            ),
+            const _BallSprite(size: 56),
             const SizedBox(height: 16),
             Text(
               _accessError!,
@@ -506,7 +521,7 @@ class _BallScreenState extends ConsumerState<BallScreen>
           Positioned(
             right: 30,
             bottom: height * 0.05,
-            child: const _BallArt(size: 72),
+            child: const _BallSprite(size: 72),
           ),
         ],
       );
@@ -544,7 +559,7 @@ class _BallScreenState extends ConsumerState<BallScreen>
               Positioned(
                 left: (x - ballSize / 2).clamp(0.0, width - ballSize),
                 top: (y - ballSize / 2).clamp(0.0, height - ballSize),
-                child: _BallArt(size: ballSize),
+                child: _BallSprite(size: ballSize),
               ),
             if (session.phase == BallSessionPhase.feedback ||
                 session.phase == BallSessionPhase.transitioning)
@@ -613,13 +628,17 @@ class _BallScreenState extends ConsumerState<BallScreen>
                   ),
                   const SizedBox(height: 12),
                   _ResultStat(
-                    icon: Icons.sports_baseball_rounded,
+                    leading: const _BallSprite(size: 34),
                     label: 'Точные передачи',
                     value: '${session.accuratePasses} / 8',
                   ),
                   const SizedBox(height: 8),
                   _ResultStat(
-                    icon: Icons.star_rounded,
+                    leading: const Icon(
+                      Icons.star_rounded,
+                      color: AppColors.primary,
+                      size: 34,
+                    ),
                     label: 'Лучшая серия',
                     value: '${session.bestStreak}',
                   ),
@@ -762,34 +781,19 @@ class _FinnyImage extends StatelessWidget {
   }
 }
 
-/// Neutral Flutter placeholder until a production Ball sprite is supplied.
-class _BallArt extends StatelessWidget {
-  const _BallArt({required this.size});
+class _BallSprite extends StatelessWidget {
+  const _BallSprite({required this.size});
 
   final double size;
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: const Key('ball-placeholder-art'),
+  Widget build(BuildContext context) => Image.asset(
+    'assets/minigames/ball/ball.png',
+    key: const Key('ball-art'),
     width: size,
     height: size,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Color(0xFFAD9AFF), AppColors.primaryDark],
-      ),
-      border: Border.all(color: Colors.white, width: 3),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x550F0C69),
-          blurRadius: 12,
-          offset: Offset(0, 5),
-        ),
-      ],
-    ),
-    child: Icon(Icons.pets_rounded, color: Colors.white, size: size * 0.48),
+    fit: BoxFit.contain,
+    semanticLabel: 'Мяч',
   );
 }
 
@@ -868,12 +872,12 @@ class _WhiteCard extends StatelessWidget {
 
 class _ResultStat extends StatelessWidget {
   const _ResultStat({
-    required this.icon,
+    required this.leading,
     required this.label,
     required this.value,
   });
 
-  final IconData icon;
+  final Widget leading;
   final String label;
   final String value;
 
@@ -887,7 +891,7 @@ class _ResultStat extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Icon(icon, color: AppColors.primary, size: 34),
+        leading,
         const SizedBox(width: 12),
         Expanded(
           child: Text(
