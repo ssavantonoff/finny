@@ -288,7 +288,8 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                   child: SizedBox(
                     height:
                         AppTheme.homeContentNavigationClearance +
-                        MediaQuery.viewPaddingOf(context).bottom,
+                        MediaQuery.viewPaddingOf(context).bottom +
+                        AppTheme.homeContentNavigationGap * 2,
                   ),
                 ),
               ],

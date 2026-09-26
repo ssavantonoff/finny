@@ -110,25 +110,28 @@ class HomeWallet extends StatelessWidget {
           borderRadius: BorderRadius.circular(100),
           border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
         ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 8 : 10,
-            vertical: compact ? 4 : 7,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FinnyCoin(size: compact ? 18 : 22),
-              SizedBox(width: compact ? AppSpacing.tiny : AppSpacing.small),
-              Text(
-                '$balance',
-                style:
-                    (compact
-                            ? Theme.of(context).textTheme.bodyLarge
-                            : Theme.of(context).textTheme.titleLarge)
-                        ?.copyWith(color: AppColors.textPrimary),
-              ),
-            ],
+        child: SizedBox(
+          height: 48,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact ? 8 : 10,
+              vertical: compact ? 4 : 7,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FinnyCoin(size: compact ? 18 : 22),
+                SizedBox(width: compact ? AppSpacing.tiny : AppSpacing.small),
+                Text(
+                  '$balance',
+                  style:
+                      (compact
+                              ? Theme.of(context).textTheme.bodyLarge
+                              : Theme.of(context).textTheme.titleLarge)
+                          ?.copyWith(color: AppColors.textPrimary),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -290,7 +293,10 @@ class HomeGoalCard extends StatelessWidget {
     key: const Key('home-savings-goal'),
     color: AppColors.surface.withValues(alpha: 0.84),
     child: Padding(
-      padding: EdgeInsets.all(compact ? 4 : AppSpacing.small),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 4 : AppSpacing.small,
+        vertical: compact ? 2 : AppSpacing.small,
+      ),
       child: Row(
         children: [
           _GoalIcon(compact: compact),
@@ -397,7 +403,10 @@ class HomeNoGoalCard extends StatelessWidget {
     key: const Key('home-savings-goal'),
     color: AppColors.surface.withValues(alpha: 0.84),
     child: Padding(
-      padding: EdgeInsets.all(compact ? 4 : AppSpacing.small),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 4 : AppSpacing.small,
+        vertical: compact ? 2 : AppSpacing.small,
+      ),
       child: Row(
         children: [
           _GoalIcon(compact: compact),
