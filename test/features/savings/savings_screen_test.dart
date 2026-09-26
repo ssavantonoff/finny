@@ -369,6 +369,46 @@ void main() {
     expect((controller.state as SavingsReady).gameState.savedAmount, 600);
   });
 
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('goal selection, change and claim sheets fit $size', (
+      tester,
+    ) async {
+      await _pumpSavings(tester, ready(saved: 250), size: size);
+      await tapVisible(
+        tester,
+        find.byKey(const Key('savings-goal-goal_scooter')),
+      );
+      expect(find.text('Выбрать «Самокат»?'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Закрыть'));
+      await tester.pumpAndSettle();
+
+      await _pumpSavings(
+        tester,
+        ready(
+          activeGoalId: 'goal_night_light',
+          saved: 250,
+          period: testPeriod(actual: 0),
+        ),
+        size: size,
+      );
+      await tapVisible(tester, find.byKey(const Key('savings-change-goal')));
+      expect(find.text('Сменить цель'), findsWidgets);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Закрыть'));
+      await tester.pumpAndSettle();
+
+      await _pumpSavings(
+        tester,
+        ready(activeGoalId: 'goal_night_light', saved: 590),
+        size: size,
+      );
+      await tapVisible(tester, find.byKey(const Key('savings-claim')));
+      expect(find.text('Получить «Ночник»?'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('no goal shows canonical choices and confirms a reached goal', (
     tester,
   ) async {
