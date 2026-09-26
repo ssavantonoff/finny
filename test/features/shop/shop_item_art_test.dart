@@ -91,17 +91,14 @@ void main() {
           );
         }
         if (item.id == 'accessory_bow') {
-          final scale = tester.widget<Transform>(
-            find.byKey(const Key('shop-item-art-headphones-scale')),
+          expect(
+            find.byKey(const Key('shop-item-art-headphones')),
+            findsOneWidget,
           );
-          final position = tester.widget<Transform>(
-            find.byKey(const Key('shop-item-art-headphones-position')),
-          );
-          expect(scale.transform.getMaxScaleOnAxis(), closeTo(1.22, 0.001));
-          expect(position.transform.getTranslation().x, greaterThan(0));
+          expect(image.alignment, Alignment.center);
         } else {
           expect(
-            find.byKey(const Key('shop-item-art-headphones-scale')),
+            find.byKey(const Key('shop-item-art-headphones')),
             findsNothing,
           );
         }

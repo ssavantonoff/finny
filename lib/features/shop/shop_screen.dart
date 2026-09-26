@@ -289,7 +289,7 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                     height:
                         AppTheme.homeContentNavigationClearance +
                         MediaQuery.viewPaddingOf(context).bottom +
-                        24,
+                        AppTheme.homeContentNavigationGap * 2,
                   ),
                 ),
               ],

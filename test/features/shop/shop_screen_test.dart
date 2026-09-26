@@ -269,10 +269,10 @@ void main() {
         final navTop = tester
             .getTopLeft(find.byKey(const Key('test-floating-navigation')))
             .dy;
-        expect(
-          tester.getBottomRight(lastSaleCard).dy,
-          lessThanOrEqualTo(navTop - 24),
-        );
+        final saleToNavigationGap =
+            navTop - tester.getBottomRight(lastSaleCard).dy;
+        expect(saleToNavigationGap, greaterThanOrEqualTo(24));
+        expect(saleToNavigationGap, lessThanOrEqualTo(80));
         expect(tester.takeException(), isNull);
       },
     );
