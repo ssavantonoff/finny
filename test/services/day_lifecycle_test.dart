@@ -491,7 +491,7 @@ void main() {
     },
   );
 
-  for (final unavailableToy in [_frisbee, _car]) {
+  for (final unavailableToy in [_car]) {
     test(
       'unavailable ${unavailableToy.name} cannot block bedtime fallback',
       () async {
@@ -533,6 +533,31 @@ void main() {
       BedtimeDecisionType.carePossible,
     );
     await markUsed(player, 'item:toy_ball');
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+      )).type,
+      BedtimeDecisionType.fallbackAllowed,
+    );
+  });
+
+  test('Frisbee counts only while its period reward is available', () async {
+    final player = await createPlayer(
+      satiety: 100,
+      care: 100,
+      mood: 35,
+      wallet: 0,
+    );
+    await grant(player.profileId, _frisbee);
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+      )).type,
+      BedtimeDecisionType.carePossible,
+    );
+    await markUsed(player, 'item:toy_frisbee');
     expect(
       (await lifecycle.evaluateBedtime(
         profileId: player.profileId,

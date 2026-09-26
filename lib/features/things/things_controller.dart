@@ -91,6 +91,22 @@ class ThingsState {
             period!.status == GamePeriodStatus.readyToFinish);
   }
 
+  /// Replay remains available after the Frisbee mood reward was used.
+  bool canPlayFrisbee(ShopItem item) {
+    if (item.id != 'toy_frisbee' ||
+        profileId == null ||
+        load != ThingsLoad.ready ||
+        mutating ||
+        pending != null ||
+        quantityOf(item.id) <= 0) {
+      return false;
+    }
+    if (freePlay) return true;
+    return period != null &&
+        (period!.status == GamePeriodStatus.active ||
+            period!.status == GamePeriodStatus.readyToFinish);
+  }
+
   bool canUse(ShopItem item) {
     if (profileId == null ||
         load != ThingsLoad.ready ||

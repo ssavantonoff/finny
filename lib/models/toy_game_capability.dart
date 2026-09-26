@@ -4,7 +4,7 @@ import 'package:finny/models/shop_item.dart';
 /// Add future games here when their reward flow becomes available in Campaign.
 abstract final class ToyGameCapability {
   static bool hasCampaignMoodReward(ShopItem item) => switch (item.id) {
-    'toy_ball' =>
+    'toy_ball' || 'toy_frisbee' =>
       item.displaySection == ShopDisplaySection.toys &&
           item.persistent &&
           item.usagePolicy == ItemUsagePolicy.oncePerPeriod &&
