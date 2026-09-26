@@ -5,6 +5,7 @@ import 'package:finny/features/shop/shop_screen.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/purchase_exception.dart';
 import 'package:finny/models/shop_item.dart';
+import 'package:finny/models/special_purchase.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,21 +15,71 @@ import 'shop_test_support.dart';
 
 void main() {
   late ShopHarness h;
-  setUp(() => h = ShopHarness());
-  tearDown(() => h.dispose());
+  ShopHarness? saleHarness;
+  late List<ShopItem> canonicalItems;
+  setUpAll(() async {
+    canonicalItems = await AssetContentRepository().loadShopItems();
+  });
+  setUp(() {
+    h = ShopHarness();
+    saleHarness = null;
+  });
+  tearDown(() {
+    h.dispose();
+    saleHarness?.dispose();
+  });
 
-  Future<void> mount(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(360, 800);
+  Future<void> mount(
+    WidgetTester tester, {
+    Size size = const Size(360, 800),
+    bool floatingNavigation = false,
+    ShopHarness? harness,
+  }) async {
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final Widget home;
+    if (floatingNavigation) {
+      tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+      addTearDown(tester.view.resetViewPadding);
+      home = Stack(
+        fit: StackFit.expand,
+        children: [
+          const ShopScreen(),
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 32,
+            height: 68,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                key: const Key('test-floating-navigation'),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      home = const ShopScreen();
+    }
     await tester.pumpWidget(
       UncontrolledProviderScope(
-        container: h.container,
-        child: MaterialApp(theme: AppTheme.light, home: const ShopScreen()),
+        container: (harness ?? h).container,
+        child: MaterialApp(theme: AppTheme.light, home: home),
       ),
     );
-    await tester.pumpAndSettle();
+    if (floatingNavigation) {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump();
+    } else {
+      await tester.pumpAndSettle();
+    }
   }
 
   Future<void> details(WidgetTester tester, [String id = 'food_apple']) async {
@@ -149,7 +200,7 @@ void main() {
   });
 
   testWidgets('Shop shows all 12 final product identities', (tester) async {
-    h.content.items = await AssetContentRepository().loadShopItems();
+    h.content.items = canonicalItems;
     await mount(tester);
     expect(h.content.items, hasLength(12));
     for (final item in h.content.items) {
@@ -163,6 +214,69 @@ void main() {
     }
     expect(tester.takeException(), isNull);
   });
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets(
+      'Day 5 last SALE card clears floating navigation at ${size.width}x${size.height}',
+      (tester) async {
+        saleHarness = ShopHarness(
+          saleOffers: const [
+            DayFiveSaleOffer(
+              itemId: 'care_shampoo',
+              discountAmount: 20,
+              purchased: false,
+            ),
+            DayFiveSaleOffer(
+              itemId: 'accessory_bow',
+              discountAmount: 20,
+              purchased: false,
+            ),
+            DayFiveSaleOffer(
+              itemId: 'accessory_hat',
+              discountAmount: 20,
+              purchased: false,
+            ),
+          ],
+        );
+        saleHarness!.content.items = canonicalItems;
+        saleHarness!.games.periods[1] = period(1, periodNumber: 5);
+        await mount(
+          tester,
+          size: size,
+          floatingNavigation: true,
+          harness: saleHarness,
+        );
+
+        final lastSaleCard = find.byKey(
+          const Key('shop-promo-card-accessory_hat'),
+        );
+        expect(lastSaleCard, findsOneWidget);
+        expect(
+          find.descendant(
+            of: lastSaleCard,
+            matching: find.byKey(const Key('shop-promo-marker-accessory_hat')),
+          ),
+          findsOneWidget,
+        );
+        final catalog = tester.widget<CustomScrollView>(
+          find.byType(CustomScrollView),
+        );
+        final scrollController = catalog.controller!;
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+        await tester.pump();
+        await tester.pump();
+
+        final navTop = tester
+            .getTopLeft(find.byKey(const Key('test-floating-navigation')))
+            .dy;
+        expect(
+          tester.getBottomRight(lastSaleCard).dy,
+          lessThanOrEqualTo(navTop - 24),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     '360dp list, details and confirmation; double tap/rebuild do not repurchase',

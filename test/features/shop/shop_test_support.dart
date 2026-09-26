@@ -11,6 +11,7 @@ import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/special_purchase.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/services/special_purchase_service.dart';
 import 'package:finny/services/purchase_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -98,12 +99,13 @@ GameState wallet(int profileId, [int balance = 500]) => GameState(
 GamePeriod period(
   int profileId, {
   int id = 91,
+  int periodNumber = 3,
   GamePeriodStatus status = GamePeriodStatus.active,
 }) => GamePeriod(
   id: id,
   profileId: profileId,
   definitionId: 'day-3',
-  periodNumber: 3,
+  periodNumber: periodNumber,
   startWalletBalance: 0,
   baseIncome: 500,
   extraIncome: 0,
@@ -213,6 +215,25 @@ class ShopPurchases extends PurchaseService {
   }
 }
 
+class _ShopSaleOffers extends SpecialPurchaseService {
+  _ShopSaleOffers(this.offers, ShopContent content)
+    : super(_UnusedSpecialPurchasePort(), content);
+
+  final List<DayFiveSaleOffer> offers;
+
+  @override
+  Future<List<DayFiveSaleOffer>> loadOrCreateDayFiveSale({
+    required int profileId,
+    required int periodId,
+  }) async => offers;
+}
+
+class _UnusedSpecialPurchasePort implements SpecialPurchasePort {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError(invocation.memberName.toString());
+}
+
 class _UnusedPurchasePort implements PurchasePort {
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -220,7 +241,10 @@ class _UnusedPurchasePort implements PurchasePort {
 }
 
 class ShopHarness {
-  ShopHarness({int? profileId = 1}) {
+  ShopHarness({
+    int? profileId = 1,
+    List<DayFiveSaleOffer> saleOffers = const [],
+  }) {
     purchases = ShopPurchases(content);
     container = ProviderContainer(
       overrides: [
@@ -231,6 +255,9 @@ class ShopHarness {
         gameRepositoryProvider.overrideWithValue(games),
         contentRepositoryProvider.overrideWithValue(content),
         purchaseServiceProvider.overrideWithValue(purchases),
+        specialPurchaseServiceProvider.overrideWithValue(
+          _ShopSaleOffers(saleOffers, content),
+        ),
         shopControllerProvider.overrideWith(
           () => ShopController(
             operationIdFactory: (_, _) => 'test-op-${++generatedIds}',

@@ -115,6 +115,37 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('quick deposit buttons add repeatedly and stop at the cap', (
+    tester,
+  ) async {
+    await pumpSavings(
+      tester,
+      ready(
+        activeGoalId: 'goal_scooter',
+        saved: 350,
+        wallet: 500,
+        period: testPeriod(),
+      ),
+    );
+    await tester.ensureVisible(
+      find.byKey(const Key('savings-deposit-plus-50')),
+    );
+
+    Future<void> tapAmount(String key, String expected) async {
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+      expect(find.text('Отложить $expected 🪙'), findsOneWidget);
+    }
+
+    await tapAmount('savings-deposit-plus-50', '60');
+    await tapAmount('savings-deposit-plus-50', '110');
+    await tapAmount('savings-deposit-plus-100', '210');
+    await tapAmount('savings-deposit-plus-100', '250');
+    await tapAmount('savings-deposit-plus-50', '250');
+    expect(find.text('+50'), findsOneWidget);
+    expect(find.text('+100'), findsOneWidget);
+  });
+
   testWidgets('reached goal shows claim and excess remainder', (tester) async {
     await pumpSavings(
       tester,

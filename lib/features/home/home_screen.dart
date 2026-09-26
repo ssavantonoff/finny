@@ -135,81 +135,91 @@ class _HomeFloatingHeader extends StatelessWidget {
       Expanded(
         child: Align(
           alignment: Alignment.centerLeft,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.84),
-              borderRadius: BorderRadius.circular(100),
-              border: Border.all(
-                color: AppColors.border.withValues(alpha: 0.55),
+          child: SizedBox(
+            key: const Key('home-day-chip'),
+            height: 48,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.84),
+                borderRadius: BorderRadius.circular(100),
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.55),
+                ),
               ),
-            ),
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: compact ? 8 : 10,
-                vertical: compact ? 4 : 6,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!(compact && freePlay)) ...[
-                    Icon(
-                      freePlay
-                          ? Icons.sports_esports_rounded
-                          : Icons.calendar_month_rounded,
-                      size: 20,
-                      color: AppColors.primary,
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 8 : 10,
+                  vertical: compact ? 4 : 6,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!(compact && freePlay)) ...[
+                      Icon(
+                        freePlay
+                            ? Icons.sports_esports_rounded
+                            : Icons.calendar_month_rounded,
+                        size: 20,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            (freePlay
+                                    ? Theme.of(context).textTheme.titleSmall
+                                    : Theme.of(context).textTheme.bodyLarge)
+                                ?.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: compact && freePlay ? 12 : null,
+                                ),
+                      ),
                     ),
-                    const SizedBox(width: 6),
-                  ],
-                  Flexible(
-                    child: Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          (freePlay
-                                  ? Theme.of(context).textTheme.titleSmall
-                                  : Theme.of(context).textTheme.bodyLarge)
-                              ?.copyWith(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w800,
-                                fontSize: compact && freePlay ? 12 : null,
-                              ),
-                    ),
-                  ),
-                  if (phase != null) ...[
-                    SizedBox(width: compact ? 4 : 6),
-                    Tooltip(
-                      key: Key('home-phase-${phase!.name}'),
-                      message: _phaseLabel,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight.withValues(alpha: 0.8),
-                          shape: BoxShape.circle,
-                        ),
-                        child: SizedBox(
-                          width: compact ? 20 : 22,
-                          height: compact ? 20 : 22,
-                          child: Icon(
-                            _phaseIcon,
-                            size: compact ? 14 : 16,
-                            color: AppColors.primary,
+                    if (phase != null) ...[
+                      SizedBox(width: compact ? 4 : 6),
+                      Tooltip(
+                        key: Key('home-phase-${phase!.name}'),
+                        message: _phaseLabel,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight.withValues(
+                              alpha: 0.8,
+                            ),
+                            shape: BoxShape.circle,
+                          ),
+                          child: SizedBox(
+                            width: compact ? 20 : 22,
+                            height: compact ? 20 : 22,
+                            child: Icon(
+                              _phaseIcon,
+                              size: compact ? 14 : 16,
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
       const SizedBox(width: AppSpacing.small),
-      HomeWallet(
-        key: const Key('home-wallet'),
-        balance: balance,
-        compact: compact,
+      SizedBox(
+        height: 48,
+        child: HomeWallet(
+          key: const Key('home-wallet'),
+          balance: balance,
+          compact: compact,
+        ),
       ),
       const SizedBox(width: AppSpacing.small),
       DecoratedBox(
@@ -1072,6 +1082,7 @@ class _HomeContent extends StatelessWidget {
                         child: const Text('Посмотреть план'),
                       ),
               if (state.activeGoal case final goal?) ...[
+                const SizedBox(height: 5),
                 HomeGoalCard(
                   name: goal.name,
                   saved: state.gameState.savedAmount,
@@ -1079,16 +1090,17 @@ class _HomeContent extends StatelessWidget {
                   compact: compact,
                 ),
               ] else ...[
+                const SizedBox(height: 5),
                 HomeNoGoalCard(
                   saved: state.gameState.savedAmount,
                   onSelect: () => context.go('/savings'),
                   compact: compact,
                 ),
               ],
-              SizedBox(height: compact ? 2 : AppSpacing.tiny),
+              const SizedBox(height: 5),
               if (stableCampaignLayout)
                 SizedBox(
-                  height: 104,
+                  height: compact ? 100 : 104,
                   child: Align(
                     alignment: Alignment.topCenter,
                     child: _buildStatusContent(compact, period),
@@ -1138,6 +1150,10 @@ class _RequiredActionsSummary extends StatelessWidget {
     return Card(
       key: const Key('home-required-actions'),
       color: AppColors.surface.withValues(alpha: 0.82),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppSpacing.tiny,
+        vertical: compact ? 2 : AppSpacing.tiny,
+      ),
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: compact ? 8 : AppSpacing.small,

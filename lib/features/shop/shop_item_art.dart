@@ -20,6 +20,31 @@ class ShopItemArt extends StatelessWidget {
       _ => null,
     };
     if (standaloneAsset != null) {
+      if (item.id == 'accessory_bow') {
+        return ClipRect(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final side = math.min(
+                constraints.maxWidth,
+                constraints.maxHeight,
+              );
+              return Transform.translate(
+                key: const Key('shop-item-art-headphones-position'),
+                offset: Offset(side * 0.04, 0),
+                child: Transform.scale(
+                  key: const Key('shop-item-art-headphones-scale'),
+                  scale: 1.22,
+                  child: Image.asset(
+                    standaloneAsset,
+                    fit: BoxFit.contain,
+                    semanticLabel: item.name,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      }
       return Image.asset(
         standaloneAsset,
         fit: BoxFit.contain,

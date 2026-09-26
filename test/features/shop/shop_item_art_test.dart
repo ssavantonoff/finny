@@ -90,6 +90,21 @@ void main() {
             alignment,
           );
         }
+        if (item.id == 'accessory_bow') {
+          final scale = tester.widget<Transform>(
+            find.byKey(const Key('shop-item-art-headphones-scale')),
+          );
+          final position = tester.widget<Transform>(
+            find.byKey(const Key('shop-item-art-headphones-position')),
+          );
+          expect(scale.transform.getMaxScaleOnAxis(), closeTo(1.22, 0.001));
+          expect(position.transform.getTranslation().x, greaterThan(0));
+        } else {
+          expect(
+            find.byKey(const Key('shop-item-art-headphones-scale')),
+            findsNothing,
+          );
+        }
 
         await tester.pumpWidget(
           MaterialApp(
