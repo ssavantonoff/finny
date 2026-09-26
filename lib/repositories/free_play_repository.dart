@@ -1,5 +1,6 @@
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/ball_reward.dart';
+import 'package:finny/models/frisbee_reward.dart';
 import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/game_state.dart';
@@ -12,6 +13,7 @@ import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/campaign_lifecycle_repository.dart';
+import 'package:finny/repositories/content_repository.dart';
 import 'package:sqflite/sqflite.dart';
 
 class FreePlayItemResult {
@@ -21,8 +23,10 @@ class FreePlayItemResult {
 }
 
 class FreePlayRepository {
-  FreePlayRepository(this._database);
+  FreePlayRepository(this._database, {ContentRepository? canonicalContent})
+    : _canonicalContent = canonicalContent ?? AssetContentRepository();
   final AppDatabase _database;
+  final ContentRepository _canonicalContent;
 
   Future<Map<ShopEquipSlot, String>> equipped(int profileId) async {
     final db = await _database.database;
@@ -395,6 +399,9 @@ class FreePlayRepository {
     if (actionId == 'item:toy_ball' || item?.id == 'toy_ball') {
       throw PetItemNotUsableException('toy_ball');
     }
+    if (actionId == 'item:toy_frisbee' || item?.id == 'toy_frisbee') {
+      throw PetItemNotUsableException('toy_frisbee');
+    }
     _checkOperation(operationId);
     if (effects.isEmpty ||
         effects.satiety < 0 ||
@@ -593,6 +600,129 @@ class FreePlayRepository {
       final delta = updated.mood - pet.mood;
       return BallRewardResult(
         status: delta == 0 ? BallRewardStatus.capped : BallRewardStatus.applied,
+        canonicalMoodEffect: item.petEffects.mood,
+        actualMoodDelta: delta,
+        pet: updated,
+      );
+    });
+  }
+
+  Future<FrisbeeRewardResult> completeFrisbee({
+    required int profileId,
+    required ShopItem item,
+    required String operationId,
+    required List<PeriodDefinition> definitions,
+    required bool Function() activeProfileMatches,
+  }) async {
+    _checkOperation(operationId);
+    final matches = (await _canonicalContent.loadShopItems()).where(
+      (candidate) => candidate.id == 'toy_frisbee',
+    );
+    if (matches.length != 1) {
+      throw StateError('Canonical Frisbee item is missing or duplicated.');
+    }
+    final canonical = matches.single;
+    if (!operationId.startsWith('toy-frisbee:$profileId:') ||
+        item.id != canonical.id ||
+        item.petEffects != canonical.petEffects ||
+        !canonical.persistent ||
+        canonical.usagePolicy != ItemUsagePolicy.oncePerPeriod ||
+        canonical.displaySection != ShopDisplaySection.toys ||
+        canonical.petEffects.mood <= 0 ||
+        canonical.petEffects.care != 0 ||
+        canonical.petEffects.satiety != 0) {
+      throw StateError('Invalid canonical Frisbee action.');
+    }
+    final db = await _database.database;
+    return db.transaction((txn) async {
+      void requireActiveProfile() {
+        if (!activeProfileMatches()) {
+          throw StateError(
+            'The active profile changed during the Frisbee session.',
+          );
+        }
+      }
+
+      requireActiveProfile();
+      await _requireFreePlay(txn, profileId, definitions);
+      final owned = await txn.query(
+        'inventory',
+        columns: ['quantity'],
+        where: 'profile_id = ? AND item_id = ?',
+        whereArgs: [profileId, item.id],
+        limit: 1,
+      );
+      if (owned.isEmpty || (owned.single['quantity'] as int) <= 0) {
+        throw PetItemNotOwnedException(item.id);
+      }
+      final previous = await txn.query(
+        'free_play_pet_operations',
+        columns: ['action_id'],
+        where: 'profile_id = ? AND operation_id = ?',
+        whereArgs: [profileId, operationId],
+        limit: 1,
+      );
+      if (previous.isNotEmpty) {
+        if (previous.single['action_id'] != 'item:toy_frisbee') {
+          throw PetOperationConflictException(operationId);
+        }
+        requireActiveProfile();
+        return FrisbeeRewardResult(
+          status: FrisbeeRewardStatus.confirmedPreviously,
+          canonicalMoodEffect: item.petEffects.mood,
+          actualMoodDelta: 0,
+          pet: await _pet(txn, profileId),
+        );
+      }
+      final campaignPrevious = await txn.query(
+        'pet_action_operations',
+        columns: ['operation_id'],
+        where: 'profile_id = ? AND operation_id = ?',
+        whereArgs: [profileId, operationId],
+        limit: 1,
+      );
+      if (campaignPrevious.isNotEmpty) {
+        throw PetOperationConflictException(operationId);
+      }
+      final alreadyRewarded = await txn.query(
+        'free_play_pet_operations',
+        columns: ['operation_id'],
+        where: 'profile_id = ? AND action_id = ?',
+        whereArgs: [profileId, 'item:toy_frisbee'],
+        limit: 1,
+      );
+      final pet = await _pet(txn, profileId);
+      if (alreadyRewarded.isNotEmpty) {
+        requireActiveProfile();
+        return FrisbeeRewardResult(
+          status: FrisbeeRewardStatus.alreadyRewarded,
+          canonicalMoodEffect: item.petEffects.mood,
+          actualMoodDelta: 0,
+          pet: pet,
+        );
+      }
+      requireActiveProfile();
+      final updated = pet.copyWith(
+        mood: PetStateRules.clampStat(pet.mood + item.petEffects.mood),
+      );
+      await txn.update(
+        'pets',
+        updated.toMap()..remove('profile_id'),
+        where: 'profile_id = ?',
+        whereArgs: [profileId],
+      );
+      await txn.insert('free_play_pet_operations', {
+        'profile_id': profileId,
+        'operation_id': operationId,
+        'action_id': 'item:toy_frisbee',
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      requireActiveProfile();
+      final delta = updated.mood - pet.mood;
+      return FrisbeeRewardResult(
+        status: delta == 0
+            ? FrisbeeRewardStatus.capped
+            : FrisbeeRewardStatus.applied,
         canonicalMoodEffect: item.petEffects.mood,
         actualMoodDelta: delta,
         pet: updated,

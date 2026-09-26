@@ -79,10 +79,10 @@ const itemFrisbee = ShopItem(
   id: 'toy_frisbee',
   name: 'Фрисби',
   category: ShopItemCategory.want,
-  price: 90,
+  price: 140,
   persistent: true,
   effectType: 'mood',
-  effectValue: 10,
+  effectValue: 40,
   unlockType: 'available',
   displaySection: ShopDisplaySection.toys,
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
@@ -597,7 +597,59 @@ void main() {
     expect(find.text('Ball route'), findsOneWidget);
   });
 
-  testWidgets('Frisbee and Car cannot grant instant play rewards', (
+  testWidgets(
+    'Frisbee opens its route after systemic use without instant mood',
+    (tester) async {
+      final database = createTestDatabase();
+      addTearDown(database.close);
+      final games = _ThingsGames(database, activePeriod);
+      games.inventory = {itemFrisbee.id: 1};
+      final usageKey =
+          'item:${itemFrisbee.id}:${PetActionSlot.defaultSlot.storageValue}';
+      games.usages[usageKey] = 1;
+      final container = ProviderContainer(
+        overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
+          activeProfileIdProvider.overrideWith(
+            () => _ActiveThingsProfileMock(1),
+          ),
+          profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+          gameRepositoryProvider.overrideWithValue(games),
+          contentRepositoryProvider.overrideWithValue(
+            TestContentRepository(const [], shopItems: [itemFrisbee]),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final router = GoRouter(
+        initialLocation: '/things',
+        routes: [
+          GoRoute(path: '/things', builder: (_, _) => const ThingsScreen()),
+          GoRoute(
+            path: '/toy-frisbee',
+            builder: (_, _) => const Scaffold(body: Text('Frisbee route')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('things-play-toy_frisbee')));
+      await tester.pumpAndSettle();
+      expect(find.text('Frisbee route'), findsOneWidget);
+      expect(games.usages[usageKey], 1);
+    },
+  );
+
+  testWidgets('Frisbee can play while Car cannot grant instant rewards', (
     tester,
   ) async {
     final database = createTestDatabase();
@@ -636,11 +688,17 @@ void main() {
           .onPressed,
       isNotNull,
     );
-    for (final id in ['toy_frisbee', 'toy_plush']) {
-      final button = find.byKey(Key('things-use-$id'));
-      expect(button, findsOneWidget);
-      expect(tester.widget<FilledButton>(button).onPressed, isNull);
-    }
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('things-play-toy_frisbee')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    final carButton = find.byKey(const Key('things-use-toy_plush'));
+    expect(carButton, findsOneWidget);
+    expect(tester.widget<FilledButton>(carButton).onPressed, isNull);
     expect(games.usages, isEmpty);
   });
 

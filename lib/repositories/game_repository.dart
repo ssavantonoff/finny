@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/ball_reward.dart';
+import 'package:finny/models/frisbee_reward.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/day_five_task.dart';
@@ -19,6 +20,7 @@ import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/special_purchase.dart';
 import 'package:finny/models/story_event.dart';
 import 'package:finny/models/transaction.dart';
+import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/models/task_progress.dart';
 import 'package:finny/models/task_submission_result.dart';
 import 'package:finny/models/virtual_day_rules.dart';
@@ -277,6 +279,24 @@ abstract interface class BallRewardPort {
   });
 }
 
+abstract interface class FrisbeeRewardPort {
+  Future<FrisbeeRewardResult?> confirmFrisbeeOperation({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  });
+
+  Future<FrisbeeRewardResult> completeFrisbee({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  });
+}
+
 abstract interface class DayLifecyclePort {
   Future<BedtimeDecision> evaluateBedtime({
     required int profileId,
@@ -388,6 +408,7 @@ class SqliteGameRepository implements GameRepository {
     required PetStatEffects effects,
     ShopItem? item,
     bool ballCompletion = false,
+    bool frisbeeCompletion = false,
     bool Function()? activeProfileMatches,
   }) async {
     _validateOperationId(operationId);
@@ -417,6 +438,21 @@ class SqliteGameRepository implements GameRepository {
             item.usagePolicy != ItemUsagePolicy.oncePerPeriod ||
             item.petEffects != effects) {
           throw StateError('Invalid canonical Ball action.');
+        }
+        if (await _readInventoryQuantity(txn, profileId, item.id) <= 0) {
+          throw PetItemNotOwnedException(item.id);
+        }
+      }
+      if (frisbeeCompletion) {
+        if (item?.id != 'toy_frisbee' ||
+            actionId != 'item:toy_frisbee' ||
+            !item!.persistent ||
+            item.usagePolicy != ItemUsagePolicy.oncePerPeriod ||
+            item.petEffects != effects ||
+            item.petEffects.mood <= 0 ||
+            item.petEffects.care != 0 ||
+            item.petEffects.satiety != 0) {
+          throw StateError('Invalid canonical Frisbee action.');
         }
         if (await _readInventoryQuantity(txn, profileId, item.id) <= 0) {
           throw PetItemNotOwnedException(item.id);
@@ -463,7 +499,7 @@ class SqliteGameRepository implements GameRepository {
         slot: slot,
       );
       if (usagePolicy != ItemUsagePolicy.unlimited && usageCount > 0) {
-        if (ballCompletion) {
+        if (ballCompletion || frisbeeCompletion) {
           requireActiveProfile();
           return (
             pet: pet,
@@ -1774,7 +1810,9 @@ class SqlitePetActionPort implements PetActionPort {
     required String operationId,
     required PetActionSlot slot,
   }) async {
-    if (item.id == 'toy_ball') throw PetItemNotUsableException(item.id);
+    if (item.id == 'toy_ball' || item.id == 'toy_frisbee') {
+      throw PetItemNotUsableException(item.id);
+    }
     final result = await _core._applyPetAction(
       profileId: profileId,
       periodId: periodId,
@@ -1883,6 +1921,120 @@ class SqliteBallRewardPort implements BallRewardPort {
           : result.moodDelta == 0
           ? BallRewardStatus.capped
           : BallRewardStatus.applied,
+      canonicalMoodEffect: item.petEffects.mood,
+      actualMoodDelta: result.moodDelta,
+      pet: result.pet,
+    );
+  }
+}
+
+class SqliteFrisbeeRewardPort implements FrisbeeRewardPort {
+  SqliteFrisbeeRewardPort(AppDatabase database, this._content)
+    : _core = SqliteGameRepository(database);
+
+  final SqliteGameRepository _core;
+  final ContentRepository _content;
+
+  Future<void> _requireCanonicalItem(ShopItem item) async {
+    final matches = (await _content.loadShopItems()).where(
+      (candidate) => candidate.id == 'toy_frisbee',
+    );
+    if (matches.length != 1) {
+      throw StateError('Canonical Frisbee item is missing or duplicated.');
+    }
+    final canonical = matches.single;
+    if (item.id != canonical.id ||
+        item.petEffects != canonical.petEffects ||
+        !canonical.persistent ||
+        canonical.usagePolicy != ItemUsagePolicy.oncePerPeriod ||
+        canonical.displaySection != ShopDisplaySection.toys ||
+        canonical.petEffects.mood <= 0 ||
+        canonical.petEffects.care != 0 ||
+        canonical.petEffects.satiety != 0) {
+      throw StateError('Frisbee reward does not match canonical content.');
+    }
+  }
+
+  @override
+  Future<FrisbeeRewardResult?> confirmFrisbeeOperation({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  }) async {
+    await _requireCanonicalItem(item);
+    if (!operationId.startsWith('toy-frisbee:$profileId:') ||
+        !activeProfileMatches()) {
+      throw StateError('The Frisbee operation identity or profile changed.');
+    }
+    final db = await _core._appDatabase.database;
+    return db.transaction((txn) async {
+      if (!activeProfileMatches()) {
+        throw StateError(
+          'The active profile changed during the Frisbee session.',
+        );
+      }
+      if (await _core._readInventoryQuantity(txn, profileId, item.id) <= 0) {
+        throw PetItemNotOwnedException(item.id);
+      }
+      final previous = await _core._readPetActionOperation(
+        txn,
+        profileId: profileId,
+        operationId: operationId,
+      );
+      if (previous == null) return null;
+      if (previous['period_id'] != periodId ||
+          previous['action_id'] != 'item:toy_frisbee' ||
+          previous['usage_slot'] != PetActionSlot.defaultSlot.storageValue) {
+        throw PetOperationConflictException(operationId);
+      }
+      final pet = await _core._requirePet(txn, profileId);
+      if (!activeProfileMatches()) {
+        throw StateError(
+          'The active profile changed during the Frisbee session.',
+        );
+      }
+      return FrisbeeRewardResult(
+        status: FrisbeeRewardStatus.confirmedPreviously,
+        canonicalMoodEffect: item.petEffects.mood,
+        actualMoodDelta: 0,
+        pet: pet,
+      );
+    });
+  }
+
+  @override
+  Future<FrisbeeRewardResult> completeFrisbee({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  }) async {
+    await _requireCanonicalItem(item);
+    if (!operationId.startsWith('toy-frisbee:$profileId:')) {
+      throw StateError('The Frisbee operation identity changed.');
+    }
+    final result = await _core._applyPetAction(
+      profileId: profileId,
+      periodId: periodId,
+      actionId: 'item:toy_frisbee',
+      operationId: operationId,
+      slot: PetActionSlot.defaultSlot,
+      effects: item.petEffects,
+      item: item,
+      frisbeeCompletion: true,
+      activeProfileMatches: activeProfileMatches,
+    );
+    return FrisbeeRewardResult(
+      status: result.duplicateOperation
+          ? FrisbeeRewardStatus.confirmedPreviously
+          : result.alreadyUsed
+          ? FrisbeeRewardStatus.alreadyRewarded
+          : result.moodDelta == 0
+          ? FrisbeeRewardStatus.capped
+          : FrisbeeRewardStatus.applied,
       canonicalMoodEffect: item.petEffects.mood,
       actualMoodDelta: result.moodDelta,
       pet: result.pet,

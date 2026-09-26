@@ -36,6 +36,7 @@ class _DisplayGames extends SqliteGameRepository {
     if (readPersistedWallet) return await super.getGameState(profileId);
     return state;
   }
+
   @override
   Future<Pet?> getPet(int profileId) async => pet;
   @override
@@ -491,6 +492,76 @@ void main() {
     scope.dispose();
   });
 
+  testWidgets('direct Frisbee route follows Campaign and Free Play lifecycle', (
+    tester,
+  ) async {
+    final (database, content, games) = await completedSave(tester);
+    addTearDown(database.close);
+    final scope = container(database, content, games);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+    );
+    await waitFor(tester, find.text('5 дней вместе!'));
+    final router = scope.read(routerProvider);
+    final db = await database.database;
+
+    await tester.runAsync(() async {
+      await db.update(
+        'game_periods',
+        {'status': 'active', 'completed_at': null},
+        where: 'profile_id = ? AND period_number = ?',
+        whereArgs: [1, 5],
+      );
+      router.go('/home');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      router.go('/toy-frisbee');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(router.routeInformationProvider.value.uri.path, '/toy-frisbee');
+    expect(find.byType(NavigationBar), findsNothing);
+
+    await tester.runAsync(() async {
+      await db.update(
+        'game_periods',
+        {
+          'status': 'completed',
+          'completed_at': DateTime.utc(2026).toIso8601String(),
+        },
+        where: 'profile_id = ? AND period_number = ?',
+        whereArgs: [1, 5],
+      );
+      router.go('/home');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      router.go('/toy-frisbee');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(router.routeInformationProvider.value.uri.path, '/finale');
+
+    await tester.runAsync(() async {
+      await scope.read(campaignLifecycleServiceProvider).finishStory(1);
+      router.go('/toy-frisbee');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      '/campaign-complete',
+    );
+
+    await tester.runAsync(() async {
+      await scope.read(campaignLifecycleServiceProvider).startFreePlay(1);
+      router.go('/toy-frisbee');
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await tester.pump();
+    expect(router.routeInformationProvider.value.uri.path, '/toy-frisbee');
+    expect(find.byType(NavigationBar), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    scope.dispose();
+  });
+
   testWidgets(
     'Free Play card pushes game and return reloads persisted wallet',
     (tester) async {
@@ -577,5 +648,4 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     scope.dispose();
   });
-
 }

@@ -453,6 +453,15 @@ class _ItemCard extends StatelessWidget {
                         : null,
                     child: const Text('Играть'),
                   )
+                : item.id == 'toy_frisbee'
+                ? FilledButton(
+                    key: const Key('things-play-toy_frisbee'),
+                    style: _thingsActionStyle,
+                    onPressed: state.canPlayFrisbee(item)
+                        ? () => context.push('/toy-frisbee')
+                        : null,
+                    child: const Text('Играть'),
+                  )
                 : FilledButton(
                     key: Key('things-use-${item.id}'),
                     style: _thingsActionStyle,
