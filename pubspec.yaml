@@ -66,6 +66,8 @@ flutter:
     - assets/content/
     - assets/images/home/
     - assets/images/things/
+    - assets/images/tasks/day4/
+    - assets/images/tasks/day5/
     - assets/minigames/finny_catch/
     - assets/minigames/ball/
 

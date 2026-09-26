@@ -2,7 +2,9 @@ import 'dart:math';
 
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/tasks/tasks_controller.dart';
+import 'package:finny/features/tasks/task_visual_components.dart';
 import 'package:finny/models/financial_task.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/task_submission_result.dart';
 import 'package:flutter/material.dart';
 
@@ -11,11 +13,13 @@ class PlanAdaptationTaskScreen extends StatefulWidget {
     super.key,
     required this.task,
     required this.controller,
+    this.shopItems = const {},
     this.random,
   });
 
   final FinancialTask task;
   final TasksController controller;
+  final Map<String, ShopItem> shopItems;
   final Random? random;
 
   @override
@@ -109,155 +113,183 @@ class _PlanAdaptationTaskScreenState extends State<PlanAdaptationTaskScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    key: const Key('plan-adaptation-task-screen'),
-    appBar: AppBar(
-      title: Text(widget.task.title),
-      leading: IconButton(
-        tooltip: 'Закрыть',
-        onPressed: submitting ? null : () => Navigator.pop(context),
-        icon: const Icon(Icons.close),
-      ),
-    ),
-    body: SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.medium),
+  Widget build(BuildContext context) {
+    final currentKeepTotal = scenario.items
+        .where(
+          (item) =>
+              assignments[item.id] == PlanAdaptationDecision.keep.wireValue,
+        )
+        .fold<int>(0, (total, item) => total + item.price);
+    return Scaffold(
+      key: const Key('plan-adaptation-task-screen'),
+      backgroundColor: AppColors.background,
+      body: Stack(
         children: [
-          _BudgetSummary(
-            scenario: scenario,
-            currentKeepTotal: scenario.items
-                .where(
-                  (item) =>
-                      assignments[item.id] ==
-                      PlanAdaptationDecision.keep.wireValue,
-                )
-                .fold<int>(0, (total, item) => total + item.price),
-          ),
-          const SizedBox(height: AppSpacing.medium),
-          Text(scenario.prompt, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: AppSpacing.small),
-          Text(
-            'Перетащи карточку или нажми на неё, а затем выбери зону.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: AppSpacing.medium),
-          if (assignments.length < scenario.items.length) ...[
-            Text('Карточки', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: AppSpacing.small),
-            Wrap(
-              spacing: AppSpacing.small,
-              runSpacing: AppSpacing.small,
+          const Positioned.fill(child: TaskBackdrop()),
+          SafeArea(
+            child: Column(
               children: [
-                for (final item in shuffledItems)
-                  if (!assignments.containsKey(item.id))
-                    _buildDraggableItem(context, item),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.medium),
-          ],
-          _buildZone(
-            context,
-            decision: PlanAdaptationDecision.keep.wireValue,
-            label: scenario.keepLabel,
-            description: scenario.keepDescription,
-          ),
-          const SizedBox(height: AppSpacing.medium),
-          _buildZone(
-            context,
-            decision: PlanAdaptationDecision.later.wireValue,
-            label: scenario.laterLabel,
-            description: scenario.laterDescription,
-          ),
-          if (result is TaskPlanAdaptationIncorrect) ...[
-            const SizedBox(height: AppSpacing.medium),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                'Проверь план',
-                key: const Key('plan-adaptation-incorrect-title'),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            if (result case TaskPlanAdaptationIncorrect(:final overBudgetBy))
-              if (overBudgetBy > 0)
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.small),
-                  child: Text(
-                    'Не хватает $overBudgetBy монет.',
-                    key: const Key('plan-adaptation-over-budget'),
-                  ),
-                ),
-            if (result case TaskPlanAdaptationIncorrect(:final explanation))
-              Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.small),
-                child: Text(
-                  explanation,
-                  key: const Key('plan-adaptation-incorrect-explanation'),
-                ),
-              ),
-            for (final item in scenario.items)
-              if (incorrectItemIds.contains(item.id))
-                Padding(
-                  padding: const EdgeInsets.only(top: AppSpacing.small),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                     children: [
-                      const Icon(Icons.error_outline),
-                      const SizedBox(width: AppSpacing.small),
-                      Expanded(
-                        child: Text(
-                          '${item.label}: ${item.feedback}',
-                          key: Key('plan-adaptation-feedback-${item.id}'),
-                        ),
+                      TaskScreenHeader(
+                        day: widget.task.period,
+                        title: widget.task.title,
+                        description: 'По дороге потерялись монеты. Измени готовый план и сохрани важное для Финни.',
+                        onClose: submitting
+                            ? null
+                            : () => Navigator.pop(context),
                       ),
+                      const SizedBox(height: 16),
+                      if (result case TaskAnswerCompleted(:final explanation))
+                        TaskSuccessPanel(
+                          reward: widget.task.reward,
+                          explanation: explanation,
+                          titleKey: const Key('plan-adaptation-success-title'),
+                          rewardKey: const Key('plan-adaptation-reward'),
+                        )
+                      else ...[
+                        TaskSurface(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Ситуация изменилась',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Исходный план: ${scenario.originalPlan} монет',
+                              ),
+                              Text(
+                                'Потерялось: −${scenario.lostAmount} монет',
+                                style: const TextStyle(
+                                  color: AppColors.warning,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 20,
+                                ),
+                              ),
+                              Text(
+                                'Теперь доступно: ${scenario.availableBudget} монет',
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _BudgetSummary(
+                          scenario: scenario,
+                          currentKeepTotal: currentKeepTotal,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Перетащи карточку или нажми на неё, а затем выбери зону.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: _buildZone(
+                                decision: PlanAdaptationDecision.keep.wireValue,
+                                label: scenario.keepLabel,
+                                description: scenario.keepDescription,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _buildZone(
+                                decision:
+                                    PlanAdaptationDecision.later.wireValue,
+                                label: scenario.laterLabel,
+                                description: scenario.laterDescription,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (result case TaskPlanAdaptationIncorrect(
+                          :final explanation,
+                          :final overBudgetBy,
+                        )) ...[
+                          const SizedBox(height: 16),
+                          TaskFeedbackPanel(
+                            title: 'Проверь план',
+                            titleKey: const Key(
+                              'plan-adaptation-incorrect-title',
+                            ),
+                            children: [
+                              if (overBudgetBy > 0)
+                                Text(
+                                  'Не хватает $overBudgetBy монет.',
+                                  key: const Key('plan-adaptation-over-budget'),
+                                ),
+                              Text(
+                                explanation,
+                                key: const Key(
+                                  'plan-adaptation-incorrect-explanation',
+                                ),
+                              ),
+                              for (final item in scenario.items)
+                                if (incorrectItemIds.contains(item.id))
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      '${item.label}: ${item.feedback}',
+                                      key: Key(
+                                        'plan-adaptation-feedback-${item.id}',
+                                      ),
+                                    ),
+                                  ),
+                            ],
+                          ),
+                        ],
+                        if (failed) ...[
+                          const SizedBox(height: 16),
+                          const TaskFeedbackPanel(
+                            title: 'Не получилось выполнить действие.',
+                            children: [Text('Попробуй ещё раз.')],
+                          ),
+                        ],
+                      ],
                     ],
                   ),
                 ),
-          ],
-          if (result case TaskAnswerCompleted(:final explanation)) ...[
-            const SizedBox(height: AppSpacing.medium),
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                'Отлично!',
-                key: const Key('plan-adaptation-success-title'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: TaskPrimaryButton(
+                    keyName: completed
+                        ? 'plan-adaptation-continue'
+                        : 'plan-adaptation-check',
+                    label: completed
+                        ? 'Продолжить'
+                        : submitting
+                        ? 'Проверяем…'
+                        : 'Проверить решение',
+                    onPressed: completed
+                        ? () => Navigator.pop(context)
+                        : !submitting
+                        ? _check
+                        : null,
+                  ),
+                ),
+              ],
             ),
-            Text('+${widget.task.reward} монет'),
-            const SizedBox(height: AppSpacing.small),
-            Text(explanation),
-          ],
-          if (failed)
-            const Padding(
-              padding: EdgeInsets.only(top: AppSpacing.small),
-              child: Text(
-                'Не получилось выполнить действие. Попробуй ещё раз.',
-              ),
-            ),
-          const SizedBox(height: AppSpacing.small),
-          if (completed)
-            FilledButton(
-              key: const Key('plan-adaptation-continue'),
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Продолжить'),
-            )
-          else
-            FilledButton(
-              key: const Key('plan-adaptation-check'),
-              onPressed:
-                  assignments.length == scenario.items.length && !submitting
-                  ? _check
-                  : null,
-              child: Text(submitting ? 'Проверяем…' : 'Проверить решение'),
-            ),
+          ),
         ],
       ),
-    ),
-  );
+    );
+  }
 
-  Widget _buildZone(
-    BuildContext context, {
+  Widget _buildZone({
     required String decision,
     required String label,
     required String description,
@@ -265,59 +297,34 @@ class _PlanAdaptationTaskScreenState extends State<PlanAdaptationTaskScreen> {
     onWillAcceptWithDetails: (_) => !submitting && !completed,
     onAcceptWithDetails: (details) => _moveItem(details.data, decision),
     builder: (context, candidates, rejected) {
-      final highlighted = candidates.isNotEmpty || selectedItemId != null;
-      return InkWell(
-        key: Key('plan-adaptation-zone-$decision'),
+      return TaskDecisionZone(
+        zoneKey: Key('plan-adaptation-zone-$decision'),
+        title: label,
+        description: description,
+        icon: decision == PlanAdaptationDecision.keep.wireValue
+            ? Icons.shopping_bag_rounded
+            : Icons.favorite_rounded,
+        color: decision == PlanAdaptationDecision.keep.wireValue
+            ? AppColors.need
+            : AppColors.want,
+        highlighted: candidates.isNotEmpty || selectedItemId != null,
         onTap: submitting || completed ? null : () => _placeSelected(decision),
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          constraints: const BoxConstraints(minHeight: 112),
-          padding: const EdgeInsets.all(AppSpacing.medium),
-          decoration: BoxDecoration(
-            color: highlighted
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(
-              width: candidates.isNotEmpty ? 3 : 1,
-              color: candidates.isNotEmpty
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.outline,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 2),
-              Text(description),
-              if (selectedItemId != null) ...[
-                const SizedBox(height: AppSpacing.small),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: FilledButton.tonal(
-                    key: Key('plan-adaptation-place-$decision'),
-                    onPressed: submitting || completed
-                        ? null
-                        : () => _placeSelected(decision),
-                    child: Text('Поместить в «$label»'),
-                  ),
-                ),
-              ],
-              const SizedBox(height: AppSpacing.small),
-              Wrap(
-                spacing: AppSpacing.small,
-                runSpacing: AppSpacing.small,
-                children: [
-                  for (final item in shuffledItems)
-                    if (assignments[item.id] == decision)
-                      _buildDraggableItem(context, item),
-                ],
+        children: [
+          if (selectedItemId != null)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonal(
+                key: Key('plan-adaptation-place-$decision'),
+                onPressed: submitting || completed
+                    ? null
+                    : () => _placeSelected(decision),
+                child: const Text('Поместить'),
               ),
-            ],
-          ),
-        ),
+            ),
+          for (final item in shuffledItems)
+            if (assignments[item.id] == decision)
+              _buildDraggableItem(context, item),
+        ],
       );
     },
   );
@@ -330,58 +337,29 @@ class _PlanAdaptationTaskScreenState extends State<PlanAdaptationTaskScreen> {
     maxSimultaneousDrags: submitting || completed ? 0 : 1,
     feedback: Material(
       color: Colors.transparent,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 240),
-        child: _buildItemCard(context, item, dragging: true),
-      ),
+      child: SizedBox(width: 150, child: _buildItemCard(item, dragging: true)),
     ),
     childWhenDragging: Opacity(
       opacity: 0.35,
-      child: _buildItemCard(context, item),
+      child: _buildItemCard(item, dragging: true),
     ),
-    child: _buildItemCard(context, item),
+    child: _buildItemCard(item),
   );
 
-  Widget _buildItemCard(
-    BuildContext context,
-    PlanAdaptationTaskItem item, {
-    bool dragging = false,
-  }) {
-    final selected = selectedItemId == item.id;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: '${item.label}, ${item.price} монет',
-      child: InkWell(
-        key: dragging ? null : Key('plan-adaptation-item-${item.id}'),
+  Widget _buildItemCard(PlanAdaptationTaskItem item, {bool dragging = false}) =>
+      TaskItemTile(
+        itemId: item.id,
+        label: item.label,
+        price: item.price,
+        shopItems: widget.shopItems,
+        compact: true,
+        selected: selectedItemId == item.id,
+        incorrect: incorrectItemIds.contains(item.id),
+        tileKey: dragging ? null : Key('plan-adaptation-item-${item.id}'),
         onTap: dragging || submitting || completed
             ? null
             : () => _selectItem(item.id),
-        borderRadius: BorderRadius.circular(AppRadii.button),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          constraints: const BoxConstraints(minHeight: 48),
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.medium,
-            vertical: AppSpacing.small,
-          ),
-          decoration: BoxDecoration(
-            color: selected
-                ? Theme.of(context).colorScheme.secondaryContainer
-                : Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(AppRadii.button),
-            border: Border.all(
-              color: selected
-                  ? Theme.of(context).colorScheme.secondary
-                  : Theme.of(context).colorScheme.outline,
-            ),
-          ),
-          child: Text('${item.label} · ${item.price} 🪙'),
-        ),
-      ),
-    );
-  }
+      );
 }
 
 class _BudgetSummary extends StatelessWidget {
@@ -394,33 +372,45 @@ class _BudgetSummary extends StatelessWidget {
   final int currentKeepTotal;
 
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) => TaskSurface(
     key: const Key('plan-adaptation-budget-summary'),
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'План и новая ситуация',
-            style: Theme.of(context).textTheme.titleMedium,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Текущий план',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w800,
+            fontSize: 17,
           ),
-          const SizedBox(height: AppSpacing.small),
-          Text('Исходный план: ${scenario.originalPlan} монет'),
-          Text('Потерялось: ${scenario.lostAmount} монет'),
-          Text('Теперь доступно: ${scenario.availableBudget} монет'),
-          Text('Сейчас в плане: $currentKeepTotal монет'),
-          if (currentKeepTotal > scenario.availableBudget)
-            Text(
-              'Нужно сократить план на '
-              '${currentKeepTotal - scenario.availableBudget} монет',
-            )
-          else
-            Text(
-              'Свободно: ${scenario.availableBudget - currentKeepTotal} монет',
-            ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        Text('Сейчас в плане: $currentKeepTotal монет'),
+        if (currentKeepTotal > scenario.availableBudget)
+          Text(
+            'Нужно сократить план на '
+            '${currentKeepTotal - scenario.availableBudget} монет',
+          )
+        else
+          Text(
+            'Свободно: ${scenario.availableBudget - currentKeepTotal} монет',
+          ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: LinearProgressIndicator(
+            value: (currentKeepTotal / scenario.availableBudget)
+                .clamp(0, 1)
+                .toDouble(),
+            minHeight: 9,
+            backgroundColor: AppColors.primaryLight,
+            color: currentKeepTotal > scenario.availableBudget
+                ? AppColors.warning
+                : AppColors.primary,
+          ),
+        ),
+      ],
     ),
   );
 }

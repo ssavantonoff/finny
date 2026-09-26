@@ -232,6 +232,12 @@ class TaskItemArt extends StatelessWidget {
     'bow' => 'accessory_bow',
     'comb' => 'care_comb',
     'ball' => 'toy_ball',
+    'toy' => 'toy_ball',
+    'food_feed' ||
+    'care_shampoo' ||
+    'care_comb' ||
+    'toy_ball' ||
+    'accessory_bow' => taskItemId,
     _ => null,
   };
 
@@ -242,18 +248,92 @@ class TaskItemArt extends StatelessWidget {
     return SizedBox.square(
       key: Key('task-item-art-$taskItemId'),
       dimension: size,
-      child: item == null
-          ? Icon(
-              taskItemId == 'room_decoration'
-                  ? Icons.weekend_rounded
-                  : Icons.inventory_2_outlined,
-              color: AppColors.primary,
-              size: size * 0.64,
-              semanticLabel: label,
-            )
-          : ShopItemArt(item: item),
+      child: switch (taskItemId) {
+        'scenario_waterer_05' => Image.asset(
+          'assets/images/tasks/day5/waterer.png',
+          fit: BoxFit.contain,
+          semanticLabel: label,
+        ),
+        'savings' => FinnyCatchArt(type: FinnyCatchObjectType.coin, size: size),
+        _ =>
+          item == null
+              ? Icon(
+                  taskItemId == 'room_decoration'
+                      ? Icons.weekend_rounded
+                      : Icons.inventory_2_outlined,
+                  color: AppColors.primary,
+                  size: size * 0.64,
+                  semanticLabel: label,
+                )
+              : ShopItemArt(item: item),
+      },
     );
   }
+}
+
+class TaskQuantityStepper extends StatelessWidget {
+  const TaskQuantityStepper({
+    required this.value,
+    required this.onDecrease,
+    required this.onIncrease,
+    required this.decreaseTooltip,
+    required this.increaseTooltip,
+    this.decreaseKey,
+    this.increaseKey,
+    this.valueKey,
+    super.key,
+  });
+
+  final int value;
+  final VoidCallback? onDecrease;
+  final VoidCallback? onIncrease;
+  final String decreaseTooltip;
+  final String increaseTooltip;
+  final Key? decreaseKey;
+  final Key? increaseKey;
+  final Key? valueKey;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      IconButton(
+        key: decreaseKey,
+        tooltip: decreaseTooltip,
+        onPressed: onDecrease,
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        style: IconButton.styleFrom(
+          backgroundColor: AppColors.primaryLight,
+          foregroundColor: AppColors.primaryDark,
+        ),
+        icon: const Icon(Icons.remove_rounded),
+      ),
+      SizedBox(
+        width: 36,
+        child: Text(
+          '$value',
+          key: valueKey,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      IconButton(
+        key: increaseKey,
+        tooltip: increaseTooltip,
+        onPressed: onIncrease,
+        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+        style: IconButton.styleFrom(
+          backgroundColor: AppColors.primaryLight,
+          foregroundColor: AppColors.primaryDark,
+        ),
+        icon: const Icon(Icons.add_rounded),
+      ),
+    ],
+  );
 }
 
 class TaskItemTile extends StatelessWidget {

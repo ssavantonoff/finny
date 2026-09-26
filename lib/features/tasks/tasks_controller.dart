@@ -187,6 +187,7 @@ class TasksController extends Notifier<TasksState> {
       }
       if (period.periodNumber == 1 ||
           period.periodNumber == 2 ||
+          period.periodNumber == 3 ||
           period.periodNumber == 5) {
         final catalog = await ref
             .read(contentRepositoryProvider)

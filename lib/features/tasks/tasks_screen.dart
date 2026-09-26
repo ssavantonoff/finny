@@ -271,7 +271,7 @@ class _TaskCard extends StatelessWidget {
                     ? null
                     : () {
                         if (task.type == 'independent_budget') {
-                          Navigator.of(context).push(
+                          Navigator.of(context, rootNavigator: true).push(
                             MaterialPageRoute<void>(
                               fullscreenDialog: true,
                               builder: (_) => IndependentBudgetTaskScreen(
@@ -284,7 +284,7 @@ class _TaskCard extends StatelessWidget {
                           return;
                         }
                         if (task.type == 'plan_repair') {
-                          Navigator.of(context).push(
+                          Navigator.of(context, rootNavigator: true).push(
                             MaterialPageRoute<void>(
                               fullscreenDialog: true,
                               builder: (_) => PlanRepairTaskScreen(
@@ -297,7 +297,7 @@ class _TaskCard extends StatelessWidget {
                           return;
                         }
                         if (task.type == 'shopping_trip') {
-                          Navigator.of(context).push(
+                          Navigator.of(context, rootNavigator: true).push(
                             MaterialPageRoute<void>(
                               fullscreenDialog: true,
                               builder: (_) => ShoppingTripTaskScreen(
@@ -337,12 +337,13 @@ class _TaskCard extends StatelessWidget {
                           return;
                         }
                         if (task.type == 'plan_adaptation') {
-                          Navigator.of(context).push(
+                          Navigator.of(context, rootNavigator: true).push(
                             MaterialPageRoute<void>(
                               fullscreenDialog: true,
                               builder: (_) => PlanAdaptationTaskScreen(
                                 task: task,
                                 controller: controller,
+                                shopItems: state.shopItems,
                               ),
                             ),
                           );

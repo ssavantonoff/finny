@@ -26,7 +26,7 @@ Future<void> _pumpUntil(WidgetTester tester, Finder finder) async {
 
 void main() {
   for (final size in [const Size(360, 800), const Size(393, 852)]) {
-    for (final day in [1, 2]) {
+    for (final day in [1, 2, 3, 4, 5]) {
       testWidgets('Tasks hub and Day $day focused route at $size', (
         tester,
       ) async {
@@ -79,13 +79,16 @@ void main() {
         final shopItems = await tester.runAsync(
           () => AssetContentRepository().loadShopItems(),
         );
+        final tasks = await tester.runAsync(
+          () => AssetContentRepository().loadTasks(),
+        );
         final container = ProviderContainer(
           overrides: [
             appDatabaseProvider.overrideWithValue(database),
             contentRepositoryProvider.overrideWithValue(
               TestContentRepository(
-                testPeriodDefinitions(count: 2),
-                tasks: [testCategorizationTask(), testBudgetPriorityTask()],
+                testPeriodDefinitions(count: 5),
+                tasks: tasks,
                 shopItems: shopItems!,
               ),
             ),
@@ -104,7 +107,13 @@ void main() {
         );
         await _pumpUntil(tester, find.byType(NavigationBar));
         await tester.tap(find.byKey(const Key('nav-tasks')));
-        final taskId = day == 1 ? 'task_need_or_want_01' : 'task_priority_02';
+        final taskId = switch (day) {
+          1 => 'task_need_or_want_01',
+          2 => 'task_priority_02',
+          3 => 'task_changed_plan_03',
+          4 => 'task_shopping_trip_04',
+          _ => 'task_independent_budget_05',
+        };
         await _pumpUntil(tester, find.byKey(Key('task-open-$taskId')));
         expect(find.text('День $day'), findsOneWidget);
         expect(find.byKey(Key('task-card-$taskId')), findsOneWidget);
@@ -115,11 +124,13 @@ void main() {
         await _pumpUntil(
           tester,
           find.byKey(
-            Key(
-              day == 1
-                  ? 'categorization-task-screen'
-                  : 'budget-priority-task-screen',
-            ),
+            Key(switch (day) {
+              1 => 'categorization-task-screen',
+              2 => 'budget-priority-task-screen',
+              3 => 'plan-adaptation-task-screen',
+              4 => 'shopping-trip-screen',
+              _ => 'independent-budget-task-screen',
+            }),
           ),
         );
         expect(find.byType(NavigationBar).hitTestable(), findsNothing);
@@ -129,6 +140,22 @@ void main() {
         await _pumpUntil(tester, find.byType(NavigationBar));
         expect(find.byKey(Key('task-open-$taskId')), findsOneWidget);
         expect(tester.takeException(), isNull);
+        if (day == 5) {
+          const secondTaskId = 'task_plan_repair_05';
+          await tester.ensureVisible(
+            find.byKey(const Key('task-open-$secondTaskId')),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('task-open-$secondTaskId')));
+          await _pumpUntil(
+            tester,
+            find.byKey(const Key('plan-repair-task-screen')),
+          );
+          expect(find.byType(NavigationBar).hitTestable(), findsNothing);
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byTooltip('Закрыть'));
+          await _pumpUntil(tester, find.byType(NavigationBar));
+        }
         for (var attempt = 0; attempt < 100; attempt++) {
           if (container.read(shopControllerProvider).load != ShopLoad.loading) {
             break;
