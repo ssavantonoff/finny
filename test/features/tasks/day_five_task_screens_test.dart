@@ -56,8 +56,11 @@ void main() {
     expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
     final food = find.byKey(const Key('independent-budget-toggle-food_feed'));
     await tester.ensureVisible(food);
+    await tester.pumpAndSettle();
     await tester.tap(food);
     await tester.pump();
+    await tester.drag(find.byType(ListView), const Offset(0, 700));
+    await tester.pumpAndSettle();
     expect(find.text('Покупки: 90'), findsOneWidget);
     expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
     expect(tester.takeException(), isNull);
@@ -88,10 +91,24 @@ void main() {
     );
     expect(find.text('410 / 350'), findsOneWidget);
     expect(find.text('Не хватает 60 монет'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                'assets/images/tasks/day5/waterer.png' &&
+            widget.fit == BoxFit.contain,
+      ),
+      findsWidgets,
+    );
     final later = find.byKey(const Key('plan-repair-later-food_feed'));
     await tester.ensureVisible(later);
+    await tester.pumpAndSettle();
     await tester.tap(later);
     await tester.pump();
+    await tester.drag(find.byType(ListView), const Offset(0, 900));
+    await tester.pumpAndSettle();
     expect(find.text('320 / 350'), findsOneWidget);
     expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
     expect(tester.takeException(), isNull);

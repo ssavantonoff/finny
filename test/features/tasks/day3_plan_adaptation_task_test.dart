@@ -51,10 +51,12 @@ Future<void> _pumpUntil(WidgetTester tester, Finder finder) async {
 Future<void> _tapToZone(WidgetTester tester, String itemId, String zone) async {
   final item = find.byKey(Key('plan-adaptation-item-$itemId'));
   await tester.ensureVisible(item);
+  await tester.pumpAndSettle();
   await tester.tap(item);
   await tester.pump();
   final place = find.byKey(Key('plan-adaptation-place-$zone'));
   await tester.ensureVisible(place);
+  await tester.pumpAndSettle();
   await tester.tap(place);
   await tester.pump();
 }
@@ -158,7 +160,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Исходный план: 300 монет'), findsOneWidget);
-      expect(find.text('Потерялось: 80 монет'), findsOneWidget);
+      expect(find.text('Потерялось: −80 монет'), findsOneWidget);
       expect(find.text('Теперь доступно: 220 монет'), findsOneWidget);
       expect(find.text('Сейчас в плане: 300 монет'), findsOneWidget);
 
@@ -185,7 +187,10 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       // Keep the card placement intact after the incorrect check.
-      expect(find.text('Корм · 90 🪙'), findsOneWidget);
+      expect(
+        find.byKey(const Key('plan-adaptation-item-food')),
+        findsOneWidget,
+      );
       await _tapToZone(tester, 'savings', 'keep');
       await tester.drag(
         find.descendant(

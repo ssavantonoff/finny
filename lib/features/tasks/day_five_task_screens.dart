@@ -1,5 +1,6 @@
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/tasks/tasks_controller.dart';
+import 'package:finny/features/tasks/task_visual_components.dart';
 import 'package:finny/models/day_five_task.dart';
 import 'package:finny/models/financial_task.dart';
 import 'package:finny/models/shop_item.dart';
@@ -63,63 +64,98 @@ class _IndependentBudgetTaskScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       key: const Key('independent-budget-task-screen'),
-      appBar: AppBar(title: Text(widget.task.title)),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _DayFiveSummary(
-              budget: scenario.budget,
-              purchases: purchaseTotal,
-              savings: savingsAmount,
-              keyPrefix: 'independent-budget',
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(AppSpacing.medium),
-                children: [
-                  Text(
-                    scenario.prompt,
-                    style: Theme.of(context).textTheme.titleMedium,
+      backgroundColor: AppColors.background,
+      body: Stack(
+        children: [
+          const Positioned.fill(child: TaskBackdrop()),
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    children: [
+                      TaskScreenHeader(
+                        day: widget.task.period,
+                        title: widget.task.title,
+                        description: scenario.prompt,
+                        onClose: submitting
+                            ? null
+                            : () => Navigator.pop(context),
+                      ),
+                      const SizedBox(height: 16),
+                      if (result case TaskAnswerCompleted(:final explanation))
+                        TaskSuccessPanel(
+                          reward: widget.task.reward,
+                          explanation: explanation,
+                          titleKey: const Key(
+                            'independent-budget-success-title',
+                          ),
+                          rewardKey: const Key('independent-budget-reward'),
+                        )
+                      else ...[
+                        _DayFiveSummary(
+                          budget: scenario.budget,
+                          purchases: purchaseTotal,
+                          savings: savingsAmount,
+                          keyPrefix: 'independent-budget',
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Выбери покупки',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        for (final item in scenario.items)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _BudgetItemCard(
+                              item: item,
+                              price: widget.shopItems[item.id]!.price,
+                              shopItems: widget.shopItems,
+                              selected: selectedIds.contains(item.id),
+                              enabled: !submitting,
+                              onPressed: () => setState(() {
+                                if (!selectedIds.add(item.id)) {
+                                  selectedIds.remove(item.id);
+                                }
+                                result = null;
+                                failed = false;
+                              }),
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        _SavingsStepper(
+                          amount: savingsAmount,
+                          minimum: scenario.minimumSavings,
+                          enabled: !submitting,
+                          onChanged: (value) => setState(() {
+                            savingsAmount = value;
+                            result = null;
+                            failed = false;
+                          }),
+                        ),
+                        const SizedBox(height: 12),
+                        _DayFiveFeedback(result: result, failed: failed),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: AppSpacing.medium),
-                  for (final item in scenario.items)
-                    _BudgetItemCard(
-                      item: item,
-                      price: widget.shopItems[item.id]!.price,
-                      selected: selectedIds.contains(item.id),
-                      enabled: !submitting && result is! TaskAnswerCompleted,
-                      onPressed: () => setState(() {
-                        if (!selectedIds.add(item.id)) {
-                          selectedIds.remove(item.id);
-                        }
-                        result = null;
-                        failed = false;
-                      }),
-                    ),
-                  const SizedBox(height: AppSpacing.medium),
-                  _SavingsStepper(
-                    amount: savingsAmount,
-                    enabled: !submitting && result is! TaskAnswerCompleted,
-                    onChanged: (value) => setState(() {
-                      savingsAmount = value;
-                      result = null;
-                      failed = false;
-                    }),
-                  ),
-                  const SizedBox(height: AppSpacing.medium),
-                  _DayFiveFeedback(result: result, failed: failed),
-                ],
-              ),
+                ),
+                _CheckBar(
+                  completed: result is TaskAnswerCompleted,
+                  submitting: submitting,
+                  onCheck: _check,
+                  onReturn: () => Navigator.pop(context),
+                  keyPrefix: 'independent-budget',
+                ),
+              ],
             ),
-            _CheckBar(
-              completed: result is TaskAnswerCompleted,
-              submitting: submitting,
-              onCheck: _check,
-              onReturn: () => Navigator.pop(context),
-              keyPrefix: 'independent-budget',
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -187,67 +223,129 @@ class _PlanRepairTaskScreenState extends State<PlanRepairTaskScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     key: const Key('plan-repair-task-screen'),
-    appBar: AppBar(title: Text(widget.task.title)),
-    body: SafeArea(
-      child: Column(
-        children: [
-          _DayFiveSummary(
-            budget: scenario.budget,
-            purchases: purchaseTotal,
-            savings: savingsAmount,
-            keyPrefix: 'plan-repair',
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.medium),
-              children: [
-                Text(
-                  scenario.prompt,
-                  style: Theme.of(context).textTheme.titleMedium,
+    backgroundColor: AppColors.background,
+    body: Stack(
+      children: [
+        const Positioned.fill(child: TaskBackdrop()),
+        SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  children: [
+                    TaskScreenHeader(
+                      day: widget.task.period,
+                      title: widget.task.title,
+                      description: scenario.prompt,
+                      onClose: submitting ? null : () => Navigator.pop(context),
+                    ),
+                    const SizedBox(height: 16),
+                    if (result case TaskAnswerCompleted(:final explanation))
+                      TaskSuccessPanel(
+                        reward: widget.task.reward,
+                        explanation: explanation,
+                        titleKey: const Key('plan-repair-success-title'),
+                        rewardKey: const Key('plan-repair-reward'),
+                      )
+                    else ...[
+                      TaskSurface(
+                        child: Row(
+                          children: [
+                            TaskItemArt(
+                              taskItemId: scenario.scenarioExpenseId,
+                              label: 'Новая поилка',
+                              shopItems: widget.shopItems,
+                              size: 76,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Неожиданная трата',
+                                    style: TextStyle(
+                                      color: AppColors.warning,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 17,
+                                    ),
+                                  ),
+                                  Text(
+                                    scenario.event,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  TaskCoinAmount(
+                                    text: '${scenario.scenarioExpensePrice}',
+                                    coinSize: 19,
+                                    fontSize: 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _DayFiveSummary(
+                        budget: scenario.budget,
+                        purchases: purchaseTotal,
+                        savings: savingsAmount,
+                        keyPrefix: 'plan-repair',
+                      ),
+                      const SizedBox(height: 16),
+                      for (final item in scenario.items)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _RepairItemCard(
+                            item: item,
+                            price: _price(item.id),
+                            shopItems: widget.shopItems,
+                            now: nowIds.contains(item.id),
+                            enabled: !submitting,
+                            onChanged: (now) => setState(() {
+                              if (now) {
+                                nowIds.add(item.id);
+                              } else {
+                                nowIds.remove(item.id);
+                              }
+                              result = null;
+                              failed = false;
+                            }),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      _SavingsStepper(
+                        amount: savingsAmount,
+                        minimum: scenario.minimumSavings,
+                        enabled: !submitting,
+                        onChanged: (value) => setState(() {
+                          savingsAmount = value;
+                          result = null;
+                          failed = false;
+                        }),
+                      ),
+                      const SizedBox(height: 12),
+                      _DayFiveFeedback(result: result, failed: failed),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.small),
-                Text(scenario.event),
-                const SizedBox(height: AppSpacing.medium),
-                for (final item in scenario.items)
-                  _RepairItemCard(
-                    item: item,
-                    price: _price(item.id),
-                    now: nowIds.contains(item.id),
-                    enabled: !submitting && result is! TaskAnswerCompleted,
-                    onChanged: (now) => setState(() {
-                      if (now) {
-                        nowIds.add(item.id);
-                      } else {
-                        nowIds.remove(item.id);
-                      }
-                      result = null;
-                      failed = false;
-                    }),
-                  ),
-                const SizedBox(height: AppSpacing.medium),
-                _SavingsStepper(
-                  amount: savingsAmount,
-                  enabled: !submitting && result is! TaskAnswerCompleted,
-                  onChanged: (value) => setState(() {
-                    savingsAmount = value;
-                    result = null;
-                    failed = false;
-                  }),
-                ),
-                const SizedBox(height: AppSpacing.medium),
-                _DayFiveFeedback(result: result, failed: failed),
-              ],
-            ),
+              ),
+              _CheckBar(
+                completed: result is TaskAnswerCompleted,
+                submitting: submitting,
+                onCheck: _check,
+                onReturn: () => Navigator.pop(context),
+                keyPrefix: 'plan-repair',
+              ),
+            ],
           ),
-          _CheckBar(
-            completed: result is TaskAnswerCompleted,
-            submitting: submitting,
-            onCheck: _check,
-            onReturn: () => Navigator.pop(context),
-            keyPrefix: 'plan-repair',
-          ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }
@@ -268,40 +366,85 @@ class _DayFiveSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final remaining = budget - purchases - savings;
-    return Card(
-      margin: const EdgeInsets.fromLTRB(
-        AppSpacing.medium,
-        AppSpacing.small,
-        AppSpacing.medium,
-        0,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.medium),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: AppSpacing.medium,
-              runSpacing: AppSpacing.small,
-              children: [
-                Text('Бюджет: $budget'),
-                Text(
-                  '${purchases + savings} / $budget',
-                  key: Key('$keyPrefix-total'),
+    return TaskSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Бюджет',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TaskCoinAmount(text: '$budget', fontSize: 19),
+                  ],
                 ),
-                Text('Покупки: $purchases'),
-                Text('На цель: $savings'),
-                Text('Осталось: $remaining', key: Key('$keyPrefix-remaining')),
-              ],
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Всего',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '${purchases + savings} / $budget',
+                      key: Key('$keyPrefix-total'),
+                      style: const TextStyle(
+                        color: AppColors.primaryDark,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: AppSpacing.medium,
+            runSpacing: AppSpacing.small,
+            children: [
+              Text('Покупки: $purchases'),
+              Text('На цель: $savings'),
+              Text('Осталось: $remaining', key: Key('$keyPrefix-remaining')),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: ((purchases + savings) / budget).clamp(0, 1).toDouble(),
+              minHeight: 9,
+              backgroundColor: AppColors.primaryLight,
+              color: remaining < 0 ? AppColors.error : AppColors.primary,
             ),
-            if (remaining < 0)
-              Text(
+          ),
+          if (remaining < 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
                 'Не хватает ${-remaining} монет',
                 key: Key('$keyPrefix-deficit'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                style: const TextStyle(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -311,39 +454,76 @@ class _BudgetItemCard extends StatelessWidget {
   const _BudgetItemCard({
     required this.item,
     required this.price,
+    required this.shopItems,
     required this.selected,
     required this.enabled,
     required this.onPressed,
   });
   final DayFiveTaskItem item;
   final int price;
+  final Map<String, ShopItem> shopItems;
   final bool selected;
   final bool enabled;
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) => TaskSurface(
     key: Key('independent-budget-item-${item.id}'),
-    color: selected ? Theme.of(context).colorScheme.secondaryContainer : null,
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${item.label} • $price 🪙',
-            style: Theme.of(context).textTheme.titleMedium,
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            TaskItemArt(
+              taskItemId: item.id,
+              label: item.label,
+              shopItems: shopItems,
+              size: 70,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.label,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TaskCoinAmount(text: '$price', coinSize: 18, fontSize: 16),
+                  Text(
+                    item.context,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected)
+              const Icon(Icons.check_circle_rounded, color: AppColors.success),
+          ],
+        ),
+        const SizedBox(height: 8),
+        FilledButton.tonal(
+          key: Key('independent-budget-toggle-${item.id}'),
+          onPressed: enabled ? onPressed : null,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(48),
+            backgroundColor: selected
+                ? AppColors.primaryLight
+                : AppColors.surfaceSecondary,
+            foregroundColor: AppColors.primaryDark,
           ),
-          Text(item.context),
-          const SizedBox(height: AppSpacing.small),
-          OutlinedButton(
-            key: Key('independent-budget-toggle-${item.id}'),
-            onPressed: enabled ? onPressed : null,
-            style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
-            child: Text(selected ? 'Убрать из плана' : 'Добавить в план'),
-          ),
-        ],
-      ),
+          child: Text(selected ? 'В плане ✓' : 'Добавить в план'),
+        ),
+      ],
     ),
   );
 }
@@ -352,60 +532,87 @@ class _RepairItemCard extends StatelessWidget {
   const _RepairItemCard({
     required this.item,
     required this.price,
+    required this.shopItems,
     required this.now,
     required this.enabled,
     required this.onChanged,
   });
   final DayFiveTaskItem item;
   final int price;
+  final Map<String, ShopItem> shopItems;
   final bool now;
   final bool enabled;
   final ValueChanged<bool> onChanged;
 
   @override
-  Widget build(BuildContext context) => Card(
+  Widget build(BuildContext context) => TaskSurface(
     key: Key('plan-repair-item-${item.id}'),
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${item.label} • $price 🪙',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          Text(item.context),
-          const SizedBox(height: AppSpacing.small),
-          Wrap(
-            spacing: AppSpacing.small,
-            runSpacing: AppSpacing.small,
-            children: [
-              for (final choice in [true, false])
-                choice == now
-                    ? FilledButton(
-                        key: Key(
-                          'plan-repair-${choice ? 'now' : 'later'}-${item.id}',
-                        ),
-                        onPressed: enabled ? () => onChanged(choice) : null,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(96, 48),
-                        ),
-                        child: Text(choice ? 'Сейчас' : 'Потом'),
-                      )
-                    : OutlinedButton(
-                        key: Key(
-                          'plan-repair-${choice ? 'now' : 'later'}-${item.id}',
-                        ),
-                        onPressed: enabled ? () => onChanged(choice) : null,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(96, 48),
-                        ),
-                        child: Text(choice ? 'Сейчас' : 'Потом'),
-                      ),
+    padding: const EdgeInsets.all(12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            TaskItemArt(
+              taskItemId: item.id,
+              label: item.label,
+              shopItems: shopItems,
+              size: 70,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.label,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  TaskCoinAmount(text: '$price', coinSize: 18, fontSize: 16),
+                  Text(
+                    item.context,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (final choice in [true, false]) ...[
+              if (!choice) const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.tonal(
+                  key: Key(
+                    'plan-repair-${choice ? 'now' : 'later'}-${item.id}',
+                  ),
+                  onPressed: enabled ? () => onChanged(choice) : null,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    backgroundColor: choice == now
+                        ? (choice ? AppColors.need : AppColors.want)
+                        : AppColors.surfaceSecondary,
+                    foregroundColor: choice == now
+                        ? Colors.white
+                        : AppColors.textSecondary,
+                  ),
+                  child: Text(choice ? 'Сейчас' : 'Потом'),
+                ),
+              ),
             ],
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     ),
   );
 }
@@ -413,49 +620,70 @@ class _RepairItemCard extends StatelessWidget {
 class _SavingsStepper extends StatelessWidget {
   const _SavingsStepper({
     required this.amount,
+    required this.minimum,
     required this.enabled,
     required this.onChanged,
   });
   final int amount;
+  final int minimum;
   final bool enabled;
   final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('На цель', style: Theme.of(context).textTheme.titleMedium),
-          Row(
-            children: [
-              IconButton(
-                key: const Key('day5-savings-minus'),
-                tooltip: 'Уменьшить на 10 монет',
-                onPressed: enabled && amount >= 10
-                    ? () => onChanged(amount - 10)
-                    : null,
-                icon: const Icon(Icons.remove),
-              ),
-              Expanded(
-                child: Text(
-                  '$amount 🪙',
-                  key: const Key('day5-savings-amount'),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              IconButton(
-                key: const Key('day5-savings-plus'),
-                tooltip: 'Увеличить на 10 монет',
-                onPressed: enabled ? () => onChanged(amount + 10) : null,
-                icon: const Icon(Icons.add),
-              ),
-            ],
+  Widget build(BuildContext context) => TaskSurface(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'На финансовую цель',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          minimum == 10
+              ? 'Сохрани минимум 10 монет на цель.'
+              : 'Нужно отложить минимум $minimum монет',
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Center(
+          child: TaskCoinAmount(
+            key: const Key('day5-savings-amount'),
+            text: '$amount',
+            coinSize: 26,
+            fontSize: 24,
+          ),
+        ),
+        Center(
+          child: TaskQuantityStepper(
+            value: amount,
+            decreaseKey: const Key('day5-savings-minus'),
+            increaseKey: const Key('day5-savings-plus'),
+            decreaseTooltip: 'Уменьшить на 10 монет',
+            increaseTooltip: 'Увеличить на 10 монет',
+            onDecrease: enabled && amount >= 10
+                ? () => onChanged(amount - 10)
+                : null,
+            onIncrease: enabled ? () => onChanged(amount + 10) : null,
+          ),
+        ),
+        Text(
+          amount >= minimum
+              ? 'Условие выполнено ✓'
+              : 'Ещё нужно ${minimum - amount} монет',
+          style: TextStyle(
+            color: amount >= minimum ? AppColors.success : AppColors.warning,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -475,11 +703,9 @@ class _DayFiveFeedback extends StatelessWidget {
     if (message == null) return const SizedBox.shrink();
     return Semantics(
       liveRegion: true,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.medium),
-          child: Text(message, key: const Key('day5-task-feedback')),
-        ),
+      child: TaskFeedbackPanel(
+        title: result is TaskAnswerCompleted ? 'Отлично!' : 'Проверь план',
+        children: [Text(message, key: const Key('day5-task-feedback'))],
       ),
     );
   }
@@ -501,25 +727,19 @@ class _CheckBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(AppSpacing.medium),
-    child: SizedBox(
-      width: double.infinity,
-      child: FilledButton(
-        key: Key('$keyPrefix-check'),
-        onPressed: submitting
-            ? null
-            : completed
-            ? onReturn
-            : onCheck,
-        style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
-        child: Text(
-          completed
-              ? 'К заданиям'
-              : submitting
-              ? 'Проверяем…'
-              : 'Проверить план',
-        ),
-      ),
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+    child: TaskPrimaryButton(
+      keyName: '$keyPrefix-check',
+      onPressed: submitting
+          ? null
+          : completed
+          ? onReturn
+          : onCheck,
+      label: completed
+          ? 'Продолжить'
+          : submitting
+          ? 'Проверяем…'
+          : 'Проверить план',
     ),
   );
 }
