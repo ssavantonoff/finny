@@ -20,6 +20,15 @@ class ShopItemArt extends StatelessWidget {
       _ => null,
     };
     if (standaloneAsset != null) {
+      if (item.id == 'accessory_bow') {
+        return Image.asset(
+          standaloneAsset,
+          key: const Key('shop-item-art-headphones'),
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          semanticLabel: item.name,
+        );
+      }
       return Image.asset(
         standaloneAsset,
         fit: BoxFit.contain,

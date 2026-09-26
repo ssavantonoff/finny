@@ -23,6 +23,7 @@ import 'package:finny/models/transaction.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/models/task_progress.dart';
 import 'package:finny/models/task_submission_result.dart';
+import 'package:finny/models/toy_game_capability.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -411,6 +412,11 @@ class SqliteGameRepository implements GameRepository {
     bool frisbeeCompletion = false,
     bool Function()? activeProfileMatches,
   }) async {
+    if (item?.displaySection == ShopDisplaySection.toys &&
+        !ballCompletion &&
+        !frisbeeCompletion) {
+      throw PetItemNotUsableException(item!.id);
+    }
     _validateOperationId(operationId);
     if (profileId <= 0 || periodId <= 0 || actionId.trim().isEmpty) {
       throw ArgumentError('Pet action identity is invalid.');
@@ -1810,7 +1816,7 @@ class SqlitePetActionPort implements PetActionPort {
     required String operationId,
     required PetActionSlot slot,
   }) async {
-    if (item.id == 'toy_ball' || item.id == 'toy_frisbee') {
+    if (item.displaySection == ShopDisplaySection.toys) {
       throw PetItemNotUsableException(item.id);
     }
     final result = await _core._applyPetAction(
@@ -2203,6 +2209,10 @@ class SqliteDayLifecyclePort implements DayLifecyclePort {
 
     for (final item in canonicalItems) {
       if (item.usagePolicy == ItemUsagePolicy.none || item.petEffects.isEmpty) {
+        continue;
+      }
+      if (item.displaySection == ShopDisplaySection.toys &&
+          !ToyGameCapability.hasCampaignMoodReward(item)) {
         continue;
       }
       final kind = switch ((item.displaySection, item.usagePolicy)) {

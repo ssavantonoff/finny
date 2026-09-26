@@ -183,9 +183,7 @@ void main() {
     'Day 4 planning shows 60 → 35, then active purchase uses 35 and reverts to 60',
     (tester) async {
       await mount(tester);
-      expect(find.byKey(const Key('shop-promo-banner')), findsOneWidget);
-      expect(find.text('Акция дня'), findsWidgets);
-      expect(find.text('Звёздное печенье · 60 → 35 монет'), findsOneWidget);
+      expect(find.text('SALE'), findsOneWidget);
       expect(
         find.byKey(const Key('shop-promo-card-food_treat')),
         findsOneWidget,
@@ -206,10 +204,14 @@ void main() {
         find.byKey(const Key('shop-promo-price-food_treat')),
         findsOneWidget,
       );
-      expect(find.text('35 монет'), findsOneWidget);
+      expect(find.text('35'), findsOneWidget);
       final oldPrice = tester.widget<Text>(find.text('60'));
       expect(oldPrice.style?.decoration, TextDecoration.lineThrough);
       await openTreat(tester);
+      expect(
+        find.text('Купить «Звёздное печенье» за 35 монет?'),
+        findsOneWidget,
+      );
       expect(
         find.descendant(
           of: find.byType(ShopItemDetails),
@@ -253,8 +255,6 @@ void main() {
       await reload;
       await openTreat(tester);
       final buy = find.byKey(const Key('shop-buy'));
-      await tester.tap(buy);
-      await tester.pump();
       expect(
         find.text('Купить «Звёздное печенье» за 35 монет?'),
         findsOneWidget,
@@ -277,16 +277,13 @@ void main() {
       expect(state.promotionPurchased, isTrue);
       expect(state.effectivePriceFor(state.itemById('food_treat')!), 60);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('shop-promo-banner')), findsNothing);
       expect(find.byKey(const Key('shop-promo-card-food_treat')), findsNothing);
       expect(
         find.byKey(const Key('shop-promo-marker-food_treat')),
         findsNothing,
       );
-      expect(find.text('60 монет • Еда'), findsOneWidget);
+      expect(find.text('60'), findsOneWidget);
       await openTreat(tester);
-      await tester.tap(find.byKey(const Key('shop-buy')));
-      await tester.pump();
       expect(
         find.text('Купить «Звёздное печенье» за 60 монет?'),
         findsOneWidget,
@@ -338,8 +335,6 @@ void main() {
       });
       await mount(tester);
       await openTreat(tester);
-      await tester.tap(find.byKey(const Key('shop-buy')));
-      await tester.pump();
       expect(
         find.text('Купить «Звёздное печенье» за 35 монет?'),
         findsOneWidget,
@@ -471,13 +466,12 @@ void main() {
         await tester.pump();
       }
       expect(container.read(shopControllerProvider).period?.periodNumber, day);
-      expect(find.byKey(const Key('shop-promo-banner')), findsNothing);
       expect(find.byKey(const Key('shop-promo-card-food_treat')), findsNothing);
       expect(
         find.byKey(const Key('shop-promo-marker-food_treat')),
         findsNothing,
       );
-      expect(find.text('60 монет • Еда'), findsOneWidget);
+      expect(find.text('60'), findsOneWidget);
     }
   });
 }

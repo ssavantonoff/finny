@@ -225,7 +225,10 @@ void main() {
 
   group('HomeScreen atmosphere and interactions', () {
     Future<({ProviderContainer container, _AtmosphereGames games})>
-    controllerHarness({int savedAmount = 0}) async {
+    controllerHarness({
+      int savedAmount = 0,
+      List<String> requiredCheckpoints = const [],
+    }) async {
       final database = createTestDatabase();
       addTearDown(database.close);
       final profile = Profile(
@@ -268,7 +271,7 @@ void main() {
         actualNeed: 0,
         actualWant: 0,
         actualSavings: 0,
-        requiredCheckpoints: const [],
+        requiredCheckpoints: requiredCheckpoints,
         resolvedCheckpoints: const [],
         growthPointsEarned: 0,
         status: GamePeriodStatus.active,
@@ -288,12 +291,12 @@ void main() {
           gameRepositoryProvider.overrideWithValue(games),
           contentRepositoryProvider.overrideWithValue(
             TestContentRepository([
-              const PeriodDefinition(
+              PeriodDefinition(
                 id: 'period_1',
                 number: 1,
                 title: 'Период 1',
                 baseIncome: 500,
-                requiredCheckpoints: [],
+                requiredCheckpoints: requiredCheckpoints,
               ),
             ]),
           ),
@@ -623,6 +626,15 @@ void main() {
         expect(find.byKey(const Key('home-wallet')), findsOneWidget);
         expect(find.byType(HomeWallet), findsOneWidget);
         expect(find.text('350'), findsOneWidget);
+        expect(
+          tester.getSize(find.byKey(const Key('home-day-chip'))).height,
+          48,
+        );
+        expect(tester.getSize(find.byKey(const Key('home-wallet'))).height, 48);
+        expect(
+          tester.getSize(find.byKey(const Key('home-settings'))).height,
+          48,
+        );
 
         // Pet name
         expect(find.byKey(const Key('home-pet-name')), findsOneWidget);
@@ -692,6 +704,20 @@ void main() {
         final statusTop = tester
             .getTopLeft(find.byKey(const Key('home-required-actions')))
             .dy;
+        expect(
+          goalTop -
+              tester
+                  .getBottomRight(find.byKey(const Key('home-next-savings')))
+                  .dy,
+          closeTo(5, 1),
+        );
+        expect(
+          statusTop -
+              tester
+                  .getBottomRight(find.byKey(const Key('home-savings-goal')))
+                  .dy,
+          closeTo(5, 1),
+        );
         final navTop = tester
             .getTopLeft(find.byKey(const Key('test-bottom-nav')))
             .dy;
@@ -838,6 +864,64 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    testWidgets('Campaign Home keeps geometry at 393x852', (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.view.resetViewPadding);
+      final harness = await controllerHarness(
+        requiredCheckpoints: const ['financial_task', 'savings_decision'],
+      );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: harness.container,
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: const Scaffold(
+              body: HomeScreen(),
+              bottomNavigationBar: SizedBox(
+                key: Key('home-test-bottom-nav'),
+                height: 72,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final cta = find.byKey(const Key('home-next-task'));
+      final goal = find.byKey(const Key('home-savings-goal'));
+      final actions = find.byKey(const Key('home-required-actions'));
+      expect(cta, findsOneWidget);
+      expect(goal, findsOneWidget);
+      expect(actions, findsOneWidget);
+      expect(
+        tester.getTopLeft(goal).dy - tester.getBottomRight(cta).dy,
+        closeTo(5, 1),
+      );
+      expect(
+        tester.getTopLeft(actions).dy - tester.getBottomRight(goal).dy,
+        closeTo(5, 1),
+      );
+      expect(
+        tester.getBottomRight(actions).dy,
+        lessThanOrEqualTo(
+          tester.getTopLeft(find.byKey(const Key('home-test-bottom-nav'))).dy -
+              24,
+        ),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(HomeScreen),
+          matching: find.byType(Scrollable),
+        ),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
 
     testWidgets(
       'free interaction changes button state to used today and disabled',

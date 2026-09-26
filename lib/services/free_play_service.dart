@@ -136,7 +136,7 @@ class FreePlayService {
     final matches = items.where((item) => item.id == itemId);
     if (matches.length != 1) throw StateError('Unknown shop item $itemId.');
     final item = matches.single;
-    if (item.id == 'toy_ball' || item.id == 'toy_frisbee') {
+    if (item.displaySection == ShopDisplaySection.toys) {
       throw PetItemNotUsableException(item.id);
     }
     if (item.usagePolicy == ItemUsagePolicy.none || item.petEffects.isEmpty) {

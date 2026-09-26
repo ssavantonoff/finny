@@ -90,6 +90,18 @@ void main() {
             alignment,
           );
         }
+        if (item.id == 'accessory_bow') {
+          expect(
+            find.byKey(const Key('shop-item-art-headphones')),
+            findsOneWidget,
+          );
+          expect(image.alignment, Alignment.center);
+        } else {
+          expect(
+            find.byKey(const Key('shop-item-art-headphones')),
+            findsNothing,
+          );
+        }
 
         await tester.pumpWidget(
           MaterialApp(

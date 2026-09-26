@@ -437,12 +437,16 @@ class _DepositControls extends StatelessWidget {
                 icon: const Icon(Icons.add),
               ),
               TextButton(
-                onPressed: () => onChanged(50),
-                child: const Text('50'),
+                key: const Key('savings-deposit-plus-50'),
+                onPressed: () =>
+                    onChanged((amount + 50).clamp(1, maximum).toInt()),
+                child: const Text('+50'),
               ),
               TextButton(
-                onPressed: () => onChanged(100),
-                child: const Text('100'),
+                key: const Key('savings-deposit-plus-100'),
+                onPressed: () =>
+                    onChanged((amount + 100).clamp(1, maximum).toInt()),
+                child: const Text('+100'),
               ),
               TextButton(
                 onPressed: () => onChanged(maximum),

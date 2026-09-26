@@ -396,8 +396,9 @@ class FreePlayRepository {
     required List<PeriodDefinition> definitions,
     ShopItem? item,
   }) async {
-    if (actionId == 'item:toy_ball' || item?.id == 'toy_ball') {
-      throw PetItemNotUsableException('toy_ball');
+    if (item?.displaySection == ShopDisplaySection.toys ||
+        actionId.startsWith('item:toy_')) {
+      throw PetItemNotUsableException(item?.id ?? actionId.substring(5));
     }
     if (actionId == 'item:toy_frisbee' || item?.id == 'toy_frisbee') {
       throw PetItemNotUsableException('toy_frisbee');

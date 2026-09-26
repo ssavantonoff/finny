@@ -79,7 +79,55 @@ const _accessory = ShopItem(
   equipSlot: ShopEquipSlot.head,
 );
 
-const _items = [_apple, _shampoo, _comb, _toothbrush, _accessory];
+const _ball = ShopItem(
+  id: 'toy_ball',
+  name: 'Мяч',
+  category: ShopItemCategory.want,
+  price: 120,
+  persistent: true,
+  effectType: 'mood',
+  effectValue: 35,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+
+const _frisbee = ShopItem(
+  id: 'toy_frisbee',
+  name: 'Фрисби',
+  category: ShopItemCategory.want,
+  price: 140,
+  persistent: true,
+  effectType: 'mood',
+  effectValue: 40,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+
+const _car = ShopItem(
+  id: 'toy_plush',
+  name: 'Машинка',
+  category: ShopItemCategory.want,
+  price: 160,
+  persistent: true,
+  effectType: 'mood',
+  effectValue: 30,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+
+const _items = [
+  _apple,
+  _shampoo,
+  _comb,
+  _toothbrush,
+  _accessory,
+  _ball,
+  _frisbee,
+  _car,
+];
 
 typedef _Player = ({int profileId, GamePeriod period});
 
@@ -442,6 +490,82 @@ void main() {
       );
     },
   );
+
+  for (final unavailableToy in [_car]) {
+    test(
+      'unavailable ${unavailableToy.name} cannot block bedtime fallback',
+      () async {
+        final player = await createPlayer(
+          satiety: 100,
+          care: 100,
+          mood: 35,
+          wallet: 0,
+        );
+        await grant(player.profileId, unavailableToy);
+        final decision = await lifecycle.evaluateBedtime(
+          profileId: player.profileId,
+          periodId: player.period.id!,
+        );
+        expect(decision.type, BedtimeDecisionType.fallbackAllowed);
+        final completed = await lifecycle.sleep(
+          profileId: player.profileId,
+          periodId: player.period.id!,
+          allowFallback: true,
+        );
+        expect(completed.period.status, GamePeriodStatus.completed);
+      },
+    );
+  }
+
+  test('Ball counts only while its period reward is available', () async {
+    final player = await createPlayer(
+      satiety: 100,
+      care: 100,
+      mood: 35,
+      wallet: 0,
+    );
+    await grant(player.profileId, _ball);
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+      )).type,
+      BedtimeDecisionType.carePossible,
+    );
+    await markUsed(player, 'item:toy_ball');
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+      )).type,
+      BedtimeDecisionType.fallbackAllowed,
+    );
+  });
+
+  test('Frisbee counts only while its period reward is available', () async {
+    final player = await createPlayer(
+      satiety: 100,
+      care: 100,
+      mood: 35,
+      wallet: 0,
+    );
+    await grant(player.profileId, _frisbee);
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+      )).type,
+      BedtimeDecisionType.carePossible,
+    );
+    await markUsed(player, 'item:toy_frisbee');
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+      )).type,
+      BedtimeDecisionType.fallbackAllowed,
+    );
+  });
 
   test('fallback rechecks current resources inside the transaction', () async {
     final player = await createPlayer(satiety: 60, care: 100, mood: 100);

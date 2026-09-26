@@ -53,6 +53,19 @@ const comb = ShopItem(
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
 );
 
+const careBrush = ShopItem(
+  id: 'care_brush',
+  name: 'Щётка для шерсти',
+  category: ShopItemCategory.need,
+  price: 75,
+  persistent: true,
+  effectType: 'care',
+  effectValue: 15,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.care,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+
 const shampoo = ShopItem(
   id: 'care_shampoo',
   name: 'Шампунь',
@@ -118,7 +131,17 @@ const plush = ShopItem(
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
 );
 
-const items = [apple, treat, comb, shampoo, toothbrush, ball, frisbee, plush];
+const items = [
+  apple,
+  treat,
+  comb,
+  careBrush,
+  shampoo,
+  toothbrush,
+  ball,
+  frisbee,
+  plush,
+];
 
 typedef ActivePlayer = ({int profileId, GamePeriod period});
 
@@ -400,11 +423,45 @@ void main() {
     expect(await games.getInventoryQuantity(player.profileId, comb.id), 1);
   });
 
+  test('generic use rejects every toy in service and repository', () async {
+    final player = await createPlayer();
+    final port = SqlitePetActionPort(database);
+    final initialMood = (await games.getPet(player.profileId))!.mood;
+    for (final item in [ball, frisbee, plush]) {
+      await grant(player.profileId, item);
+      await expectLater(
+        service.useItem(
+          profileId: player.profileId,
+          periodId: player.period.id!,
+          itemId: item.id,
+          operationId: 'service-${item.id}',
+        ),
+        throwsA(isA<PetItemNotUsableException>()),
+      );
+      await expectLater(
+        port.useItem(
+          profileId: player.profileId,
+          periodId: player.period.id!,
+          item: item,
+          operationId: 'port-${item.id}',
+          slot: PetActionSlot.defaultSlot,
+        ),
+        throwsA(isA<PetItemNotUsableException>()),
+      );
+      expect(await games.getInventoryQuantity(player.profileId, item.id), 1);
+    }
+    expect((await games.getPet(player.profileId))?.mood, initialMood);
+    final db = await database.database;
+    expect(await db.query('pet_action_operations'), isEmpty);
+    expect(await db.query('pet_daily_usage'), isEmpty);
+  });
+
   test(
     'Frisbee generic service and repository use cannot bypass gameplay',
     () async {
       final player = await createPlayer();
       await grant(player.profileId, frisbee);
+
       await expectLater(
         service.useItem(
           profileId: player.profileId,
@@ -433,17 +490,17 @@ void main() {
   );
 
   test(
-    'persistent items retain independent once-per-period identities',
+    'persistent non-toy items retain independent once-per-period identities',
     () async {
       final player = await createPlayer();
-      await grant(player.profileId, plush);
+      await grant(player.profileId, careBrush);
       await grant(player.profileId, comb);
 
       await service.useItem(
         profileId: player.profileId,
         periodId: player.period.id!,
-        itemId: plush.id,
-        operationId: 'plush-1',
+        itemId: careBrush.id,
+        operationId: 'care-brush-1',
       );
       await service.useItem(
         profileId: player.profileId,
@@ -451,13 +508,13 @@ void main() {
         itemId: comb.id,
         operationId: 'comb-independent',
       );
-      expect((await games.getPet(player.profileId))?.mood, 69);
+      expect((await games.getPet(player.profileId))?.care, 76);
       await expectLater(
         service.useItem(
           profileId: player.profileId,
           periodId: player.period.id!,
-          itemId: plush.id,
-          operationId: 'plush-2',
+          itemId: careBrush.id,
+          operationId: 'care-brush-2',
         ),
         throwsA(isA<PetActionAlreadyUsedException>()),
       );
@@ -722,20 +779,20 @@ void main() {
   test('period ownership and profiles are isolated', () async {
     final normal = await createPlayer();
     final demo = await createPlayer(type: ProfileType.demo, mood: 60);
-    await grant(normal.profileId, plush);
+    await grant(normal.profileId, comb);
 
     await expectLater(
       service.useItem(
         profileId: normal.profileId,
         periodId: demo.period.id!,
-        itemId: plush.id,
+        itemId: comb.id,
         operationId: 'foreign-period',
       ),
       throwsStateError,
     );
     expect((await games.getPet(normal.profileId))?.mood, 39);
     expect((await games.getPet(demo.profileId))?.mood, 59);
-    expect(await games.getInventoryQuantity(normal.profileId, plush.id), 1);
+    expect(await games.getInventoryQuantity(normal.profileId, comb.id), 1);
   });
 
   test('storage failure rolls pet, inventory, usage and proof back', () async {
@@ -767,14 +824,14 @@ void main() {
 
   test('concurrent persistent uses allow exactly one new operation', () async {
     final player = await createPlayer();
-    await grant(player.profileId, plush);
+    await grant(player.profileId, comb);
 
     Future<Object> attempt(String operationId) async {
       try {
         return await service.useItem(
           profileId: player.profileId,
           periodId: player.period.id!,
-          itemId: plush.id,
+          itemId: comb.id,
           operationId: operationId,
         );
       } catch (error) {
@@ -783,12 +840,12 @@ void main() {
     }
 
     final results = await Future.wait([
-      attempt('plush-concurrent-a'),
-      attempt('plush-concurrent-b'),
+      attempt('comb-concurrent-a'),
+      attempt('comb-concurrent-b'),
     ]);
     expect(results.whereType<Pet>(), hasLength(1));
     expect(results.whereType<PetActionAlreadyUsedException>(), hasLength(1));
-    expect((await games.getPet(player.profileId))?.mood, 69);
+    expect((await games.getPet(player.profileId))?.care, 62);
   });
 
   test('restart preserves quantity, usage and idempotent replay', () async {
