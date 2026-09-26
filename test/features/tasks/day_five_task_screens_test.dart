@@ -28,89 +28,97 @@ void main() {
     );
   }
 
-  testWidgets('independent budget starts empty and fits 360dp', (tester) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final fixture = (await tester.runAsync(
-      () => data('task_independent_budget_05'),
-    ))!;
-    addTearDown(fixture.container.dispose);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: fixture.container,
-        child: MaterialApp(
-          home: IndependentBudgetTaskScreen(
-            task: fixture.task,
-            controller: fixture.container.read(
-              tasksControllerProvider.notifier,
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('independent budget starts empty and fits $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final fixture = (await tester.runAsync(
+        () => data('task_independent_budget_05'),
+      ))!;
+      addTearDown(fixture.container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: fixture.container,
+          child: MaterialApp(
+            home: IndependentBudgetTaskScreen(
+              task: fixture.task,
+              controller: fixture.container.read(
+                tasksControllerProvider.notifier,
+              ),
+              shopItems: fixture.catalog,
             ),
-            shopItems: fixture.catalog,
           ),
         ),
-      ),
-    );
-    expect(find.text('Покупки: 0'), findsOneWidget);
-    expect(find.text('На цель: 0'), findsOneWidget);
-    expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
-    final food = find.byKey(const Key('independent-budget-toggle-food_feed'));
-    await tester.ensureVisible(food);
-    await tester.pumpAndSettle();
-    await tester.tap(food);
-    await tester.pump();
-    await tester.drag(find.byType(ListView), const Offset(0, 700));
-    await tester.pumpAndSettle();
-    expect(find.text('Покупки: 90'), findsOneWidget);
-    expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      );
+      expect(find.text('Покупки: 0'), findsOneWidget);
+      expect(find.text('На цель: 0'), findsOneWidget);
+      expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
+      final food = find.byKey(const Key('independent-budget-toggle-food_feed'));
+      await tester.ensureVisible(food);
+      await tester.pumpAndSettle();
+      await tester.tap(food);
+      await tester.pump();
+      await tester.drag(find.byType(ListView), const Offset(0, 700));
+      await tester.pumpAndSettle();
+      expect(find.text('Покупки: 90'), findsOneWidget);
+      expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
-  testWidgets('plan repair starts at 410 and allows delaying required food', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final fixture = (await tester.runAsync(() => data('task_plan_repair_05')))!;
-    addTearDown(fixture.container.dispose);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: fixture.container,
-        child: MaterialApp(
-          home: PlanRepairTaskScreen(
-            task: fixture.task,
-            controller: fixture.container.read(
-              tasksControllerProvider.notifier,
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('plan repair starts at 410 and allows delaying food at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final fixture = (await tester.runAsync(
+        () => data('task_plan_repair_05'),
+      ))!;
+      addTearDown(fixture.container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: fixture.container,
+          child: MaterialApp(
+            home: PlanRepairTaskScreen(
+              task: fixture.task,
+              controller: fixture.container.read(
+                tasksControllerProvider.notifier,
+              ),
+              shopItems: fixture.catalog,
             ),
-            shopItems: fixture.catalog,
           ),
         ),
-      ),
-    );
-    expect(find.text('410 / 350'), findsOneWidget);
-    expect(find.text('Не хватает 60 монет'), findsOneWidget);
-    expect(
-      find.byWidgetPredicate(
-        (widget) =>
-            widget is Image &&
-            widget.image is AssetImage &&
-            (widget.image as AssetImage).assetName ==
-                'assets/images/tasks/day5/waterer.png' &&
-            widget.fit == BoxFit.contain,
-      ),
-      findsWidgets,
-    );
-    final later = find.byKey(const Key('plan-repair-later-food_feed'));
-    await tester.ensureVisible(later);
-    await tester.pumpAndSettle();
-    await tester.tap(later);
-    await tester.pump();
-    await tester.drag(find.byType(ListView), const Offset(0, 900));
-    await tester.pumpAndSettle();
-    expect(find.text('320 / 350'), findsOneWidget);
-    expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      );
+      expect(find.text('410 / 350'), findsOneWidget);
+      expect(find.text('Не хватает 60 монет'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName ==
+                  'assets/images/tasks/day5/waterer.png' &&
+              widget.fit == BoxFit.contain,
+        ),
+        findsWidgets,
+      );
+      final later = find.byKey(const Key('plan-repair-later-food_feed'));
+      await tester.ensureVisible(later);
+      await tester.pumpAndSettle();
+      await tester.tap(later);
+      await tester.pump();
+      await tester.drag(find.byType(ListView), const Offset(0, 900));
+      await tester.pumpAndSettle();
+      expect(find.text('320 / 350'), findsOneWidget);
+      expect(find.byKey(const Key('day5-task-feedback')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

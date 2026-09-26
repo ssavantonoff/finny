@@ -284,60 +284,65 @@ void main() {
     },
   );
 
-  testWidgets(
-    'over-budget checkout preserves basket; 190 succeeds without reshuffle',
-    (tester) async {
-      await mount(tester);
-      await tapKey(tester, 'shopping-enter');
-      await tapKey(tester, 'shopping-plus-water-large');
-      await tapKey(tester, 'shopping-next');
-      await tapKey(tester, 'shopping-plus-soap-small');
-      await tapKey(tester, 'shopping-plus-soap-small');
-      await tapKey(tester, 'shopping-next');
-      await tapKey(tester, 'shopping-plus-cookies-large');
-      expect(find.text('210 / 190'), findsWidgets);
-      await tapKey(tester, 'shopping-next');
-      expect(find.text('Касса'), findsOneWidget);
-      expect(
-        tester
-            .widget<TaskCoinAmount>(
-              find.byKey(const Key('shopping-checkout-total')),
-            )
-            .fontSize,
-        greaterThanOrEqualTo(20),
-      );
-      expect(find.text('Корзина дороже бюджета на 20 монет.'), findsNothing);
-      await tapKey(tester, 'shopping-check');
-      await waitForText(tester, 'Корзина дороже бюджета на 20 монет.');
-      expect(find.text('Корзина дороже бюджета на 20 монет.'), findsOneWidget);
-      expect(random.calls, 6);
-      await tester.tap(find.text('← Назад к полкам'));
-      await tester.pumpAndSettle();
-      await tapKey(tester, 'shopping-minus-cookies-large');
-      await tapKey(tester, 'shopping-plus-cookies-small');
-      await tapKey(tester, 'shopping-plus-cookies-small');
-      await tester.tap(find.byTooltip('Предыдущая полка'));
-      await tester.pumpAndSettle();
-      await tapKey(tester, 'shopping-minus-soap-small');
-      await tapKey(tester, 'shopping-minus-soap-small');
-      await tapKey(tester, 'shopping-plus-soap-large');
-      await tapKey(tester, 'shopping-next');
-      expect(find.text('190 / 190'), findsWidgets);
-      await tapKey(tester, 'shopping-next');
-      await tapKey(tester, 'shopping-check');
-      await waitForText(tester, 'Покупки готовы!');
-      expect(find.text('Покупки готовы!'), findsOneWidget);
-      expect(find.text('Потрачено: 190 монет'), findsOneWidget);
-      expect(find.text('+50 монет'), findsOneWidget);
-      expect(random.calls, 6);
-      expect(
-        (await tester.runAsync(() => games.getGameState(profileId)))!
-            .walletBalance,
-        550,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets(
+      'over-budget checkout preserves basket; 190 succeeds at $size',
+      (tester) async {
+        await mount(tester, size: size);
+        await tapKey(tester, 'shopping-enter');
+        await tapKey(tester, 'shopping-plus-water-large');
+        await tapKey(tester, 'shopping-next');
+        await tapKey(tester, 'shopping-plus-soap-small');
+        await tapKey(tester, 'shopping-plus-soap-small');
+        await tapKey(tester, 'shopping-next');
+        await tapKey(tester, 'shopping-plus-cookies-large');
+        expect(find.text('210 / 190'), findsWidgets);
+        await tapKey(tester, 'shopping-next');
+        expect(find.text('Касса'), findsOneWidget);
+        expect(
+          tester
+              .widget<TaskCoinAmount>(
+                find.byKey(const Key('shopping-checkout-total')),
+              )
+              .fontSize,
+          greaterThanOrEqualTo(20),
+        );
+        expect(find.text('Корзина дороже бюджета на 20 монет.'), findsNothing);
+        await tapKey(tester, 'shopping-check');
+        await waitForText(tester, 'Корзина дороже бюджета на 20 монет.');
+        expect(
+          find.text('Корзина дороже бюджета на 20 монет.'),
+          findsOneWidget,
+        );
+        expect(random.calls, 6);
+        await tester.tap(find.text('← Назад к полкам'));
+        await tester.pumpAndSettle();
+        await tapKey(tester, 'shopping-minus-cookies-large');
+        await tapKey(tester, 'shopping-plus-cookies-small');
+        await tapKey(tester, 'shopping-plus-cookies-small');
+        await tester.tap(find.byTooltip('Предыдущая полка'));
+        await tester.pumpAndSettle();
+        await tapKey(tester, 'shopping-minus-soap-small');
+        await tapKey(tester, 'shopping-minus-soap-small');
+        await tapKey(tester, 'shopping-plus-soap-large');
+        await tapKey(tester, 'shopping-next');
+        expect(find.text('190 / 190'), findsWidgets);
+        await tapKey(tester, 'shopping-next');
+        await tapKey(tester, 'shopping-check');
+        await waitForText(tester, 'Покупки готовы!');
+        expect(find.text('Покупки готовы!'), findsOneWidget);
+        expect(find.text('Потрачено: 190 монет'), findsOneWidget);
+        expect(find.text('+50 монет'), findsOneWidget);
+        expect(random.calls, 6);
+        expect(
+          (await tester.runAsync(() => games.getGameState(profileId)))!
+              .walletBalance,
+          550,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets(
     'empty exit is immediate; nonempty exit asks and next attempt starts empty',
