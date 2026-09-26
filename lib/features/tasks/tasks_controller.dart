@@ -178,18 +178,22 @@ class TasksController extends Notifier<TasksState> {
             .loadDayFiveCompletion(profileId: profileId, periodId: period.id!);
         legacyDayFiveCompleted = status.legacyCompleted;
         completed.addAll(status.completedTaskIds);
-        final catalog = await ref
-            .read(contentRepositoryProvider)
-            .loadShopItems();
-        shopItems = Map.unmodifiable({
-          for (final item in catalog) item.id: item,
-        });
       } else {
         for (final task in tasks) {
           if (await games.getTaskProgress(profileId, task.id) != null) {
             completed.add(task.id);
           }
         }
+      }
+      if (period.periodNumber == 1 ||
+          period.periodNumber == 2 ||
+          period.periodNumber == 5) {
+        final catalog = await ref
+            .read(contentRepositoryProvider)
+            .loadShopItems();
+        shopItems = Map.unmodifiable({
+          for (final item in catalog) item.id: item,
+        });
       }
       if (!_isCurrent(generation, profileId)) return;
       state = TasksState(
