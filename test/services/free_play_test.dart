@@ -2,6 +2,7 @@ import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/campaign_lifecycle_repository.dart';
@@ -447,75 +448,83 @@ void main() {
     expect(afterSummary.factRemainder, beforeSummary.factRemainder);
   });
 
-  test(
-    'petting repeats, toy repeats and consumable at max is preserved',
-    () async {
-      await completeCampaign();
-      await lifecycle.startFreePlay(profileId, days);
-      final db = await database.database;
-      await db.insert('inventory', {
-        'profile_id': profileId,
-        'item_id': 'toy',
-        'quantity': 1,
-        'acquired_at': DateTime.utc(2026).toIso8601String(),
-      });
-      await db.insert('inventory', {
-        'profile_id': profileId,
-        'item_id': 'food',
-        'quantity': 1,
-        'acquired_at': DateTime.utc(2026).toIso8601String(),
-      });
-      await freePlay.pet(profileId: profileId, operationId: 'pet-1');
-      await freePlay.pet(profileId: profileId, operationId: 'pet-2');
-      expect((await games.getPet(profileId))!.mood, 100);
-      await freePlay.useItem(
+  test('petting repeats, generic toy use is blocked and consumable at max is preserved', () async {
+    await completeCampaign();
+    await lifecycle.startFreePlay(profileId, days);
+    final db = await database.database;
+    await db.insert('inventory', {
+      'profile_id': profileId,
+      'item_id': 'toy',
+      'quantity': 1,
+      'acquired_at': DateTime.utc(2026).toIso8601String(),
+    });
+    await db.insert('inventory', {
+      'profile_id': profileId,
+      'item_id': 'food',
+      'quantity': 1,
+      'acquired_at': DateTime.utc(2026).toIso8601String(),
+    });
+    await freePlay.pet(profileId: profileId, operationId: 'pet-1');
+    await freePlay.pet(profileId: profileId, operationId: 'pet-2');
+    expect((await games.getPet(profileId))!.mood, 100);
+    final moodBeforeToy = (await games.getPet(profileId))!.mood;
+    await expectLater(
+      freePlay.useItem(
         profileId: profileId,
         itemId: 'toy',
         operationId: 'toy-1',
-      );
-      await freePlay.useItem(
+      ),
+      throwsA(isA<PetItemNotUsableException>()),
+    );
+    await expectLater(
+      FreePlayRepository(database).petAction(
         profileId: profileId,
-        itemId: 'toy',
-        operationId: 'toy-2',
-      );
-      expect(await games.getInventoryQuantity(profileId, 'toy'), 1);
-      await freePlay.useItem(
-        profileId: profileId,
-        itemId: 'food',
-        operationId: 'food-use',
-      );
-      expect((await games.getPet(profileId))!.satiety, 100);
-      await db.insert('inventory', {
-        'profile_id': profileId,
-        'item_id': 'food',
-        'quantity': 1,
-        'acquired_at': DateTime.utc(2026).toIso8601String(),
-      });
-      final maxResult = await freePlay.useItem(
-        profileId: profileId,
-        itemId: 'food',
-        operationId: 'food-max',
-      );
-      expect(maxResult.notice, 'Финни уже сыт!');
-      expect(await games.getInventoryQuantity(profileId, 'food'), 1);
-      expect(
-        await db.query(
-          'pet_daily_usage',
-          where: 'profile_id = ?',
-          whereArgs: [profileId],
-        ),
-        isEmpty,
-      );
-      expect(
-        (await db.query(
-          'game_periods',
-          where: 'profile_id = ? AND period_number = 5',
-          whereArgs: [profileId],
-        )).single['day_progress'],
-        0,
-      );
-    },
-  );
+        actionId: 'item:toy',
+        effects: toy.petEffects,
+        operationId: 'toy-direct',
+        item: toy,
+        definitions: days,
+      ),
+      throwsA(isA<PetItemNotUsableException>()),
+    );
+    expect((await games.getPet(profileId))!.mood, moodBeforeToy);
+    expect(await games.getInventoryQuantity(profileId, 'toy'), 1);
+    await freePlay.useItem(
+      profileId: profileId,
+      itemId: 'food',
+      operationId: 'food-use',
+    );
+    expect((await games.getPet(profileId))!.satiety, 100);
+    await db.insert('inventory', {
+      'profile_id': profileId,
+      'item_id': 'food',
+      'quantity': 1,
+      'acquired_at': DateTime.utc(2026).toIso8601String(),
+    });
+    final maxResult = await freePlay.useItem(
+      profileId: profileId,
+      itemId: 'food',
+      operationId: 'food-max',
+    );
+    expect(maxResult.notice, 'Финни уже сыт!');
+    expect(await games.getInventoryQuantity(profileId, 'food'), 1);
+    expect(
+      await db.query(
+        'pet_daily_usage',
+        where: 'profile_id = ?',
+        whereArgs: [profileId],
+      ),
+      isEmpty,
+    );
+    expect(
+      (await db.query(
+        'game_periods',
+        where: 'profile_id = ? AND period_number = 5',
+        whereArgs: [profileId],
+      )).single['day_progress'],
+      0,
+    );
+  });
 
   test(
     'owned accessory can be equipped and removed without changing stats',

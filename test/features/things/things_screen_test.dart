@@ -15,6 +15,7 @@ import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/item_use_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -701,6 +702,107 @@ void main() {
   });
 
   for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets(
+      'mouse drag reaches Room and Accessories and reveals selection at $size',
+      (tester) async {
+        await tester.binding.setSurfaceSize(size);
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final database = createTestDatabase();
+        addTearDown(database.close);
+        final games = _ThingsGames(database, activePeriod);
+        games.inventory = {for (final item in canonicalItems) item.id: 1};
+        final container = ProviderContainer(
+          overrides: [
+            campaignLifecycleServiceProvider.overrideWithValue(
+              CampaignOnlyLifecycleService(),
+            ),
+            appDatabaseProvider.overrideWithValue(database),
+            activeProfileIdProvider.overrideWith(
+              () => _ActiveThingsProfileMock(1),
+            ),
+            profileRepositoryProvider.overrideWithValue(
+              _ThingsProfiles(profile),
+            ),
+            gameRepositoryProvider.overrideWithValue(games),
+            contentRepositoryProvider.overrideWithValue(
+              TestContentRepository(const [], shopItems: canonicalItems),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: const ThingsScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final row = find.byKey(const Key('things-filters'));
+        final position = tester
+            .state<ScrollableState>(
+              find.descendant(of: row, matching: find.byType(Scrollable)),
+            )
+            .position;
+        expect(position.pixels, 0);
+        await tester.drag(
+          row,
+          const Offset(-150, 0),
+          kind: PointerDeviceKind.mouse,
+        );
+        await tester.pumpAndSettle();
+        expect(position.pixels, greaterThan(0));
+        for (
+          var attempt = 0;
+          attempt < 8 && position.pixels < position.maxScrollExtent - 1;
+          attempt++
+        ) {
+          await tester.drag(
+            row,
+            const Offset(-150, 0),
+            kind: PointerDeviceKind.mouse,
+          );
+          await tester.pumpAndSettle();
+        }
+
+        final room = find.byKey(const Key('things-filter-room'));
+        final accessories = find.byKey(const Key('things-filter-accessories'));
+        expect(tester.getRect(room).center.dx, greaterThan(0));
+        expect(tester.getRect(room).center.dx, lessThan(size.width));
+        expect(
+          tester.getRect(accessories).right,
+          lessThanOrEqualTo(size.width - 16),
+        );
+        await tester.tap(room);
+        await tester.pumpAndSettle();
+        expect(
+          find.text('В категории «Комната» пока нет твоих вещей.'),
+          findsOneWidget,
+        );
+        expect(tester.getRect(room).left, greaterThanOrEqualTo(16));
+        expect(tester.getRect(room).right, lessThanOrEqualTo(size.width - 16));
+
+        position.jumpTo(position.maxScrollExtent - 24);
+        await tester.pump();
+        expect(tester.getRect(accessories).right, greaterThan(size.width - 16));
+        await tester.tap(accessories);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(accessories).left, greaterThanOrEqualTo(16));
+        expect(
+          tester.getRect(accessories).right,
+          lessThanOrEqualTo(size.width - 16),
+        );
+        expect(
+          find.byKey(const Key('things-item-accessory_bow')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('two-column Things grid fits ${size.width}x${size.height}', (
       tester,
     ) async {
