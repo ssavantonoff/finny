@@ -52,6 +52,10 @@ class _ShopItemDetailsState extends ConsumerState<ShopItemDetails> {
         _close();
         return;
       }
+      if (next.result?.kind == ShopResultKind.ambiguous &&
+          next.pending != null) {
+        return;
+      }
       if (next.load != ShopLoad.ready || next.purchasing) return;
       final invalidStatus =
           !next.freePlay &&

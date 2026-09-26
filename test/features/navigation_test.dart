@@ -377,6 +377,11 @@ void main() {
           final accessories = find.byKey(
             const Key('shop-category-accessories'),
           );
+          await tester.drag(
+            find.byKey(const Key('shop-category-navigation')),
+            const Offset(-400, 0),
+          );
+          await tester.pump(const Duration(milliseconds: 500));
           await tester.ensureVisible(accessories);
           await tester.tap(accessories);
           await tester.pump(const Duration(milliseconds: 500));

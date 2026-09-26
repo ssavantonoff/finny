@@ -69,6 +69,13 @@ void main() {
 
   Future<void> select(WidgetTester tester, ShopDisplaySection section) async {
     final chip = find.byKey(Key('shop-category-${section.name}'));
+    for (var attempt = 0; attempt < 3 && chip.evaluate().isEmpty; attempt++) {
+      await tester.drag(
+        find.byKey(const Key('shop-category-navigation')),
+        Offset(section == ShopDisplaySection.food ? 300 : -300, 0),
+      );
+      await tester.pumpAndSettle();
+    }
     await tester.ensureVisible(chip);
     await tester.tap(chip);
     await tester.pumpAndSettle();
@@ -148,6 +155,29 @@ void main() {
   });
 
   for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets(
+      'horizontal drag fully reveals Accessories at ${size.width}x${size.height}',
+      (tester) async {
+        h.content.items = canonicalItems;
+        await mount(tester, size: size);
+        final row = find.byKey(const Key('shop-category-navigation'));
+        await tester.drag(row, const Offset(-400, 0));
+        await tester.pumpAndSettle();
+        final accessories = find.byKey(const Key('shop-category-accessories'));
+        expect(accessories, findsOneWidget);
+        final bounds = tester.getRect(accessories);
+        expect(bounds.left, greaterThanOrEqualTo(16));
+        expect(bounds.right, lessThanOrEqualTo(size.width - 16));
+        await tester.tap(accessories);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('shop-item-accessory_bow')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets(
       'two-column cards and safe sheet at ${size.width}x${size.height}',
       (tester) async {
@@ -278,10 +308,24 @@ void main() {
       await open(tester, ball);
       await tester.tap(find.byKey(const Key('shop-buy')));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Пока не хватает монет.'), findsWidgets);
+      final message = find.textContaining('Пока не хватает монет.');
+      expect(
+        find.descendant(of: find.byType(ShopItemDetails), matching: message),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(ShopScreen), matching: message),
+        findsNothing,
+      );
       expect(h.state.gameState?.walletBalance, 500);
       expect(h.state.quantities[ball.id], 0);
       expect(find.textContaining('InsufficientFunds'), findsNothing);
+      await tester.ensureVisible(find.byKey(const Key('shop-cancel')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('shop-cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byType(ShopItemDetails), findsNothing);
+      expect(message, findsNothing);
     },
   );
 

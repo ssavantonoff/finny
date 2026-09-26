@@ -25,7 +25,7 @@ class ItemUseService {
       );
     }
     final item = matches.single;
-    if (item.id == 'toy_ball') {
+    if (item.displaySection == ShopDisplaySection.toys) {
       throw PetItemNotUsableException(item.id);
     }
     if (item.usagePolicy == ItemUsagePolicy.none || item.petEffects.isEmpty) {

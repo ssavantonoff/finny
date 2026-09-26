@@ -103,37 +103,30 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                         ),
                       ),
                     ),
-                    if (state.purchasing ||
-                        (state.result != null &&
-                            state.result!.kind != ShopResultKind.success))
-                      _padded(ShopPurchaseNotice(state: state)),
                     if (ready)
                       SliverToBoxAdapter(
                         child: SizedBox(
                           height: 58,
-                          child: SingleChildScrollView(
+                          child: ListView.separated(
                             key: const Key('shop-category-navigation'),
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              children: [
-                                for (final section
-                                    in ShopDisplaySection.values) ...[
-                                  _CategoryChip(
-                                    section: section,
-                                    selected: _section == section,
-                                    onTap: () {
-                                      setState(() => _section = section);
-                                      if (_scrollController.hasClients) {
-                                        _scrollController.jumpTo(0);
-                                      }
-                                    },
-                                  ),
-                                  if (section != ShopDisplaySection.values.last)
-                                    const SizedBox(width: 8),
-                                ],
-                              ],
-                            ),
+                            itemCount: ShopDisplaySection.values.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 8),
+                            itemBuilder: (context, index) {
+                              final section = ShopDisplaySection.values[index];
+                              return _CategoryChip(
+                                section: section,
+                                selected: _section == section,
+                                onTap: () {
+                                  setState(() => _section = section);
+                                  if (_scrollController.hasClients) {
+                                    _scrollController.jumpTo(0);
+                                  }
+                                },
+                              );
+                            },
                           ),
                         ),
                       ),
