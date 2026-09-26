@@ -374,6 +374,12 @@ void main() {
           );
         }
         if (index == 2) {
+          final accessories = find.byKey(
+            const Key('shop-category-accessories'),
+          );
+          await tester.ensureVisible(accessories);
+          await tester.tap(accessories);
+          await tester.pump(const Duration(milliseconds: 500));
           final catalog = find.descendant(
             of: find.byType(ShopScreen),
             matching: find.byType(CustomScrollView),

@@ -196,10 +196,6 @@ void main() {
     await tester.tap(buyButton);
     await tester.pumpAndSettle();
 
-    // Confirm purchase in bottom sheet
-    await tester.tap(buyButton);
-    await tester.pumpAndSettle();
-
     // 4. Switch back to Things tab
     await tester.tap(navItem('Вещи'));
     await tester.pumpAndSettle();
