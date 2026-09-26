@@ -9,6 +9,7 @@ import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/special_purchase.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -69,14 +70,19 @@ void main() {
 
   Future<void> select(WidgetTester tester, ShopDisplaySection section) async {
     final chip = find.byKey(Key('shop-category-${section.name}'));
-    for (var attempt = 0; attempt < 3 && chip.evaluate().isEmpty; attempt++) {
-      await tester.drag(
-        find.byKey(const Key('shop-category-navigation')),
-        Offset(section == ShopDisplaySection.food ? 300 : -300, 0),
-      );
+    final row = find.byKey(const Key('shop-category-navigation'));
+    final width = tester.getSize(row).width;
+    for (var attempt = 0; attempt < 4; attempt++) {
+      if (chip.evaluate().isNotEmpty) {
+        final bounds = tester.getRect(chip);
+        if (bounds.left >= 16 && bounds.right <= width - 16) break;
+      }
+      final direction = chip.evaluate().isNotEmpty
+          ? (tester.getRect(chip).left < 16 ? 300.0 : -300.0)
+          : (section == ShopDisplaySection.food ? 300.0 : -300.0);
+      await tester.drag(row, Offset(direction, 0));
       await tester.pumpAndSettle();
     }
-    await tester.ensureVisible(chip);
     await tester.tap(chip);
     await tester.pumpAndSettle();
   }
@@ -156,20 +162,54 @@ void main() {
 
   for (final size in [const Size(360, 800), const Size(393, 852)]) {
     testWidgets(
-      'horizontal drag fully reveals Accessories at ${size.width}x${size.height}',
+      'mouse drag and selected auto-reveal Accessories at ${size.width}x${size.height}',
       (tester) async {
         h.content.items = canonicalItems;
         await mount(tester, size: size);
         final row = find.byKey(const Key('shop-category-navigation'));
-        await tester.drag(row, const Offset(-400, 0));
+        final position = tester
+            .state<ScrollableState>(
+              find.descendant(of: row, matching: find.byType(Scrollable)),
+            )
+            .position;
+        expect(position.pixels, 0);
+        await tester.drag(
+          row,
+          const Offset(-150, 0),
+          kind: PointerDeviceKind.mouse,
+        );
         await tester.pumpAndSettle();
+        expect(position.pixels, greaterThan(0));
+        for (
+          var attempt = 0;
+          attempt < 4 && position.pixels < position.maxScrollExtent - 1;
+          attempt++
+        ) {
+          await tester.drag(
+            row,
+            const Offset(-150, 0),
+            kind: PointerDeviceKind.mouse,
+          );
+          await tester.pumpAndSettle();
+        }
         final accessories = find.byKey(const Key('shop-category-accessories'));
         expect(accessories, findsOneWidget);
         final bounds = tester.getRect(accessories);
         expect(bounds.left, greaterThanOrEqualTo(16));
-        expect(bounds.right, lessThanOrEqualTo(size.width - 16));
+        expect(
+          bounds.right,
+          lessThanOrEqualTo(size.width - 16),
+          reason: 'offset ${position.pixels} / ${position.maxScrollExtent}',
+        );
+        position.jumpTo(position.maxScrollExtent - 24);
+        await tester.pump();
+        expect(tester.getRect(accessories).right, greaterThan(size.width - 16));
         await tester.tap(accessories);
         await tester.pumpAndSettle();
+        expect(
+          tester.getRect(accessories).right,
+          lessThanOrEqualTo(size.width - 16),
+        );
         expect(
           find.byKey(const Key('shop-item-accessory_bow')),
           findsOneWidget,

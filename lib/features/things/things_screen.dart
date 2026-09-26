@@ -1,5 +1,6 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/widgets/category_strip_scroll.dart';
 import 'package:finny/features/things/things_controller.dart';
 import 'package:finny/features/shop/shop_item_art.dart';
 import 'package:finny/models/shop_item.dart';
@@ -117,63 +118,72 @@ class _ThingsScreenState extends ConsumerState<ThingsScreen> {
             ),
             SizedBox(
               height: 58,
-              child: ListView.separated(
-                key: const Key('things-filters'),
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _ThingsFilter.values.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final filter = _ThingsFilter.values[index];
-                  final selected = _filter == filter;
-                  return Semantics(
-                    selected: selected,
-                    button: true,
-                    child: InkWell(
-                      key: Key('things-filter-${filter.name}'),
-                      borderRadius: BorderRadius.circular(28),
-                      onTap: () => setState(() => _filter = filter),
-                      child: Container(
-                        constraints: const BoxConstraints(minHeight: 48),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: selected ? AppColors.primary : Colors.white70,
+              child: CategoryStripScroll(
+                child: ListView.separated(
+                  key: const Key('things-filters'),
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _ThingsFilter.values.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final filter = _ThingsFilter.values[index];
+                    final selected = _filter == filter;
+                    return Builder(
+                      builder: (chipContext) => Semantics(
+                        selected: selected,
+                        button: true,
+                        child: InkWell(
+                          key: Key('things-filter-${filter.name}'),
                           borderRadius: BorderRadius.circular(28),
-                          border: Border.all(
-                            color: selected
-                                ? AppColors.primary
-                                : const Color(0xFFDAD7F4),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (selected)
-                              const Icon(
-                                Icons.check_rounded,
-                                size: 18,
-                                color: Colors.white,
-                              )
-                            else if (filter != _ThingsFilter.all)
-                              Icon(filter.icon, size: 20),
-                            if (selected || filter != _ThingsFilter.all)
-                              const SizedBox(width: 6),
-                            Text(
-                              filter.label,
-                              style: TextStyle(
+                          onTap: () {
+                            setState(() => _filter = filter);
+                            CategoryStripScroll.revealSelected(chipContext);
+                          },
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? AppColors.primary
+                                  : Colors.white70,
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(
                                 color: selected
-                                    ? Colors.white
-                                    : const Color(0xFF1A2368),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
+                                    ? AppColors.primary
+                                    : const Color(0xFFDAD7F4),
                               ),
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (selected)
+                                  const Icon(
+                                    Icons.check_rounded,
+                                    size: 18,
+                                    color: Colors.white,
+                                  )
+                                else if (filter != _ThingsFilter.all)
+                                  Icon(filter.icon, size: 20),
+                                if (selected || filter != _ThingsFilter.all)
+                                  const SizedBox(width: 6),
+                                Text(
+                                  filter.label,
+                                  style: TextStyle(
+                                    color: selected
+                                        ? Colors.white
+                                        : const Color(0xFF1A2368),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(height: 12),

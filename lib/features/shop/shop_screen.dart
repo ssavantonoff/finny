@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/widgets/category_strip_scroll.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_art.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/features/shop/shop_controller.dart';
@@ -107,26 +108,36 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                       SliverToBoxAdapter(
                         child: SizedBox(
                           height: 58,
-                          child: ListView.separated(
-                            key: const Key('shop-category-navigation'),
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: ShopDisplaySection.values.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(width: 8),
-                            itemBuilder: (context, index) {
-                              final section = ShopDisplaySection.values[index];
-                              return _CategoryChip(
-                                section: section,
-                                selected: _section == section,
-                                onTap: () {
-                                  setState(() => _section = section);
-                                  if (_scrollController.hasClients) {
-                                    _scrollController.jumpTo(0);
-                                  }
-                                },
-                              );
-                            },
+                          child: CategoryStripScroll(
+                            child: ListView.separated(
+                              key: const Key('shop-category-navigation'),
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              itemCount: ShopDisplaySection.values.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                final section =
+                                    ShopDisplaySection.values[index];
+                                return Builder(
+                                  builder: (chipContext) => _CategoryChip(
+                                    section: section,
+                                    selected: _section == section,
+                                    onTap: () {
+                                      setState(() => _section = section);
+                                      if (_scrollController.hasClients) {
+                                        _scrollController.jumpTo(0);
+                                      }
+                                      CategoryStripScroll.revealSelected(
+                                        chipContext,
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
                       ),
