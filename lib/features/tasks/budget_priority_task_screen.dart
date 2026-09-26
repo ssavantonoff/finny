@@ -2,7 +2,9 @@ import 'dart:math';
 
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/tasks/tasks_controller.dart';
+import 'package:finny/features/tasks/task_visual_components.dart';
 import 'package:finny/models/financial_task.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/task_submission_result.dart';
 import 'package:flutter/material.dart';
 
@@ -10,12 +12,14 @@ class BudgetPriorityTaskScreen extends StatefulWidget {
   const BudgetPriorityTaskScreen({
     required this.task,
     required this.controller,
+    required this.shopItems,
     this.random,
     super.key,
   });
 
   final FinancialTask task;
   final TasksController controller;
+  final Map<String, ShopItem> shopItems;
   final Random? random;
 
   @override
@@ -108,6 +112,17 @@ class _BudgetPriorityTaskScreenState extends State<BudgetPriorityTaskScreen> {
     if (itemId != null) _moveItem(itemId, decision);
   }
 
+  void _removeItem(String itemId) {
+    if (submitting || completed) return;
+    setState(() {
+      assignments.remove(itemId);
+      selectedItemId = null;
+      budgetError = null;
+      result = null;
+      failed = false;
+    });
+  }
+
   Future<void> _check() async {
     if (assignments.length != scenario.items.length || submitting) return;
     setState(() {
@@ -130,352 +145,222 @@ class _BudgetPriorityTaskScreenState extends State<BudgetPriorityTaskScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     key: const Key('budget-priority-task-screen'),
-    appBar: AppBar(
-      title: Text(widget.task.title),
-      leading: IconButton(
-        tooltip: 'Закрыть',
-        onPressed: submitting ? null : () => Navigator.pop(context),
-        icon: const Icon(Icons.close),
-      ),
-    ),
-    body: SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.medium,
-              AppSpacing.small,
-              AppSpacing.medium,
-              AppSpacing.small,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Бюджет задания: ${scenario.budget} монет',
-                  key: const Key('budget-priority-budget'),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Осталось: $remaining монет',
-                  key: const Key('budget-priority-remaining'),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Это бюджет только для задания.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (budgetError case final message?) ...[
-                  const SizedBox(height: AppSpacing.small),
-                  Semantics(
-                    liveRegion: true,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.account_balance_wallet_outlined,
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        const SizedBox(width: AppSpacing.small),
-                        Expanded(
-                          child: Text(
-                            message,
-                            key: const Key('budget-priority-budget-error'),
-                          ),
-                        ),
-                      ],
+    backgroundColor: AppColors.background,
+    body: Stack(
+      children: [
+        const Positioned.fill(child: TaskBackdrop()),
+        SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                  children: [
+                    TaskScreenHeader(
+                      day: widget.task.period,
+                      title: widget.task.title,
+                      description:
+                          'У Финни ${scenario.budget} монет. Выбери самое важное и уложись в бюджет.',
+                      onClose: submitting ? null : () => Navigator.pop(context),
                     ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(AppSpacing.medium),
-              children: [
-                Text(
-                  scenario.prompt,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: AppSpacing.small),
-                Text(
-                  'Перетащи покупку или нажми на неё, а затем выбери решение.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: AppSpacing.medium),
-                if (assignments.length < scenario.items.length) ...[
-                  Text(
-                    'Покупки',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  Wrap(
-                    spacing: AppSpacing.small,
-                    runSpacing: AppSpacing.small,
-                    children: [
-                      for (final item in displayItems)
-                        if (!assignments.containsKey(item.id))
-                          _buildDraggableItem(context, item),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.medium),
-                ],
-                _buildDecisionZone(
-                  context,
-                  BudgetPriorityDecision.buyNow,
-                  scenario.buyNowLabel,
-                  scenario.buyNowDescription,
-                ),
-                const SizedBox(height: AppSpacing.medium),
-                _buildDecisionZone(
-                  context,
-                  BudgetPriorityDecision.later,
-                  scenario.laterLabel,
-                  scenario.laterDescription,
-                ),
-                if (result case TaskBudgetPriorityIncorrect(
-                  :final explanation,
-                )) ...[
-                  const SizedBox(height: AppSpacing.medium),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      'Почти получилось!',
-                      key: const Key('budget-priority-incorrect-title'),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  Text(explanation),
-                  const SizedBox(height: AppSpacing.small),
-                  for (final item in displayItems)
-                    if (incorrectItemIds.contains(item.id))
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: AppSpacing.small,
+                    const SizedBox(height: 16),
+                    if (result case TaskAnswerCompleted(:final explanation))
+                      TaskSuccessPanel(
+                        reward: widget.task.reward,
+                        explanation: explanation,
+                        titleKey: const Key('budget-priority-success-title'),
+                        rewardKey: const Key('budget-priority-reward'),
+                      )
+                    else ...[
+                      TaskBudgetPanel(
+                        budget: scenario.budget,
+                        remaining: remaining,
+                        spent: buyNowTotal,
+                        error: budgetError,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Это бюджет только для задания.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        scenario.prompt,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Перетащи покупку или нажми на неё, а затем выбери решение.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if (assignments.length < scenario.items.length) ...[
+                        const SizedBox(height: 16),
+                        TaskUnresolvedSection(
+                          title: 'Осталось решить',
                           children: [
-                            const Icon(Icons.error_outline),
-                            const SizedBox(width: AppSpacing.small),
-                            Expanded(
-                              child: Text(
-                                '${item.label}: ${item.feedback}',
-                                key: Key('budget-priority-feedback-${item.id}'),
-                              ),
-                            ),
+                            for (final item in displayItems)
+                              if (!assignments.containsKey(item.id))
+                                _buildDraggableItem(item, compact: false),
                           ],
                         ),
+                      ],
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildDecisionZone(
+                              BudgetPriorityDecision.buyNow,
+                              scenario.buyNowLabel,
+                              'То, что Финни нужно сейчас.',
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _buildDecisionZone(
+                              BudgetPriorityDecision.later,
+                              scenario.laterLabel,
+                              'То, что можно купить позже.',
+                            ),
+                          ),
+                        ],
                       ),
-                ],
-                if (result case TaskAnswerCompleted(:final explanation)) ...[
-                  const SizedBox(height: AppSpacing.medium),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      'Отлично!',
-                      key: const Key('budget-priority-success-title'),
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  Text(
-                    '+${widget.task.reward} монет',
-                    key: const Key('budget-priority-reward'),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  Text(explanation),
-                ],
-                if (failed) ...[
-                  const SizedBox(height: AppSpacing.small),
-                  const Text(
-                    'Не получилось выполнить действие. Попробуй ещё раз.',
-                  ),
-                ],
-              ],
-            ),
+                      if (result case TaskBudgetPriorityIncorrect(
+                        :final explanation,
+                      )) ...[
+                        const SizedBox(height: 16),
+                        TaskFeedbackPanel(
+                          title: 'Почти получилось!',
+                          titleKey: const Key(
+                            'budget-priority-incorrect-title',
+                          ),
+                          children: [
+                            Text(explanation),
+                            for (final item in displayItems)
+                              if (incorrectItemIds.contains(item.id))
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    '${item.label}: ${item.feedback}',
+                                    key: Key(
+                                      'budget-priority-feedback-${item.id}',
+                                    ),
+                                  ),
+                                ),
+                          ],
+                        ),
+                      ],
+                      if (failed) ...[
+                        const SizedBox(height: 16),
+                        const TaskFeedbackPanel(
+                          title: 'Не получилось выполнить действие.',
+                          children: [Text('Попробуй ещё раз.')],
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: TaskPrimaryButton(
+                  keyName: completed
+                      ? 'budget-priority-continue'
+                      : 'budget-priority-check',
+                  label: completed
+                      ? 'Продолжить'
+                      : submitting
+                      ? 'Проверяем…'
+                      : 'Проверить решение',
+                  onPressed: completed
+                      ? () => Navigator.pop(context)
+                      : assignments.length == scenario.items.length &&
+                            !submitting
+                      ? _check
+                      : null,
+                ),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.medium,
-              AppSpacing.small,
-              AppSpacing.medium,
-              AppSpacing.medium,
-            ),
-            child: SizedBox(
-              width: double.infinity,
-              child: completed
-                  ? FilledButton(
-                      key: const Key('budget-priority-continue'),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Продолжить'),
-                    )
-                  : FilledButton(
-                      key: const Key('budget-priority-check'),
-                      onPressed:
-                          assignments.length == scenario.items.length &&
-                              !submitting
-                          ? _check
-                          : null,
-                      child: Text(
-                        submitting ? 'Проверяем…' : 'Проверить решение',
-                      ),
-                    ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 
   Widget _buildDecisionZone(
-    BuildContext context,
     BudgetPriorityDecision decision,
     String label,
     String description,
   ) => DragTarget<String>(
     onWillAcceptWithDetails: (_) => !submitting && !completed,
     onAcceptWithDetails: (details) => _moveItem(details.data, decision),
-    builder: (context, candidates, rejected) {
-      final highlighted = candidates.isNotEmpty || selectedItemId != null;
-      return InkWell(
-        key: Key('budget-priority-zone-${decision.wireValue}'),
-        onTap: submitting || completed ? null : () => _placeSelected(decision),
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          constraints: const BoxConstraints(minHeight: 120),
-          padding: const EdgeInsets.all(AppSpacing.medium),
-          decoration: BoxDecoration(
-            color: highlighted
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(
-              width: candidates.isNotEmpty ? 3 : 1,
-              color: candidates.isNotEmpty
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.outline,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(label, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 2),
-              Text(description),
-              const SizedBox(height: AppSpacing.small),
-              Wrap(
-                spacing: AppSpacing.small,
-                runSpacing: AppSpacing.small,
-                children: [
-                  for (final item in displayItems)
-                    if (assignments[item.id] == decision.wireValue)
-                      _buildDraggableItem(context, item),
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    },
+    builder: (context, candidates, rejected) => TaskDecisionZone(
+      zoneKey: Key('budget-priority-zone-${decision.wireValue}'),
+      title: label,
+      description: description,
+      icon: decision == BudgetPriorityDecision.buyNow
+          ? Icons.shopping_cart_rounded
+          : Icons.favorite_rounded,
+      color: decision == BudgetPriorityDecision.buyNow
+          ? AppColors.need
+          : AppColors.want,
+      highlighted: candidates.isNotEmpty || selectedItemId != null,
+      onTap: submitting || completed ? null : () => _placeSelected(decision),
+      children: [
+        for (final item in displayItems)
+          if (assignments[item.id] == decision.wireValue)
+            _buildDraggableItem(item, compact: true),
+      ],
+    ),
   );
 
   Widget _buildDraggableItem(
-    BuildContext context,
-    BudgetPriorityTaskItem item,
-  ) => Draggable<String>(
+    BudgetPriorityTaskItem item, {
+    required bool compact,
+  }) => Draggable<String>(
     data: item.id,
     maxSimultaneousDrags: submitting || completed ? 0 : 1,
     feedback: Material(
       color: Colors.transparent,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 220),
-        child: _buildItemCard(context, item, dragging: true),
+      child: SizedBox(
+        width: compact ? 150 : 160,
+        child: _buildItemCard(item, compact: compact, dragging: true),
       ),
     ),
     childWhenDragging: Opacity(
       opacity: 0.35,
-      child: _buildItemCard(context, item),
+      child: _buildItemCard(item, compact: compact, dragging: true),
     ),
-    child: _buildItemCard(context, item),
+    child: _buildItemCard(item, compact: compact),
   );
 
   Widget _buildItemCard(
-    BuildContext context,
     BudgetPriorityTaskItem item, {
+    required bool compact,
     bool dragging = false,
-  }) {
-    final selected = selectedItemId == item.id;
-    final incorrect = incorrectItemIds.contains(item.id);
-    return Semantics(
-      button: true,
-      selected: selected,
-      label:
-          '${item.label}, ${item.price} монет${incorrect ? ', ошибка в решении' : ''}',
-      child: InkWell(
-        key: dragging ? null : Key('budget-priority-item-${item.id}'),
-        onTap: dragging || submitting || completed
-            ? null
-            : () => _selectItem(item.id),
-        borderRadius: BorderRadius.circular(AppRadii.button),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.medium,
-            vertical: AppSpacing.small,
-          ),
-          decoration: BoxDecoration(
-            color: selected
-                ? Theme.of(context).colorScheme.secondaryContainer
-                : Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(AppRadii.button),
-            border: Border.all(
-              width: selected || incorrect ? 2 : 1,
-              color: incorrect
-                  ? Theme.of(context).colorScheme.error
-                  : selected
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.outlineVariant,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (incorrect) ...[
-                Icon(
-                  Icons.error_outline,
-                  size: 18,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-                const SizedBox(width: 4),
-              ] else if (selected) ...[
-                const Icon(Icons.check_circle_outline, size: 18),
-                const SizedBox(width: 4),
-              ],
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.label),
-                    Text(
-                      '${item.price} монет',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  }) => TaskItemTile(
+    itemId: item.id,
+    label: item.label,
+    price: item.price,
+    shopItems: widget.shopItems,
+    compact: compact,
+    selected: selectedItemId == item.id,
+    incorrect: incorrectItemIds.contains(item.id),
+    tileKey: dragging ? null : Key('budget-priority-item-${item.id}'),
+    onTap: dragging || submitting || completed
+        ? null
+        : () => _selectItem(item.id),
+    onRemove: dragging || !compact || submitting || completed
+        ? null
+        : () => _removeItem(item.id),
+  );
 }
