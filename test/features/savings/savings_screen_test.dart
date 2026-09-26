@@ -406,6 +406,21 @@ void main() {
       await tapVisible(tester, find.byKey(const Key('savings-claim')));
       expect(find.text('Получить «Ночник»?'), findsOneWidget);
       expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Закрыть'));
+      await tester.pumpAndSettle();
+
+      await _pumpSavings(
+        tester,
+        ready(
+          activeGoalId: 'goal_night_light',
+          saved: 250,
+          period: testPeriod(actual: 0),
+        ),
+        size: size,
+      );
+      await tapVisible(tester, find.byKey(const Key('savings-skip')));
+      expect(find.text('Сегодня ничего не откладывать?'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   }
 
