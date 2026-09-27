@@ -23,6 +23,9 @@ class FinnyCatchScreen extends ConsumerStatefulWidget {
 
 class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
     with WidgetsBindingObserver {
+  static const _backgroundAsset =
+      'assets/minigames/finny_catch/background_mountains.png';
+
   late final FinnyCatchController _controller;
   late final bool _ownsController;
   bool _exitDialogOpen = false;
@@ -169,22 +172,25 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
           if (!didPop) _handleBack();
         },
         child: Scaffold(
-          body: DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(0, -0.25),
-                radius: 1.3,
-                colors: [Color(0xFFF7F6FF), Color(0xFFD8D8F4)],
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                _backgroundAsset,
+                key: const Key('finny-catch-background'),
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.medium,
+                excludeFromSemantics: true,
               ),
-            ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  _header(state),
-                  Expanded(child: _field(state)),
-                ],
+              SafeArea(
+                child: Column(
+                  children: [
+                    _header(state),
+                    Expanded(child: _field(state)),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       );

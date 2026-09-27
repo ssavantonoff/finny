@@ -7,6 +7,7 @@ import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -103,6 +104,19 @@ void main() {
     await tester.pump();
   }
 
+  void expectMountainBackground(WidgetTester tester, Size screenSize) {
+    final background = find.byKey(const Key('finny-catch-background'));
+    expect(background, findsOneWidget);
+    final image = tester.widget<Image>(background);
+    expect(image.image, isA<AssetImage>());
+    expect(
+      (image.image as AssetImage).assetName,
+      'assets/minigames/finny_catch/background_mountains.png',
+    );
+    expect(image.fit, BoxFit.cover);
+    expect(tester.getSize(background), screenSize);
+  }
+
   testWidgets('free play uses the active Pet appearance with fixed hitbox', (
     tester,
   ) async {
@@ -138,6 +152,7 @@ void main() {
     'prepare reference content fits 360dp and has no falling objects or nav',
     (tester) async {
       await mount(tester);
+      expectMountainBackground(tester, const Size(360, 800));
       expect(find.text('Лови монеты'), findsOneWidget);
       expect(find.text('Очки'), findsOneWidget);
       expect(find.text('30 сек'), findsOneWidget);
@@ -160,6 +175,7 @@ void main() {
     tester,
   ) async {
     await mount(tester, size: const Size(393, 852));
+    expectMountainBackground(tester, const Size(393, 852));
     expect(find.text('Начать игру'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Начать игру'));
@@ -168,6 +184,19 @@ void main() {
     await elapse(tester, const Duration(seconds: 30));
     await tester.pump();
     expect(find.text('Отличная игра!'), findsOneWidget);
+    expectMountainBackground(tester, const Size(393, 852));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mountain background is bundled and loads without errors', (
+    tester,
+  ) async {
+    await mount(tester);
+    final data = await rootBundle.load(
+      'assets/minigames/finny_catch/background_mountains.png',
+    );
+    expect(data.lengthInBytes, greaterThan(0));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 
@@ -211,6 +240,7 @@ void main() {
       await mount(tester);
       await tester.tap(find.text('Начать игру'));
       await tester.pump();
+      expectMountainBackground(tester, const Size(360, 800));
       expect(find.text('3'), findsOneWidget);
       await elapse(tester, const Duration(milliseconds: 1500));
       expect(find.text('Старт!'), findsOneWidget);
@@ -220,6 +250,7 @@ void main() {
       expect(controller.state.phase, FinnyCatchPhase.playing);
       await elapse(tester, const Duration(seconds: 1));
       expect(find.text('29 сек'), findsOneWidget);
+      expectMountainBackground(tester, const Size(360, 800));
       final before = controller.state.finnyX;
       await tester.dragFrom(const Offset(180, 500), const Offset(170, 0));
       await tester.pump();
@@ -241,6 +272,7 @@ void main() {
       await tester.pump();
       expect(find.text('0 сек'), findsOneWidget);
       expect(find.text('Отличная игра!'), findsOneWidget);
+      expectMountainBackground(tester, const Size(360, 800));
       expect(find.text('Награда'), findsOneWidget);
       expect(find.text('+10'), findsOneWidget);
       expect(rewardCount, 1);
@@ -294,6 +326,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(controller.state.phase, FinnyCatchPhase.paused);
     expect(find.text('Выйти из игры?'), findsOneWidget);
+    expectMountainBackground(tester, const Size(360, 800));
     expect(find.text('Награда за этот раунд не сохранится.'), findsOneWidget);
     expect(rewardCount, 0);
     await tester.tap(find.text('Продолжить').last);
