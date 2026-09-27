@@ -7,7 +7,7 @@ class ProfileName {
   bool get isValid => trimmed.isNotEmpty && trimmed.runes.length <= 20;
 
   String? get error {
-    if (trimmed.isEmpty) return 'Напиши игровое имя';
+    if (trimmed.isEmpty) return 'Напиши своё имя';
     if (trimmed.runes.length > 20) {
       return 'Имя должно быть не длиннее 20 символов';
     }

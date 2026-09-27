@@ -1,4 +1,5 @@
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/pet.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +18,7 @@ void main() {
     mood: 70,
   );
 
-  testWidgets('room uses the neutral asset for each canonical stage', (
+  testWidgets('room uses selected appearance for each canonical stage', (
     tester,
   ) async {
     for (final stage in [1, 2, 3]) {
@@ -34,7 +35,7 @@ void main() {
       );
       expect(
         (art.image as AssetImage).assetName,
-        FinnyRoomScene.assetForStage(stage),
+        FinnyVisual.assetForPet(pet.copyWith(developmentStage: stage)),
       );
       expect(find.byKey(const Key('home-room-background')), findsOneWidget);
       expect(tester.takeException(), isNull);

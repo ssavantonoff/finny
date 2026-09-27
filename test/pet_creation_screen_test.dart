@@ -96,8 +96,8 @@ Map<String, Rect> _choiceRects(WidgetTester tester, List<String> ids) => {
   for (final id in ids)
     id: () {
       final choice = find.byKey(Key('pet-choice-$id'));
-      final wrap = find.ancestor(of: choice, matching: find.byType(Wrap)).first;
-      return tester.getRect(choice).shift(-tester.getTopLeft(wrap));
+      final row = find.ancestor(of: choice, matching: find.byType(Row)).first;
+      return tester.getRect(choice).shift(-tester.getTopLeft(row));
     }(),
 };
 
@@ -167,18 +167,20 @@ void main() {
       );
       expect(tester.takeException(), isNull);
     }
-    final selectedIcon =
-        tester
-                .widget<ChoiceChip>(find.byKey(const Key('pet-choice-blue')))
-                .avatar
-            as Icon;
-    final unselectedIcon =
-        tester
-                .widget<ChoiceChip>(find.byKey(const Key('pet-choice-purple')))
-                .avatar
-            as Icon;
-    expect(selectedIcon.color, isNot(Colors.transparent));
-    expect(unselectedIcon.color, Colors.transparent);
+    expect(
+      tester
+          .widget<PetAppearanceOption>(find.byKey(const Key('pet-choice-blue')))
+          .selected,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<PetAppearanceOption>(
+            find.byKey(const Key('pet-choice-purple')),
+          )
+          .selected,
+      isFalse,
+    );
     expect(find.byType(SingleChildScrollView), findsOneWidget);
   });
 
@@ -190,7 +192,7 @@ void main() {
 
       expect(
         tester.widget<FinnyPreview>(find.byType(FinnyPreview)).colorId,
-        'blue',
+        'purple',
       );
       expect(
         tester.widget<FinnyPreview>(find.byType(FinnyPreview)).patternId,
@@ -198,13 +200,17 @@ void main() {
       );
       expect(
         tester
-            .widget<ChoiceChip>(find.byKey(const Key('pet-choice-blue')))
+            .widget<PetAppearanceOption>(
+              find.byKey(const Key('pet-choice-purple')),
+            )
             .selected,
         isTrue,
       );
       expect(
         tester
-            .widget<ChoiceChip>(find.byKey(const Key('pet-choice-plain')))
+            .widget<PetAppearanceOption>(
+              find.byKey(const Key('pet-choice-plain')),
+            )
             .selected,
         isTrue,
       );

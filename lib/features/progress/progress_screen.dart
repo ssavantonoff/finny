@@ -45,6 +45,7 @@ class ProgressScreen extends ConsumerWidget {
                       const SizedBox(height: AppSpacing.large),
                       if (pet != null)
                         FinnyPreview(
+                          name: pet.name,
                           colorId: pet.colorId,
                           patternId: pet.patternId,
                           developmentStage: pet.developmentStage,

@@ -20,7 +20,7 @@ const _pet = Pet(
   profileId: 1,
   name: 'Финни',
   colorId: 'blue',
-  patternId: 'plain',
+  patternId: 'spots',
   developmentStage: 3,
   growthPoints: 0,
   satiety: 70,
@@ -156,6 +156,14 @@ void main() {
         expect(find.text('Поиграем с Финни?'), findsOneWidget);
         expect(find.byKey(const Key('car-room-background')), findsOneWidget);
         expect(find.byKey(const Key('car-finny-stage-3')), findsOneWidget);
+        expect(
+          (tester
+                      .widget<Image>(find.byKey(const Key('car-finny-stage-3')))
+                      .image
+                  as AssetImage)
+              .assetName,
+          'assets/images/finny/stage3/blue_spots.png',
+        );
         expectProductionArt(tester);
         final header = tester.getRect(find.byKey(const Key('car-header')));
         expect(header.left, 16);

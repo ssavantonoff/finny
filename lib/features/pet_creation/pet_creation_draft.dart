@@ -1,11 +1,11 @@
 class PetCreationDraft {
   const PetCreationDraft({
     this.name = '',
-    this.colorId = 'blue',
+    this.colorId = 'purple',
     this.patternId = 'plain',
   });
 
-  static const colorIds = ['blue', 'purple', 'mint'];
+  static const colorIds = ['purple', 'blue', 'mint'];
   static const patternIds = ['plain', 'spots', 'stripes'];
 
   final String name;

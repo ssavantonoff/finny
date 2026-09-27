@@ -20,7 +20,7 @@ const _pet = Pet(
   profileId: 1,
   name: 'Финни',
   colorId: 'blue',
-  patternId: 'plain',
+  patternId: 'spots',
   developmentStage: 3,
   growthPoints: 0,
   satiety: 70,
@@ -143,6 +143,12 @@ void main() {
     );
     expect(find.byKey(const Key('ball-room-background')), findsOneWidget);
     expect(find.byKey(const Key('ball-finny-stage-3')), findsOneWidget);
+    expect(
+      (tester.widget<Image>(find.byKey(const Key('ball-finny-stage-3'))).image
+              as AssetImage)
+          .assetName,
+      'assets/images/finny/stage3/blue_spots.png',
+    );
     expectProductionBall(tester);
     expect(find.byKey(const Key('ball-start')), findsOneWidget);
     expect(

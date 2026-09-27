@@ -6,6 +6,7 @@ import 'package:finny/core/database/app_database.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_visual_components.dart';
+import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
@@ -95,6 +96,8 @@ void main() {
     WidgetTester tester, {
     bool clearActiveGoal = false,
     int savedAmount = 0,
+    String colorId = 'blue',
+    String patternId = 'stripes',
   }) async => (await tester.runAsync(() async {
     final database = createTestDatabase();
     final db = await database.database;
@@ -109,11 +112,11 @@ void main() {
     final games = SqliteGameRepository(database);
     await games.ensureInitialState(profileId);
     await games.savePet(
-      const Pet(
+      Pet(
         profileId: profileId,
         name: 'Финни',
-        colorId: 'blue',
-        patternId: 'plain',
+        colorId: colorId,
+        patternId: patternId,
         developmentStage: 3,
         growthPoints: 300,
         satiety: 80,
@@ -183,6 +186,19 @@ void main() {
         UncontrolledProviderScope(container: scope, child: const FinnyApp()),
       );
       await waitFor(tester, find.text('5 дней вместе!'));
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.descendant(
+                        of: find.byType(FinnyPreview),
+                        matching: find.byType(Image),
+                      ),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/finny/stage3/blue_stripes.png',
+      );
       expect(find.text('Продолжить с Финни'), findsOneWidget);
       await tester.runAsync(() async {
         scope.read(routerProvider).go('/shop');
@@ -196,6 +212,20 @@ void main() {
       );
       await tapVisible(tester, find.text('Завершить историю'));
       await waitFor(tester, find.text('История завершена'));
+      await waitFor(tester, find.byType(FinnyPreview));
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.descendant(
+                        of: find.byType(FinnyPreview),
+                        matching: find.byType(Image),
+                      ),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/finny/stage3/blue_stripes.png',
+      );
       await tester.runAsync(() async {
         scope.read(routerProvider).go('/tasks');
         await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -223,6 +253,12 @@ void main() {
       expect(find.byType(HomeWallet), findsOneWidget);
       expect(find.byType(FinnyRoomScene), findsOneWidget);
       expect(find.byKey(const Key('home-finny-stage-3')), findsOneWidget);
+      expect(
+        (tester.widget<Image>(find.byKey(const Key('home-finny-stage-3'))).image
+                as AssetImage)
+            .assetName,
+        'assets/images/finny/stage3/blue_stripes.png',
+      );
       expect(find.text('🪙'), findsNothing);
       expect(find.text('Начать следующий день'), findsNothing);
       expect(find.text('Уложить Финни спать'), findsNothing);
@@ -295,6 +331,8 @@ void main() {
       tester,
       clearActiveGoal: true,
       savedAmount: 73,
+      colorId: 'mint',
+      patternId: 'spots',
     );
     addTearDown(database.close);
     final scope = container(database, content, games);
@@ -310,6 +348,12 @@ void main() {
     expect(find.byType(HomeWallet), findsOneWidget);
     expect(find.byType(FinnyRoomScene), findsOneWidget);
     expect(find.byKey(const Key('home-finny-stage-3')), findsOneWidget);
+    expect(
+      (tester.widget<Image>(find.byKey(const Key('home-finny-stage-3'))).image
+              as AssetImage)
+          .assetName,
+      'assets/images/finny/stage3/mint_spots.png',
+    );
     expect(find.byType(HomeSceneBackdrop), findsOneWidget);
     expect(
       tester.widget<HomeSceneBackdrop>(find.byType(HomeSceneBackdrop)).phase,
