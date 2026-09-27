@@ -1,7 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:finny/app/providers.dart';
+import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/home/home_controller.dart';
+import 'package:finny/models/pet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +26,7 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
   late final FinnyCatchController _controller;
   late final bool _ownsController;
   bool _exitDialogOpen = false;
+  Pet? _pet;
 
   @override
   void initState() {
@@ -36,6 +39,20 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
           grantReward: ref.read(freePlayServiceProvider).grantMinigameReward,
         );
     WidgetsBinding.instance.addObserver(this);
+    _loadPet();
+  }
+
+  Future<void> _loadPet() async {
+    final profileId = ref.read(activeProfileIdProvider);
+    if (profileId == null) return;
+    try {
+      final pet = await ref.read(gameRepositoryProvider).getPet(profileId);
+      if (mounted && ref.read(activeProfileIdProvider) == profileId) {
+        setState(() => _pet = pet);
+      }
+    } catch (_) {
+      // Gameplay remains usable if reading the appearance fails.
+    }
   }
 
   @override
@@ -308,20 +325,22 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
                   ),
                 ),
               ),
-            Positioned(
-              left: state.finnyX * width - finnyWidth / 2,
-              bottom: 6,
-              width: finnyWidth,
-              child: Semantics(
-                image: true,
-                label: 'Финни, перетаскивай его пальцем',
-                child: Image.asset(
-                  FinnyCatchAssets.finny,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.medium,
+            if (_pet != null)
+              Positioned(
+                left: state.finnyX * width - finnyWidth / 2,
+                bottom: 6,
+                width: finnyWidth,
+                child: Semantics(
+                  image: true,
+                  label:
+                      '${FinnyVisual.descriptionForPet(_pet!)}, перетаскивай его пальцем',
+                  child: Image.asset(
+                    FinnyVisual.assetForPet(_pet!),
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.medium,
+                  ),
                 ),
               ),
-            ),
             if (state.phase == FinnyCatchPhase.prepare)
               _centeredCard(height, _prepareCard()),
             if (state.phase == FinnyCatchPhase.countdown)

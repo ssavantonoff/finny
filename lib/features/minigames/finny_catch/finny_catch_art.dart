@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'finny_catch_models.dart';
 
 abstract final class FinnyCatchAssets {
-  static const finny = 'assets/minigames/finny_catch/finny_stage3.png';
   static const cloud = 'assets/minigames/finny_catch/cloud.png';
   static const atlas = 'assets/minigames/finny_catch/icons_atlas.png';
 }

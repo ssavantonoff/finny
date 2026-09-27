@@ -1,3 +1,4 @@
+import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/repositories/game_repository.dart';
@@ -67,9 +68,32 @@ void main() {
     expect(saved?.care, 100);
     expect(saved?.mood, 100);
     expect((await games.getPet(demo.id!))?.name, 'Демо Финни');
+    final stageOne = saved!.copyWith(developmentStage: 1);
+    await games.savePet(stageOne);
+    final reloadedStageOne = await games.getPet(normal.id!);
+    expect(
+      FinnyVisual.assetForPet(reloadedStageOne!),
+      'assets/images/finny/stage1/mint_stripes.png',
+    );
+    await games.savePet(reloadedStageOne.copyWith(developmentStage: 2));
+    final stageTwo = await games.getPet(normal.id!);
+    expect(stageTwo?.colorId, 'mint');
+    expect(stageTwo?.patternId, 'stripes');
+    expect(
+      FinnyVisual.assetForPet(stageTwo!),
+      'assets/images/finny/stage2/mint_stripes.png',
+    );
+    await games.savePet(stageTwo.copyWith(developmentStage: 3));
+    final stageThree = await games.getPet(normal.id!);
+    expect(stageThree?.colorId, 'mint');
+    expect(stageThree?.patternId, 'stripes');
+    expect(
+      FinnyVisual.assetForPet(stageThree!),
+      'assets/images/finny/stage3/mint_stripes.png',
+    );
 
     await games.savePet(
-      saved!.copyWith(name: 'Новое имя', colorId: 'purple', patternId: 'spots'),
+      saved.copyWith(name: 'Новое имя', colorId: 'purple', patternId: 'spots'),
     );
     final updated = await games.getPet(normal.id!);
     expect(updated?.name, 'Новое имя');

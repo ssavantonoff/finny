@@ -4,6 +4,7 @@ import 'dart:async';
 
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
+import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -93,14 +94,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Привет! Я Финни'), findsOneWidget);
+    await tester.ensureVisible(find.text('Дальше'));
     await tester.tap(find.text('Дальше'));
     await tester.pumpAndSettle();
-    expect(find.text('Копилка — деньги на будущую цель.'), findsOneWidget);
+    expect(
+      find.text('Монеты, которые ты сохраняешь для будущей цели.'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('Понятно'));
     await tester.tap(find.text('Понятно'));
     await tester.pumpAndSettle();
     expect(profiles.saved, isNull);
     await tester.enterText(find.byType(EditableText), '  Игрок  ');
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Продолжить'));
     await tester.tap(find.text('Продолжить'));
     await tester.pumpAndSettle();
 
@@ -175,13 +182,17 @@ void main() {
       UncontrolledProviderScope(container: container, child: const FinnyApp()),
     );
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Дальше'));
     await tester.tap(find.text('Дальше'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Понятно'));
     await tester.tap(find.text('Понятно'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Игрок');
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Продолжить'));
     await tester.tap(find.text('Продолжить'));
+    await tester.ensureVisible(find.text('Продолжить'));
     await tester.tap(find.text('Продолжить'));
     await tester.pump();
     expect(profiles.creates, 1);
@@ -213,12 +224,15 @@ void main() {
       UncontrolledProviderScope(container: container, child: const FinnyApp()),
     );
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Дальше'));
     await tester.tap(find.text('Дальше'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Понятно'));
     await tester.tap(find.text('Понятно'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Игрок');
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Продолжить'));
     await tester.tap(find.text('Продолжить'));
     await tester.pumpAndSettle();
 
@@ -230,9 +244,112 @@ void main() {
     expect(profiles.saved, isNull);
     expect(container.read(activeProfileIdProvider), isNull);
     profiles.failCreate = false;
+    await tester.ensureVisible(find.text('Попробовать снова'));
     await tester.tap(find.text('Попробовать снова'));
     await tester.pumpAndSettle();
     expect(find.text('Создай своего Финни'), findsOneWidget);
     expect(profiles.saved?.gameName, 'Игрок');
   });
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('first launch and creation stay usable at ${size.width}dp', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final database = createTestDatabase();
+      addTearDown(database.close);
+      final profiles = _Profiles();
+      final container = ProviderContainer(
+        overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
+          profileRepositoryProvider.overrideWithValue(profiles),
+          gameRepositoryProvider.overrideWithValue(_Games(database)),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const FinnyApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Привет! Я Финни'), findsOneWidget);
+      final mascot = tester.widget<Image>(
+        find.descendant(
+          of: find.byType(FinnyPreview),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        (mascot.image as AssetImage).assetName,
+        'assets/images/finny/stage1/purple_plain.png',
+      );
+      await tester.ensureVisible(find.text('Дальше'));
+      await tester.tap(find.text('Дальше'));
+      await tester.pumpAndSettle();
+      expect(find.text('Нужно'), findsOneWidget);
+      expect(find.text('Хочу'), findsOneWidget);
+      expect(find.text('Копилка'), findsOneWidget);
+      await tester.ensureVisible(find.text('Понятно'));
+      await tester.tap(find.text('Понятно'));
+      await tester.pumpAndSettle();
+      expect(find.text('Как тебя зовут?'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).decoration?.errorText,
+        isNull,
+      );
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
+      await tester.enterText(find.byType(TextField), 'Саша');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Продолжить'));
+      expect(tester.takeException(), isNull);
+      tester.view.resetViewInsets();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Продолжить'));
+      await tester.pumpAndSettle();
+      expect(find.text('Создай своего Финни'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).decoration?.errorText,
+        isNull,
+      );
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
+      await tester.ensureVisible(find.byKey(const Key('pet-choice-mint')));
+      await tester.tap(find.byKey(const Key('pet-choice-mint')));
+      await tester.ensureVisible(find.byKey(const Key('pet-choice-stripes')));
+      await tester.tap(find.byKey(const Key('pet-choice-stripes')));
+      await tester.pumpAndSettle();
+      final preview = tester.widget<Image>(
+        find.descendant(
+          of: find.byType(FinnyPreview),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(
+        (preview.image as AssetImage).assetName,
+        'assets/images/finny/stage1/mint_stripes.png',
+      );
+      await tester.enterText(find.byType(TextField), 'Пикси');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Создать Финни'));
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

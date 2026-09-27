@@ -1,4 +1,5 @@
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_art.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/models/pet.dart';
@@ -217,12 +218,6 @@ class FinnyRoomScene extends StatelessWidget {
   final Pet pet;
   final bool showBackground;
 
-  static String assetForStage(int stage) => switch (stage.clamp(1, 3)) {
-    1 => 'assets/images/home/finny_stage1_neutral.png',
-    2 => 'assets/images/home/finny_stage2_neutral.png',
-    _ => 'assets/images/home/finny_stage3_neutral.png',
-  };
-
   @override
   Widget build(BuildContext context) {
     final stage = pet.developmentStage.clamp(1, 3);
@@ -260,10 +255,10 @@ class FinnyRoomScene extends StatelessWidget {
               child: SizedBox(
                 height: finnyHeight,
                 child: Image.asset(
-                  assetForStage(stage),
+                  FinnyVisual.assetForPet(pet),
                   key: Key('home-finny-stage-$stage'),
                   fit: BoxFit.contain,
-                  semanticLabel: '${pet.name}, стадия $stage',
+                  semanticLabel: FinnyVisual.descriptionForPet(pet),
                 ),
               ),
             ),

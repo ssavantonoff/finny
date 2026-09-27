@@ -1,11 +1,38 @@
+import 'package:finny/app/providers.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_controller.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_screen.dart';
 import 'package:finny/models/game_state.dart';
+import 'package:finny/models/pet.dart';
+import 'package:finny/repositories/game_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../helpers/test_database.dart';
+
+class _CatchProfile extends ActiveProfileIdController {
+  @override
+  int? build() => 1;
+}
+
+class _CatchGames extends SqliteGameRepository {
+  _CatchGames(super.database);
+
+  @override
+  Future<Pet?> getPet(int profileId) async => const Pet(
+    profileId: 1,
+    name: 'Пикси',
+    colorId: 'blue',
+    patternId: 'spots',
+    developmentStage: 3,
+    growthPoints: 100,
+    satiety: 70,
+    care: 70,
+    mood: 70,
+  );
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -71,6 +98,37 @@ void main() {
     controller.tick();
     await tester.pump();
   }
+
+  testWidgets('free play uses the active Pet appearance with fixed hitbox', (
+    tester,
+  ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          activeProfileIdProvider.overrideWith(_CatchProfile.new),
+          gameRepositoryProvider.overrideWithValue(_CatchGames(database)),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    final art = find.byWidgetPredicate(
+      (widget) =>
+          widget is Image &&
+          widget.image is AssetImage &&
+          (widget.image as AssetImage).assetName ==
+              'assets/images/finny/stage3/blue_spots.png',
+    );
+    expect(art, findsOneWidget);
+    expect(controller.finnyVisualWidth, greaterThan(0));
+    expect(tester.getSize(art).width, controller.finnyVisualWidth);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'prepare reference content fits 360dp and has no falling objects or nav',

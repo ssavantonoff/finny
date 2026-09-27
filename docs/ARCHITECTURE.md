@@ -156,6 +156,13 @@ Summary; после Day 2 и Day 5 используется `/progress`, а сл
 Светлая Material 3 тема, базовые отступы и радиусы определены в
 `lib/core/theme/app_theme.dart`.
 
+Внешность питомца определяется только `Pet.colorId`, `Pet.patternId` и
+`Pet.developmentStage`. `FinnyVisual` в `lib/core/visual/finny_visual.dart`
+сопоставляет их с одним из 27 готовых PNG в `assets/images/finny/`.
+Onboarding до создания Pet показывает стандартный Stage 1 purple/plain;
+Home, мини-игры, Progress и Finale используют сохранённую внешность Pet.
+Рост меняет стадию, сохраняя цвет и узор, без дополнительного поля в SQLite.
+
 ## Как добавлять feature
 
 1. Развивать экран и локальное состояние внутри соответствующей папки

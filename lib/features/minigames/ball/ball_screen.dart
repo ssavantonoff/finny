@@ -1,8 +1,9 @@
+import 'package:finny/core/visual/finny_visual.dart';
+
 import 'dart:async';
 
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
-import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/features/things/things_controller.dart';
 import 'package:finny/models/ball_reward.dart';
 import 'package:finny/models/pet.dart';
@@ -771,12 +772,13 @@ class _FinnyImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stage = (pet?.developmentStage ?? 3).clamp(1, 3);
+    if (pet == null) return const SizedBox.shrink();
+    final stage = pet!.developmentStage.clamp(1, 3);
     return Image.asset(
-      FinnyRoomScene.assetForStage(stage),
+      FinnyVisual.assetForPet(pet!),
       key: Key('ball-finny-stage-$stage'),
       fit: BoxFit.contain,
-      semanticLabel: '${pet?.name ?? 'Финни'} играет с мячом',
+      semanticLabel: '${FinnyVisual.descriptionForPet(pet!)} играет с мячом',
     );
   }
 }

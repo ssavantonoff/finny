@@ -1,5 +1,6 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/features/onboarding/welcome_visuals.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/features/pet_creation/pet_creation_draft.dart';
 import 'package:finny/models/pet.dart';
@@ -158,9 +159,10 @@ class _PetCreationScreenState extends ConsumerState<PetCreationScreen> {
   @override
   Widget build(BuildContext context) {
     final profileId = ref.watch(activeProfileIdProvider);
-    ref.listen<int?>(activeProfileIdProvider, (_, next) {
-      _loadForProfile(next);
-    });
+    ref.listen<int?>(
+      activeProfileIdProvider,
+      (_, next) => _loadForProfile(next),
+    );
     final canSave =
         profileId != null &&
         profileId == _loadedProfileId &&
@@ -168,109 +170,157 @@ class _PetCreationScreenState extends ConsumerState<PetCreationScreen> {
         !_saving &&
         !_loadFailed &&
         _draft.canSave;
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Создай своего Финни')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.medium),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FinnyPreview(
-                    colorId: _draft.colorId,
-                    patternId: _draft.patternId,
-                    developmentStage: _existingPet?.developmentStage ?? 1,
-                  ),
-                  const SizedBox(height: AppSpacing.large),
-                  if (profileId == null)
-                    const _FriendlyNotice(
-                      'Сначала открой свой профиль, чтобы сохранить Финни.',
-                    )
-                  else if (_loading)
-                    const Center(child: CircularProgressIndicator())
-                  else if (_loadFailed) ...[
-                    const _FriendlyNotice(
-                      'Не получилось загрузить Финни. Попробуй ещё раз.',
+      body: WelcomeBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const FinnyBrand(),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Создай своего Финни',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 29,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    TextButton(
-                      onPressed: () => _loadForProfile(profileId),
-                      child: const Text('Повторить'),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Выбери, каким будет твой новый друг.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FinnyPreview(
+                      colorId: _draft.colorId,
+                      patternId: _draft.patternId,
+                      developmentStage: _existingPet?.developmentStage ?? 1,
+                      name: _draft.trimmedName.isEmpty
+                          ? 'Финни'
+                          : _draft.trimmedName,
+                      height: 210,
+                    ),
+                    if (profileId == null)
+                      const _FriendlyNotice(
+                        'Сначала открой свой профиль, чтобы сохранить Финни.',
+                      )
+                    else if (_loading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(8),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_loadFailed) ...[
+                      const _FriendlyNotice(
+                        'Не получилось загрузить Финни. Попробуй ещё раз.',
+                      ),
+                      TextButton(
+                        onPressed: () => _loadForProfile(profileId),
+                        child: const Text('Повторить'),
+                      ),
+                    ],
+                    if (_saveFailed)
+                      const _FriendlyNotice(
+                        'Не получилось сохранить Финни. Попробуй ещё раз.',
+                      ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(26),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x176C5CE7),
+                            blurRadius: 14,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Как назовём Финни?',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Имя Финни',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _nameController,
+                            enabled: !_loading && !_saving,
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: TextInputAction.done,
+                            decoration: welcomeInputDecoration(
+                              hint: 'Например, Пикси',
+                              error: _nameTouched ? _draft.nameError : null,
+                            ),
+                            onChanged: (value) => setState(() {
+                              _draft = _draft.copyWith(name: value);
+                              _nameTouched = true;
+                              _saveFailed = false;
+                            }),
+                            onSubmitted: (_) {
+                              if (canSave) _save();
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Выбери цвет',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _choices(colors: true),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Выбери узор',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _choices(colors: false),
+                    const SizedBox(height: 26),
+                    WelcomeButton(
+                      label: _saving ? 'Сохраняем…' : 'Создать Финни',
+                      onPressed: canSave ? _save : null,
                     ),
                   ],
-                  if (_saveFailed)
-                    const _FriendlyNotice(
-                      'Не получилось сохранить Финни. Попробуй ещё раз.',
-                    ),
-                  const SizedBox(height: AppSpacing.medium),
-                  Text(
-                    'Как его зовут?',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  TextField(
-                    controller: _nameController,
-                    enabled: !_loading && !_saving,
-                    textCapitalization: TextCapitalization.words,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      hintText: 'Имя Финни',
-                      border: const OutlineInputBorder(),
-                      errorText: _nameTouched ? _draft.nameError : null,
-                    ),
-                    onChanged: (value) => setState(() {
-                      _draft = _draft.copyWith(name: value);
-                      _nameTouched = true;
-                      _saveFailed = false;
-                    }),
-                  ),
-                  const SizedBox(height: AppSpacing.large),
-                  Text(
-                    'Выбери цвет',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  _choices(
-                    values: PetCreationDraft.colorIds,
-                    selected: _draft.colorId,
-                    labels: const {
-                      'blue': 'Синий',
-                      'purple': 'Фиолетовый',
-                      'mint': 'Мятный',
-                    },
-                    onSelect: (value) => setState(() {
-                      _draft = _draft.copyWith(colorId: value);
-                      _saveFailed = false;
-                    }),
-                  ),
-                  const SizedBox(height: AppSpacing.large),
-                  Text(
-                    'Выбери узор',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.small),
-                  _choices(
-                    values: PetCreationDraft.patternIds,
-                    selected: _draft.patternId,
-                    labels: const {
-                      'plain': 'Без узора',
-                      'spots': 'Пятнышки',
-                      'stripes': 'Полоски',
-                    },
-                    onSelect: (value) => setState(() {
-                      _draft = _draft.copyWith(patternId: value);
-                      _saveFailed = false;
-                    }),
-                  ),
-                  const SizedBox(height: AppSpacing.extraLarge),
-                  FilledButton(
-                    onPressed: canSave ? _save : null,
-                    child: Text(_saving ? 'Сохраняем…' : 'Создать Финни'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -279,55 +329,171 @@ class _PetCreationScreenState extends ConsumerState<PetCreationScreen> {
     );
   }
 
-  Widget _choices({
-    required List<String> values,
-    required String selected,
-    required Map<String, String> labels,
-    required ValueChanged<String> onSelect,
-  }) {
-    return Wrap(
-      spacing: AppSpacing.small,
-      runSpacing: AppSpacing.small,
+  Widget _choices({required bool colors}) {
+    final values = colors
+        ? PetCreationDraft.colorIds
+        : PetCreationDraft.patternIds;
+    final selected = colors ? _draft.colorId : _draft.patternId;
+    final labels = colors
+        ? const {'purple': 'Фиолетовый', 'blue': 'Синий', 'mint': 'Мятный'}
+        : const {
+            'plain': 'Без узора',
+            'spots': 'Пятнышки',
+            'stripes': 'Полоски',
+          };
+    final swatchColor = switch (_draft.colorId) {
+      'blue' => const Color(0xFF4DA3FF),
+      'mint' => const Color(0xFF4ADBC8),
+      _ => AppColors.primary,
+    };
+    return Row(
       children: [
-        for (final value in values)
-          ChoiceChip(
-            key: Key('pet-choice-$value'),
-            avatar: Icon(
-              Icons.check,
-              size: 18,
-              color: selected == value
-                  ? Theme.of(context).colorScheme.onSecondaryContainer
-                  : Colors.transparent,
-            ),
-            avatarBoxConstraints: const BoxConstraints.tightFor(
-              width: 18,
-              height: 18,
-            ),
-            label: Text(labels[value]!),
-            selected: selected == value,
-            showCheckmark: false,
-            onSelected: _saving || _loading ? null : (_) => onSelect(value),
-            materialTapTargetSize: MaterialTapTargetSize.padded,
-            labelPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.medium,
-              vertical: AppSpacing.small,
+        for (final value in values) ...[
+          if (value != values.first) const SizedBox(width: 8),
+          Expanded(
+            child: PetAppearanceOption(
+              key: Key('pet-choice-$value'),
+              label: labels[value]!,
+              selected: selected == value,
+              swatchColor: colors
+                  ? switch (value) {
+                      'blue' => const Color(0xFF4DA3FF),
+                      'mint' => const Color(0xFF4ADBC8),
+                      _ => AppColors.primary,
+                    }
+                  : swatchColor,
+              pattern: colors ? 'plain' : value,
+              onTap: _saving || _loading
+                  ? null
+                  : () => setState(() {
+                      _draft = colors
+                          ? _draft.copyWith(colorId: value)
+                          : _draft.copyWith(patternId: value);
+                      _saveFailed = false;
+                    }),
             ),
           ),
+        ],
       ],
     );
   }
 }
 
-class _FriendlyNotice extends StatelessWidget {
-  const _FriendlyNotice(this.message);
+class PetAppearanceOption extends StatelessWidget {
+  const PetAppearanceOption({
+    required this.label,
+    required this.selected,
+    required this.swatchColor,
+    required this.pattern,
+    required this.onTap,
+    super.key,
+  });
 
-  final String message;
+  final String label;
+  final bool selected;
+  final Color swatchColor;
+  final String pattern;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
-      child: Text(message),
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    label: label,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        height: 112,
+        padding: const EdgeInsets.all(7),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: selected ? AppColors.primary : Colors.white,
+            width: selected ? 2.5 : 1.5,
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x126C5CE7),
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Align(alignment: const Alignment(0, -0.35), child: _swatch()),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: selected
+                      ? AppColors.textPrimary
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+            if (selected)
+              const Align(
+                alignment: Alignment.topRight,
+                child: Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+          ],
+        ),
+      ),
     ),
+  );
+
+  Widget _swatch() => Container(
+    width: 55,
+    height: 55,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: swatchColor,
+      gradient: RadialGradient(
+        center: const Alignment(-0.45, -0.5),
+        radius: 1,
+        colors: [Color.lerp(swatchColor, Colors.white, 0.42)!, swatchColor],
+      ),
+    ),
+    child: pattern == 'plain'
+        ? null
+        : Center(
+            child: pattern == 'spots'
+                ? const Icon(
+                    Icons.more_horiz_rounded,
+                    color: Color(0xAAFFFFFF),
+                    size: 28,
+                  )
+                : const Icon(
+                    Icons.menu_rounded,
+                    color: Color(0xAAFFFFFF),
+                    size: 29,
+                  ),
+          ),
+  );
+}
+
+class _FriendlyNotice extends StatelessWidget {
+  const _FriendlyNotice(this.message);
+  final String message;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppColors.primaryLight,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Text(message, style: const TextStyle(color: AppColors.textPrimary)),
   );
 }

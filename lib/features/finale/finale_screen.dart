@@ -103,6 +103,7 @@ class _FinaleScreenState extends ConsumerState<FinaleScreen> {
                       if (pet != null)
                         Center(
                           child: FinnyPreview(
+                            name: pet.name,
                             colorId: pet.colorId,
                             patternId: pet.patternId,
                             developmentStage: pet.developmentStage,
@@ -216,6 +217,7 @@ class _CampaignCompleteScreenState
                   children: [
                     if (snapshot.data != null)
                       FinnyPreview(
+                        name: snapshot.data!.name,
                         colorId: snapshot.data!.colorId,
                         patternId: snapshot.data!.patternId,
                         developmentStage: snapshot.data!.developmentStage,

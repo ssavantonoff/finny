@@ -2,9 +2,9 @@ import 'package:finny/features/pet_creation/pet_creation_draft.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('initial appearance is blue and plain', () {
+  test('initial appearance is purple and plain', () {
     const draft = PetCreationDraft();
-    expect(draft.colorId, 'blue');
+    expect(draft.colorId, 'purple');
     expect(draft.patternId, 'plain');
     expect(draft.canSave, isFalse);
   });
@@ -22,11 +22,11 @@ void main() {
   test('color and pattern selections update independent state', () {
     const initial = PetCreationDraft();
     final selected = initial.copyWith(colorId: 'mint', patternId: 'stripes');
-    expect(initial.colorId, 'blue');
+    expect(initial.colorId, 'purple');
     expect(initial.patternId, 'plain');
     expect(selected.colorId, 'mint');
     expect(selected.patternId, 'stripes');
-    expect(PetCreationDraft.colorIds, ['blue', 'purple', 'mint']);
+    expect(PetCreationDraft.colorIds, ['purple', 'blue', 'mint']);
     expect(PetCreationDraft.patternIds, ['plain', 'spots', 'stripes']);
   });
 }

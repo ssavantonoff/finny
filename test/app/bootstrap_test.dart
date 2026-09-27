@@ -171,7 +171,7 @@ void main() {
 
   test('name validation uses trimmed runes and existing semantics', () {
     expect(const ProfileName('').isValid, isFalse);
-    expect(const ProfileName('   ').error, 'Напиши игровое имя');
+    expect(const ProfileName('   ').error, 'Напиши своё имя');
     expect(const ProfileName('  Да  ').trimmed, 'Да');
     expect(ProfileName('А' * 20).isValid, isTrue);
     expect(ProfileName('А' * 21).isValid, isFalse);
