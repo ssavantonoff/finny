@@ -87,14 +87,36 @@ void main() {
     );
   });
 
-  test('Finny movement clamps to field edges', () {
-    controller.setFieldWidth(360);
+  test('Finny can dodge a central cloud at both compact widths', () {
     controller.start();
     elapse(const Duration(seconds: 2));
-    controller.moveFinny(-10);
-    expect(controller.state.finnyX, greaterThan(0));
-    controller.moveFinny(10);
-    expect(controller.state.finnyX, lessThan(1));
+    expect(controller.state.phase, FinnyCatchPhase.playing);
+
+    for (final width in [360.0, 393.0]) {
+      controller.setFieldWidth(width);
+      final visualWidth = controller.finnyVisualWidth;
+      final halfVisualWidth = visualWidth / (2 * width);
+      final catchHalfWidth = controller.catchHalfWidth;
+      expect(visualWidth, closeTo(width * 0.40, 0.001));
+      expect(visualWidth, lessThan(width * 0.48));
+      expect(catchHalfWidth, greaterThan(0));
+      expect(catchHalfWidth, closeTo(visualWidth * 1.2 / (2 * width), 0.001));
+
+      for (final requestedX in [-10.0, 10.0]) {
+        controller.moveFinny(requestedX);
+        final edgeX = controller.state.finnyX;
+        expect(
+          edgeX,
+          closeTo(
+            requestedX < 0 ? halfVisualWidth : 1 - halfVisualWidth,
+            0.001,
+          ),
+        );
+        expect(edgeX - halfVisualWidth, greaterThanOrEqualTo(-0.001));
+        expect(edgeX + halfVisualWidth, lessThanOrEqualTo(1.001));
+        expect((edgeX - 0.5).abs() - catchHalfWidth, greaterThan(0.04));
+      }
+    }
   });
 
   test(
