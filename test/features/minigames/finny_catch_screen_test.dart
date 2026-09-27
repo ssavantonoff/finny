@@ -117,6 +117,42 @@ void main() {
     expect(tester.getSize(background), screenSize);
   }
 
+  void expectRoundedGameButton(WidgetTester tester, String label) {
+    final button = find.ancestor(
+      of: find.text(label),
+      matching: find.byKey(const Key('finny-catch-game-button')),
+    );
+    expect(button, findsOneWidget);
+
+    final material = tester.widget<Material>(button);
+    expect(
+      material.shape,
+      const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(40)),
+      ),
+    );
+    expect(material.clipBehavior, Clip.antiAlias);
+
+    final shadow = find.ancestor(
+      of: button,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is DecoratedBox &&
+            widget.decoration is BoxDecoration &&
+            ((widget.decoration as BoxDecoration).boxShadow?.any(
+                  (boxShadow) => boxShadow.color == const Color(0x335C3CD6),
+                ) ??
+                false),
+      ),
+    );
+    expect(shadow, findsOneWidget);
+    final shadowDecoration = tester.widget<DecoratedBox>(shadow).decoration;
+    expect(
+      (shadowDecoration as BoxDecoration).borderRadius,
+      const BorderRadius.all(Radius.circular(40)),
+    );
+  }
+
   testWidgets('free play uses the active Pet appearance with fixed hitbox', (
     tester,
   ) async {
@@ -165,6 +201,20 @@ void main() {
       expect(find.text('+3'), findsOneWidget);
       expect(find.text('Избегай'), findsOneWidget);
       expect(find.text('Начать игру'), findsOneWidget);
+      final header = find.byWidgetPredicate(
+        (widget) =>
+            widget is Container &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration as BoxDecoration).color ==
+                const Color(0xCCF9F8FF),
+      );
+      expect(header, findsOneWidget);
+      final headerDecoration = tester.widget<Container>(header).decoration;
+      expect(
+        (headerDecoration as BoxDecoration).borderRadius,
+        const BorderRadius.all(Radius.circular(34)),
+      );
+      expectRoundedGameButton(tester, 'Начать игру');
       expect(find.byType(BottomNavigationBar), findsNothing);
       expect(controller.state.objects, isEmpty);
       expect(tester.takeException(), isNull);
@@ -187,6 +237,31 @@ void main() {
     expectMountainBackground(tester, const Size(393, 852));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'primary buttons keep one rounded shape in prepare, pause and result',
+    (tester) async {
+      await mount(tester);
+      expectRoundedGameButton(tester, 'Начать игру');
+
+      await tester.tap(find.text('Начать игру'));
+      await tester.pump();
+      await elapse(tester, const Duration(seconds: 2));
+      controller.pause();
+      await tester.pump();
+      expect(controller.state.phase, FinnyCatchPhase.paused);
+      expect(find.text('Продолжить'), findsOneWidget);
+      expectRoundedGameButton(tester, 'Продолжить');
+
+      await tester.tap(find.text('Продолжить'));
+      await tester.pump();
+      await elapse(tester, const Duration(seconds: 30));
+      await tester.pump();
+      expect(find.text('Сыграть ещё'), findsOneWidget);
+      expectRoundedGameButton(tester, 'Сыграть ещё');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('mountain background is bundled and loads without errors', (
     tester,

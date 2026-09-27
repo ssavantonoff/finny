@@ -201,7 +201,7 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
     decoration: const BoxDecoration(
       color: Color(0xCCF9F8FF),
-      borderRadius: BorderRadius.vertical(bottom: Radius.circular(34)),
+      borderRadius: BorderRadius.all(Radius.circular(34)),
     ),
     child: Column(
       children: [
@@ -592,41 +592,51 @@ class _GameButton extends StatelessWidget {
     button: true,
     enabled: onPressed != null,
     label: label,
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(40),
-        child: Ink(
-          width: double.infinity,
-          height: 54,
-          decoration: BoxDecoration(
-            gradient: light
-                ? null
-                : const LinearGradient(
-                    colors: [Color(0xFF8B6AF6), Color(0xFF5939E2)],
-                  ),
-            color: light ? const Color(0xFFF4F1FF) : null,
-            borderRadius: BorderRadius.circular(40),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x335C3CD6),
-                blurRadius: 10,
-                offset: Offset(0, 5),
-              ),
-            ],
+    child: DecoratedBox(
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.all(Radius.circular(40)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x335C3CD6),
+            blurRadius: 10,
+            offset: Offset(0, 5),
           ),
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                color: onPressed == null
-                    ? const Color(0xFF9F9CB7)
-                    : light
-                    ? const Color(0xFF292678)
-                    : Colors.white,
+        ],
+      ),
+      child: Material(
+        key: const Key('finny-catch-game-button'),
+        color: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(40)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(40),
+          child: Ink(
+            width: double.infinity,
+            height: 54,
+            decoration: BoxDecoration(
+              gradient: light
+                  ? null
+                  : const LinearGradient(
+                      colors: [Color(0xFF8B6AF6), Color(0xFF5939E2)],
+                    ),
+              color: light ? const Color(0xFFF4F1FF) : null,
+              borderRadius: BorderRadius.circular(40),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: onPressed == null
+                      ? const Color(0xFF9F9CB7)
+                      : light
+                      ? const Color(0xFF292678)
+                      : Colors.white,
+                ),
               ),
             ),
           ),
