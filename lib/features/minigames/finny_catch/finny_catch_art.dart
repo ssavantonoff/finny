@@ -5,6 +5,7 @@ import 'finny_catch_models.dart';
 abstract final class FinnyCatchAssets {
   static const cloud = 'assets/minigames/finny_catch/cloud.png';
   static const atlas = 'assets/minigames/finny_catch/icons_atlas.png';
+  static const sparkle = 'assets/minigames/finny_catch/sparkle.png';
 }
 
 class FinnyCatchArt extends StatelessWidget {
@@ -25,15 +26,22 @@ class FinnyCatchArt extends StatelessWidget {
         semanticLabel: 'Облако',
       );
     }
-    // The supplied transparent production sheet contains the approved coin and
-    // sparkle. Display a region of that sheet without redrawing either asset.
-    final source = type == FinnyCatchObjectType.coin
-        ? const Rect.fromLTWH(0, 60, 535, 600)
-        : const Rect.fromLTWH(975, 60, 485, 600);
+    if (type == FinnyCatchObjectType.sparkle) {
+      return Image.asset(
+        FinnyCatchAssets.sparkle,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        semanticLabel: 'Звёздочка',
+      );
+    }
+    // The approved coin still comes from the existing production sheet.
+    const source = Rect.fromLTWH(0, 60, 535, 600);
     final scale = size / source.height;
     return Semantics(
       image: true,
-      label: type == FinnyCatchObjectType.coin ? 'Монета' : 'Звёздочка',
+      label: 'Монета',
       child: SizedBox(
         width: source.width * scale,
         height: size,
