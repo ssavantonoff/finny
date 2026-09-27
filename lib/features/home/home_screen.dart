@@ -1,5 +1,6 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_modal_actions.dart';
 import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/home/home_controller.dart';
@@ -1623,9 +1624,24 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
                 const SizedBox(height: 8),
                 const Align(
                   alignment: Alignment.centerLeft,
-                  child: Chip(
-                    label: Text('Нужно'),
-                    backgroundColor: Color(0xFFE4F2FF),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Color(0xFFE4F2FF),
+                      borderRadius: BorderRadius.all(Radius.circular(99)),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 13,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        'Нужно',
+                        style: TextStyle(
+                          color: AppColors.need,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 if (bowlWallet < bowlPrice)
@@ -1633,9 +1649,11 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
                 if (bowlCanUseSavings && bowlWallet < bowlPrice)
                   Text('В копилке: ${bowl.savedAmount} монет'),
               ],
-              if (state.message case final message?) ...[
+              if (state.message != null &&
+                  (!bowlDecisionShown ||
+                      bowl.status != StoryEventStatus.purchased)) ...[
                 const SizedBox(height: AppSpacing.small),
-                Semantics(liveRegion: true, child: Text(message)),
+                Semantics(liveRegion: true, child: Text(state.message!)),
               ],
             ],
           ),
@@ -1644,12 +1662,14 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
           if (bowlDecisionShown)
             FilledButton(
               key: const Key('campaign-bowl-understood'),
+              style: FinnyModalActions.primary,
               onPressed: () => Navigator.pop(context),
               child: const Text('Понятно'),
             ),
           if (!bowlDecisionShown && bowlCanUseSavings && bowlWallet < bowlPrice)
             FilledButton(
               key: const Key('campaign-bowl-savings'),
+              style: FinnyModalActions.primary,
               onPressed: state.mutating
                   ? null
                   : () async {
@@ -1664,10 +1684,12 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
                           ),
                           actions: [
                             TextButton(
+                              style: FinnyModalActions.secondary,
                               onPressed: () => Navigator.pop(context, false),
                               child: const Text('Отмена'),
                             ),
                             FilledButton(
+                              style: FinnyModalActions.primary,
                               onPressed: () => Navigator.pop(context, true),
                               child: const Text('Использовать'),
                             ),
@@ -1683,6 +1705,7 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
           if (!bowlDecisionShown)
             TextButton(
               key: const Key('campaign-bowl-postpone'),
+              style: FinnyModalActions.secondary,
               onPressed: state.mutating
                   ? null
                   : () async {
@@ -1697,6 +1720,7 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
           if (!bowlDecisionShown && bowlWallet >= bowlPrice)
             FilledButton(
               key: const Key('campaign-buy-bowl'),
+              style: FinnyModalActions.primary,
               onPressed: state.mutating
                   ? null
                   : () async {
@@ -1709,6 +1733,7 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
               !bowlDecisionShown)
             FilledButton.tonal(
               key: const Key('campaign-retry'),
+              style: FinnyModalActions.primary,
               onPressed: state.mutating
                   ? null
                   : () async {

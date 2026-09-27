@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/savings/savings_controller.dart';
+import 'package:finny/features/savings/savings_goal_visual.dart';
 import 'package:finny/features/savings/savings_screen.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
@@ -205,7 +206,42 @@ List<CompletedGoal> completedGoals([int count = 3]) => [
 ];
 
 void main() {
+  test('approved artwork is mapped by canonical goal ID', () {
+    expect(
+      SavingsGoalVisual.assetFor('goal_night_light'),
+      'assets/images/goals/night_light.png',
+    );
+    expect(
+      SavingsGoalVisual.assetFor('goal_scooter'),
+      'assets/images/goals/scooter.png',
+    );
+    expect(
+      SavingsGoalVisual.assetFor('goal_play_house'),
+      'assets/images/goals/play_house.png',
+    );
+  });
+
   for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('goal choice loads approved PNGs without crop at $size', (
+      tester,
+    ) async {
+      await _pumpSavings(tester, ready(goalList: goals), size: size);
+      for (final goal in goals) {
+        final card = find.byKey(Key('savings-goal-${goal.id}'));
+        await tester.ensureVisible(card);
+        await tester.pumpAndSettle();
+        final art = tester.widget<Image>(
+          find.byKey(Key('savings-goal-art-${goal.id}')),
+        );
+        expect(
+          (art.image as AssetImage).assetName,
+          SavingsGoalVisual.assetFor(goal.id),
+        );
+        expect(art.fit, BoxFit.contain);
+        expect(tester.takeException(), isNull);
+      }
+    });
+
     testWidgets('production goal names fit $size', (tester) async {
       const productionGoals = [
         SavingsGoal(

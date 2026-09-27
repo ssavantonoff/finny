@@ -1,4 +1,5 @@
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_modal_actions.dart';
 import 'package:flutter/material.dart';
 
 class FinnySleepDialog extends StatelessWidget {
@@ -39,6 +40,7 @@ class FinnySleepDialog extends StatelessWidget {
             width: double.infinity,
             height: 52,
             child: FilledButton(
+              style: FinnyModalActions.primary,
               onPressed: () => Navigator.pop(context, true),
               child: const Text('Уложить спать'),
             ),
@@ -47,6 +49,7 @@ class FinnySleepDialog extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: TextButton(
+              style: FinnyModalActions.secondary,
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Вернуться'),
             ),

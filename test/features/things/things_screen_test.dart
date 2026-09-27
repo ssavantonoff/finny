@@ -5,6 +5,7 @@ import '../../helpers/campaign_only_lifecycle_service.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/things/things_screen.dart';
+import 'package:finny/features/things/things_controller.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/pet_action.dart';
@@ -212,6 +213,70 @@ void main() {
     status: GamePeriodStatus.active,
     createdAt: DateTime.utc(2026, 1, 1),
   );
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('consumable quantities and persistent items fit $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final database = createTestDatabase();
+      addTearDown(database.close);
+      final games = _ThingsGames(database, activePeriod);
+      games.inventory = {'food_apple': 3, 'food_feed': 1, 'care_toothbrush': 1};
+      final content = TestContentRepository(
+        const [],
+        shopItems: canonicalItems
+            .where((item) => games.inventory.containsKey(item.id))
+            .toList(),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          campaignLifecycleServiceProvider.overrideWithValue(
+            CampaignOnlyLifecycleService(),
+          ),
+          appDatabaseProvider.overrideWithValue(database),
+          activeProfileIdProvider.overrideWith(
+            () => _ActiveThingsProfileMock(1),
+          ),
+          profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+          gameRepositoryProvider.overrideWithValue(games),
+          contentRepositoryProvider.overrideWithValue(content),
+        ],
+      );
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('×3'), findsOneWidget);
+      expect(find.text('×1'), findsOneWidget);
+      expect(
+        find.byKey(const Key('things-quantity-food_apple')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('things-quantity-food_feed')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('things-quantity-care_toothbrush')),
+        findsNothing,
+      );
+      expect(
+        tester
+            .getBottomRight(find.byKey(const Key('things-quantity-food_apple')))
+            .dy,
+        lessThan(tester.getTopLeft(find.text('Яблоко')).dy),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('loading keeps the Things layout and settles to empty', (
     tester,
@@ -433,6 +498,64 @@ void main() {
     // After use, quantity is 0, so empty state should show
     expect(find.byKey(const Key('things-empty')), findsOneWidget);
     expect(find.text('Яблоко'), findsNothing);
+  });
+
+  testWidgets('consumable badge reloads repository quantity after use', (
+    tester,
+  ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final games = _ThingsGames(database, activePeriod);
+    games.inventory = {itemApple.id: 2};
+    final content = TestContentRepository(const [], shopItems: [itemApple]);
+    final mockItemUse = _ThingsMockItemUse(
+      SqlitePetActionPort(database),
+      content,
+      (itemId, slot) async {
+        games.inventory[itemId] = games.inventory[itemId]! - 1;
+        return const Pet(
+          profileId: 1,
+          name: 'Финни',
+          colorId: 'purple',
+          patternId: 'spots',
+          developmentStage: 1,
+          growthPoints: 0,
+          satiety: 90,
+          care: 60,
+          mood: 30,
+        );
+      },
+    );
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(games),
+        contentRepositoryProvider.overrideWithValue(content),
+        itemUseServiceProvider.overrideWithValue(mockItemUse),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('×2'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('things-use-food_apple')));
+    await tester.pumpAndSettle();
+    expect(games.inventory[itemApple.id], 1);
+    expect(find.text('×1'), findsOneWidget);
+    await container.read(thingsControllerProvider.notifier).load();
+    await tester.pumpAndSettle();
+    expect(find.text('×1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
