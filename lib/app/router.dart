@@ -8,6 +8,7 @@ import 'package:finny/features/help/help_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_screen.dart';
 import 'package:finny/features/minigames/ball/ball_screen.dart';
+import 'package:finny/features/minigames/car/car_screen.dart';
 import 'package:finny/features/minigames/frisbee/frisbee_screen.dart';
 import 'package:finny/features/onboarding/onboarding_screen.dart';
 import 'package:finny/features/period_summary/period_summary_screen.dart';
@@ -30,11 +31,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isFinnyCatch = state.uri.path == '/finny-catch';
       final isToyBall = state.uri.path == '/toy-ball';
       final isToyFrisbee = state.uri.path == '/toy-frisbee';
+      final isToyCar = state.uri.path == '/toy-car';
       if (!shellPaths.contains(state.uri.path) &&
           state.uri.path != '/campaign-complete' &&
           !isFinnyCatch &&
           !isToyBall &&
-          !isToyFrisbee) {
+          !isToyFrisbee &&
+          !isToyCar) {
         return null;
       }
       final profileId = ref.read(activeProfileIdProvider);
@@ -50,7 +53,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           CampaignMode.freePlay => null,
         };
       }
-      if (isToyBall || isToyFrisbee) {
+      if (isToyBall || isToyFrisbee || isToyCar) {
         return switch (mode) {
           CampaignMode.finalePending => '/finale',
           CampaignMode.campaignFinished => '/campaign-complete',
@@ -80,6 +83,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/toy-ball', builder: (_, _) => const BallScreen()),
       GoRoute(path: '/toy-frisbee', builder: (_, _) => const FrisbeeScreen()),
+      GoRoute(path: '/toy-car', builder: (_, _) => const CarScreen()),
       GoRoute(
         path: '/campaign-complete',
         builder: (_, _) => const CampaignCompleteScreen(),

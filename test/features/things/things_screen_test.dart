@@ -89,6 +89,19 @@ const itemFrisbee = ShopItem(
   usagePolicy: ItemUsagePolicy.oncePerPeriod,
 );
 
+const itemCar = ShopItem(
+  id: 'toy_plush',
+  name: 'Машинка',
+  category: ShopItemCategory.want,
+  price: 160,
+  persistent: true,
+  effectType: 'mood',
+  effectValue: 30,
+  unlockType: 'available',
+  displaySection: ShopDisplaySection.toys,
+  usagePolicy: ItemUsagePolicy.oncePerPeriod,
+);
+
 class _BrokenThingsContent extends TestContentRepository {
   _BrokenThingsContent() : super(const []);
 
@@ -512,6 +525,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('things-item-toy_frisbee')), findsNothing);
+    expect(find.byKey(const Key('things-item-toy_plush')), findsNothing);
     for (final (filter, itemId) in [
       ('food', itemApple.id),
       ('care', itemBrush.id),
@@ -650,9 +664,56 @@ void main() {
     },
   );
 
-  testWidgets('Frisbee can play while Car cannot grant instant rewards', (
+  testWidgets('Car opens its route after reward use without instant mood', (
     tester,
   ) async {
+    final database = createTestDatabase();
+    addTearDown(database.close);
+    final games = _ThingsGames(database, activePeriod);
+    games.inventory = {itemCar.id: 1};
+    final usageKey =
+        'item:${itemCar.id}:${PetActionSlot.defaultSlot.storageValue}';
+    games.usages[usageKey] = 1;
+    final container = ProviderContainer(
+      overrides: [
+        campaignLifecycleServiceProvider.overrideWithValue(
+          CampaignOnlyLifecycleService(),
+        ),
+        appDatabaseProvider.overrideWithValue(database),
+        activeProfileIdProvider.overrideWith(() => _ActiveThingsProfileMock(1)),
+        profileRepositoryProvider.overrideWithValue(_ThingsProfiles(profile)),
+        gameRepositoryProvider.overrideWithValue(games),
+        contentRepositoryProvider.overrideWithValue(
+          TestContentRepository(const [], shopItems: [itemCar]),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final router = GoRouter(
+      initialLocation: '/things',
+      routes: [
+        GoRoute(path: '/things', builder: (_, _) => const ThingsScreen()),
+        GoRoute(
+          path: '/toy-car',
+          builder: (_, _) => const Scaffold(body: Text('Car route')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('things-play-toy_plush')));
+    await tester.pumpAndSettle();
+    expect(find.text('Car route'), findsOneWidget);
+    expect(games.usages[usageKey], 1);
+  });
+
+  testWidgets('all owned toys offer Play without generic use', (tester) async {
     final database = createTestDatabase();
     addTearDown(database.close);
     final games = _ThingsGames(database, activePeriod);
@@ -697,9 +758,10 @@ void main() {
           .onPressed,
       isNotNull,
     );
-    final carButton = find.byKey(const Key('things-use-toy_plush'));
+    expect(find.byKey(const Key('things-use-toy_plush')), findsNothing);
+    final carButton = find.byKey(const Key('things-play-toy_plush'));
     expect(carButton, findsOneWidget);
-    expect(tester.widget<FilledButton>(carButton).onPressed, isNull);
+    expect(tester.widget<FilledButton>(carButton).onPressed, isNotNull);
     expect(games.usages, isEmpty);
   });
 
