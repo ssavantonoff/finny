@@ -1,5 +1,7 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_flow_visuals.dart';
+import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/features/home/home_visual_components.dart';
@@ -7,6 +9,7 @@ import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
+import 'package:finny/models/pet.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/story_event.dart';
@@ -388,10 +391,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final period = await ref.read(homeControllerProvider.notifier).startDay();
     if (!mounted || period == null || _incomeSheetOpen) return;
     _incomeSheetOpen = true;
-    await showModalBottomSheet<void>(
+    final current = ref.read(homeControllerProvider);
+    if (current is! HomeReady) {
+      _incomeSheetOpen = false;
+      return;
+    }
+    await showGeneralDialog<void>(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => _IncomeExplanation(period: period),
+      pageBuilder: (context, _, _) =>
+          NewDayStartedScreen(period: period, pet: current.pet),
     );
     _incomeSheetOpen = false;
   }
@@ -1328,63 +1336,179 @@ class _RequiredActionRow extends StatelessWidget {
   }
 }
 
-class _IncomeExplanation extends StatelessWidget {
-  const _IncomeExplanation({required this.period});
+class NewDayStartedScreen extends StatelessWidget {
+  const NewDayStartedScreen({
+    required this.period,
+    required this.pet,
+    super.key,
+  });
 
   final GamePeriod period;
+  final Pet pet;
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.large),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Новый день начался!',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: AppSpacing.large),
-          if (period.periodNumber == 1) ...[
-            Text(
-              'Ты получил ${period.baseIncome} 🪙',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.small),
-            const Text(
-              'Каждый день у тебя есть монеты на Финни.\n\n'
-              'Сначала составь план: сколько потратить на нужное, '
-              'сколько на желания, сколько отложить и сколько оставить '
-              'на потом.\n\nПлан помогает принимать решения, но не '
-              'запрещает изменить траты позже.',
-              textAlign: TextAlign.center,
-            ),
-          ] else ...[
-            Text(
-              'День ${period.periodNumber}',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.small),
-            _MoneyRow('Было с прошлого дня', period.startWalletBalance),
-            _MoneyRow('Получено в начале дня', period.baseIncome, prefix: '+'),
-            const Divider(),
-            _MoneyRow('Доступно', period.startingBudget, emphasized: true),
-          ],
-          const SizedBox(height: AppSpacing.large),
-          FilledButton(
-            key: const Key('income-build-plan'),
-            onPressed: () {
-              Navigator.of(context).pop();
-              context.go('/budget');
-            },
-            child: const Text('Составить план'),
-          ),
-        ],
+  Widget build(BuildContext context) => Scaffold(
+    backgroundColor: AppColors.background,
+    body: FinnyFlowBackdrop(
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 750;
+            return SingleChildScrollView(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Chip(
+                            label: Text(
+                              'День ${period.periodNumber}',
+                              style: const TextStyle(
+                                color: AppColors.primaryDark,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            backgroundColor: AppColors.primaryLight,
+                            side: BorderSide.none,
+                          ),
+                        ),
+                        SizedBox(height: compact ? 16 : 24),
+                        const Text(
+                          'Новый день начался!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 34,
+                            height: 1.08,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Посмотрим, сколько у тебя сегодня.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 17,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: compact ? 8 : 20),
+                        Semantics(
+                          image: true,
+                          label: FinnyVisual.descriptionForPet(pet),
+                          child: SizedBox(
+                            height: compact ? 215 : 260,
+                            child: Image.asset(
+                              FinnyVisual.assetForPet(pet),
+                              fit: BoxFit.contain,
+                              excludeFromSemantics: true,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          key: const Key('new-day-summary'),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.94),
+                            borderRadius: BorderRadius.circular(32),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x1A6C5CE7),
+                                blurRadius: 25,
+                                offset: Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Сегодня доступно',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              FinnyAmount('${period.startingBudget}', size: 56),
+                              const SizedBox(height: 16),
+                              _NewDayMoneyRow(
+                                'С прошлого дня',
+                                '${period.startWalletBalance}',
+                              ),
+                              const SizedBox(height: 8),
+                              _NewDayMoneyRow(
+                                'Новый доход',
+                                '+${period.baseIncome}',
+                                income: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: compact ? 20 : 32),
+                        FinnyFlowButton(
+                          key: const Key('income-build-plan'),
+                          label: 'Составить план',
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            context.go('/budget');
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
+    ),
+  );
+}
+
+class _NewDayMoneyRow extends StatelessWidget {
+  const _NewDayMoneyRow(this.label, this.amount, {this.income = false});
+  final String label;
+  final String amount;
+  final bool income;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: income ? const Color(0xFFE9FAF4) : AppColors.surfaceSecondary,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          income ? Icons.stars_rounded : Icons.account_balance_wallet_rounded,
+          color: income ? AppColors.success : AppColors.primary,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        FinnyAmount(
+          amount,
+          size: 18,
+          color: income ? AppColors.success : AppColors.textPrimary,
+        ),
+      ],
     ),
   );
 }
@@ -1574,34 +1698,6 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
       ),
     );
   }
-}
-
-class _MoneyRow extends StatelessWidget {
-  const _MoneyRow(
-    this.label,
-    this.amount, {
-    this.prefix = '',
-    this.emphasized = false,
-  });
-
-  final String label;
-  final int amount;
-  final String prefix;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: AppSpacing.small),
-    child: Row(
-      children: [
-        Expanded(child: Text(label)),
-        Text(
-          '$prefix$amount',
-          style: emphasized ? Theme.of(context).textTheme.titleLarge : null,
-        ),
-      ],
-    ),
-  );
 }
 
 class _Notice extends StatelessWidget {

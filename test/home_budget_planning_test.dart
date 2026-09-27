@@ -1,8 +1,11 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:finny/features/budget/budget_controller.dart';
 import 'package:finny/features/budget/budget_screen.dart';
+import 'package:finny/features/budget/budget_visual.dart';
+import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_visual_components.dart';
@@ -407,6 +410,152 @@ void main() {
     expect(find.text('Все 5 дней завершены • Финни — этап 1'), findsOneWidget);
   });
 
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('Day 3 budget visual flow and current Finny at $size', (
+      tester,
+    ) async {
+      content = TestContentRepository(testPeriodDefinitions(count: 5));
+      final setup = (await tester.runAsync(() async {
+        final profile = await _createPlayer(profiles, games, wallet: 70);
+        final pet = (await games.getPet(profile.id!))!;
+        await games.savePet(
+          pet.copyWith(
+            developmentStage: 2,
+            colorId: 'mint',
+            patternId: 'stripes',
+          ),
+        );
+        final period = await games.startPeriod(
+          profileId: profile.id!,
+          definitionId: 'period_3',
+          periodNumber: 3,
+          baseIncome: 500,
+          requiredCheckpoints: const ['financial_task', 'savings_decision'],
+          createdAt: DateTime.utc(2026),
+        );
+        await BudgetService(games).saveDraft(
+          profileId: profile.id!,
+          periodId: period.id!,
+          allocation: const BudgetAllocation(need: 250, want: 130, savings: 70),
+        );
+        return (profile, period);
+      }))!;
+      final harness = await _pumpFeature(
+        tester,
+        profileId: setup.$1.id,
+        profiles: profiles,
+        games: games,
+        content: content,
+        database: database,
+        initialLocation: '/budget',
+      );
+      tester.view.physicalSize = size;
+      await tester.pumpAndSettle();
+      expect(find.text('День 3'), findsOneWidget);
+      expect(find.byKey(const Key('budget-distribution')), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
+      for (var attempt = 0; attempt < 100; attempt++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 2)),
+        );
+        await tester.pump();
+        if (find
+            .descendant(
+              of: find.byType(CurrentFinnyArt),
+              matching: find.byType(Image),
+            )
+            .evaluate()
+            .isNotEmpty) {
+          break;
+        }
+      }
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Image &&
+              widget.image is AssetImage &&
+              (widget.image as AssetImage).assetName ==
+                  FinnyVisual.assetFor(
+                    developmentStage: 2,
+                    colorId: 'mint',
+                    patternId: 'stripes',
+                  ),
+        ),
+        findsOneWidget,
+      );
+      final bar = tester.widget<BudgetDistributionBar>(
+        find.byType(BudgetDistributionBar),
+      );
+      expect(
+        (
+          bar.allocation.need,
+          bar.allocation.want,
+          bar.allocation.savings,
+          bar.total,
+        ),
+        (250, 130, 70, 570),
+      );
+      final controller = harness.container.read(
+        budgetControllerProvider.notifier,
+      );
+      controller.previewValue(BudgetCategory.need, 260);
+      await tester.pump();
+      final preview = tester.widget<BudgetDistributionBar>(
+        find.byType(BudgetDistributionBar),
+      );
+      expect(
+        (preview.allocation.need, preview.allocation.remainderFor(570)),
+        (260, 110),
+      );
+      controller.previewValue(BudgetCategory.need, 250);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      final confirm = find.byKey(const Key('budget-confirm'));
+      await tester.ensureVisible(confirm);
+      await tester.tap(confirm);
+      await _settleFeature(tester, harness.container);
+      expect(find.text('Всё готово?'), findsOneWidget);
+      expect(
+        find.text('После подтверждения изменить план этого дня уже нельзя.'),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.text('Вернуться к плану'));
+      await tester.tap(find.text('Вернуться к плану'));
+      await tester.pumpAndSettle();
+      expect(find.text('Всё готово?'), findsNothing);
+      expect(
+        (harness.container.read(
+          budgetControllerProvider,
+        ) as BudgetReady).draft.need,
+        250,
+      );
+
+      await tester.ensureVisible(confirm);
+      await tester.tap(confirm);
+      await _settleFeature(tester, harness.container);
+      await tester.ensureVisible(find.byKey(const Key('budget-confirm-sheet')));
+      await tester.tap(find.byKey(const Key('budget-confirm-sheet')));
+      await _settleFeature(tester, harness.container);
+      expect(
+        (await tester.runAsync(
+          () => games.getPeriodById(setup.$1.id!, setup.$2.id!),
+        ))!.status,
+        GamePeriodStatus.active,
+      );
+      harness.router.go('/budget');
+      await _settleFeature(tester, harness.container);
+      expect(
+        find.text('План подтверждён. Изменить его уже нельзя.'),
+        findsOneWidget,
+      );
+      expect(find.byType(Slider), findsNothing);
+      expect(find.byKey(const Key('budget-confirm')), findsNothing);
+      expect(find.byKey(const Key('budget-distribution')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'Start Day uses real income, carry-over, blocks double tap and survives restart',
     (tester) async {
@@ -429,8 +578,8 @@ void main() {
       await _settleFeature(tester, harness.container);
 
       expect(find.text('Новый день начался!'), findsOneWidget);
-      expect(find.text('Ты получил 375 🪙'), findsOneWidget);
-      expect(find.textContaining('Сначала составь план'), findsOneWidget);
+      expect(find.text('Сегодня доступно'), findsOneWidget);
+      expect(find.text('Посмотрим, сколько у тебя сегодня.'), findsOneWidget);
       final persisted = (await tester.runAsync(
         () async => (
           await games.getPeriods(profile.id!),
@@ -766,15 +915,35 @@ void main() {
         initialLocation: '/budget',
       );
 
-      expect(find.text('105 🪙'), findsOneWidget);
-      expect(find.text('200 🪙'), findsOneWidget);
-      expect(find.text('95 🪙'), findsOneWidget);
-      expect(find.text('225 🪙'), findsOneWidget);
-      expect(find.text('Осталось с прошлого дня'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is FinnyAmount && widget.amount == '105',
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is FinnyAmount && widget.amount == '200',
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is FinnyAmount && widget.amount == '95',
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is FinnyAmount && widget.amount == '225',
+        ),
+        findsWidgets,
+      );
+      expect(find.text('С прошлого дня'), findsOneWidget);
       expect(find.text('+500'), findsOneWidget);
       expect(find.text('625'), findsOneWidget);
 
-      final plus = find.byKey(const Key('budget-plus-Нужно Финни'));
+      final plus = find.byKey(const Key('budget-plus-Нужно'));
       await tester.ensureVisible(plus);
       await tester.tap(plus);
       await _settleFeature(tester, harness.container);
@@ -797,7 +966,7 @@ void main() {
         115,
       );
 
-      final slider = find.byKey(const Key('budget-slider-Нужно Финни'));
+      final slider = find.byKey(const Key('budget-slider-Нужно'));
       await tester.ensureVisible(slider);
       await tester.drag(slider, const Offset(800, 0));
       await _settleFeature(tester, harness.container);
@@ -835,7 +1004,7 @@ void main() {
       initialLocation: '/budget',
     );
 
-    final plus = find.byKey(const Key('budget-plus-Нужно Финни'));
+    final plus = find.byKey(const Key('budget-plus-Нужно'));
     await tester.ensureVisible(plus);
     await tester.tap(plus);
     await _settleFeature(tester, harness.container);
@@ -909,10 +1078,12 @@ void main() {
         budgets: controlled,
       );
 
-      final plus = find.byKey(const Key('budget-plus-Нужно Финни'));
+      final plus = find.byKey(const Key('budget-plus-Нужно'));
       await tester.ensureVisible(plus);
       await tester.tap(plus);
-      await tester.tap(find.byType(BackButton));
+      await tester.ensureVisible(find.byTooltip('Назад'));
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.tap(find.byTooltip('Назад'));
       await tester.pump(const Duration(milliseconds: 20));
       expect(find.byType(BudgetScreen), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 100));
@@ -927,7 +1098,12 @@ void main() {
 
       await tester.tap(find.text('Продолжить план'));
       await _settleFeature(tester, harness.container);
-      expect(find.text('10 🪙'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) => widget is FinnyAmount && widget.amount == '10',
+        ),
+        findsWidgets,
+      );
     },
   );
 
@@ -951,7 +1127,12 @@ void main() {
       database: database,
       initialLocation: '/budget',
     );
-    expect(find.text('200 🪙'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is FinnyAmount && widget.amount == '200',
+      ),
+      findsWidgets,
+    );
 
     await _pumpFeature(
       tester,
@@ -962,18 +1143,27 @@ void main() {
       database: database,
       initialLocation: '/budget',
     );
-    expect(find.text('200 🪙'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is FinnyAmount && widget.amount == '200',
+      ),
+      findsWidgets,
+    );
     expect(
       find.descendant(
         of: find.byKey(const Key('budget-editor-want')),
-        matching: find.text('100 🪙'),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is FinnyAmount && widget.amount == '100',
+        ),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: find.byKey(const Key('budget-editor-savings')),
-        matching: find.text('100 🪙'),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is FinnyAmount && widget.amount == '100',
+        ),
       ),
       findsOneWidget,
     );
@@ -1001,7 +1191,7 @@ void main() {
       budgets: controlled,
     );
 
-    final plus = find.byKey(const Key('budget-plus-Нужно Финни'));
+    final plus = find.byKey(const Key('budget-plus-Нужно'));
     await tester.ensureVisible(plus);
     await tester.tap(plus);
     await _settleFeature(tester, harness.container);
@@ -1054,7 +1244,7 @@ void main() {
       budgets: controlled,
     );
 
-    final plus = find.byKey(const Key('budget-plus-Нужно Финни'));
+    final plus = find.byKey(const Key('budget-plus-Нужно'));
     await tester.ensureVisible(plus);
     await tester.tap(plus);
     await _settleFeature(tester, harness.container);
@@ -1094,7 +1284,7 @@ void main() {
       expect(find.text('Всё готово?'), findsNothing);
       expect(find.textContaining('минимум'), findsNothing);
 
-      for (final category in ['Нужно Финни', 'Хочется Финни', 'Копилка']) {
+      for (final category in ['Нужно', 'Хочу', 'Копилка']) {
         final plus = find.byKey(Key('budget-plus-$category'));
         await tester.ensureVisible(plus);
         await tester.tap(plus);
@@ -1105,8 +1295,10 @@ void main() {
       await tester.tap(confirm);
       await _settleFeature(tester, harness.container);
       expect(find.text('Всё готово?'), findsOneWidget);
-      expect(find.text('Останется'), findsOneWidget);
-      expect(find.text('470'), findsOneWidget);
+      expect(find.text('Останется свободно'), findsWidgets);
+      expect(find.text('470'), findsWidgets);
+      await tester.ensureVisible(find.byKey(const Key('budget-confirm-sheet')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('budget-confirm-sheet')));
       await _settleFeature(tester, harness.container);
 
@@ -1179,6 +1371,8 @@ void main() {
     await tester.ensureVisible(confirm);
     await tester.tap(confirm);
     await _settleFeature(tester, harness.container);
+    await tester.ensureVisible(find.byKey(const Key('budget-confirm-sheet')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('budget-confirm-sheet')));
     await _settleFeature(tester, harness.container);
 
@@ -1226,8 +1420,18 @@ void main() {
     expect(tester.widget<HomeWallet>(find.byType(HomeWallet)).balance, 550);
     harness.router.go('/budget');
     await _settleFeature(tester, harness.container);
-    expect(find.text('200 🪙'), findsOneWidget);
-    expect(find.text('100 🪙'), findsNWidgets(3));
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is FinnyAmount && widget.amount == '200',
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is FinnyAmount && widget.amount == '100',
+      ),
+      findsWidgets,
+    );
     expect(find.text('500'), findsOneWidget);
   });
 
