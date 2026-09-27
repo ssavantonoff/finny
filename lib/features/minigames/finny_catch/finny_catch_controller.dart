@@ -99,7 +99,7 @@ class FinnyCatchController extends ChangeNotifier {
     _finnyX = _clampFinnyX(_finnyX);
   }
 
-  double get finnyVisualWidth => min(194, _fieldWidth * 0.48);
+  double get finnyVisualWidth => min(162, _fieldWidth * 0.40);
   double get catchHalfWidth => finnyVisualWidth * 1.2 / (2 * _fieldWidth);
 
   double _clampFinnyX(double x) => x.clamp(

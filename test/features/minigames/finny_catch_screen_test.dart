@@ -1,4 +1,5 @@
 import 'package:finny/app/providers.dart';
+import 'package:finny/features/minigames/finny_catch/finny_catch_art.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_controller.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_screen.dart';
@@ -84,8 +85,11 @@ void main() {
     controller.dispose();
   });
 
-  Future<void> mount(WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(360, 800));
+  Future<void> mount(
+    WidgetTester tester, {
+    Size size = const Size(360, 800),
+  }) async {
+    await tester.binding.setSurfaceSize(size);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProviderScope(child: MaterialApp.router(routerConfig: router)),
@@ -151,6 +155,55 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('prepare and result fit 393x852 without overflow', (
+    tester,
+  ) async {
+    await mount(tester, size: const Size(393, 852));
+    expect(find.text('Начать игру'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Начать игру'));
+    await tester.pump();
+    await elapse(tester, const Duration(seconds: 2));
+    await elapse(tester, const Duration(seconds: 30));
+    await tester.pump();
+    expect(find.text('Отличная игра!'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('standalone sparkle loads at HUD, legend and field sizes', (
+    tester,
+  ) async {
+    const sizes = [38.0, 58.0, 64.8, 70.74];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              for (final size in sizes)
+                FinnyCatchArt(type: FinnyCatchObjectType.sparkle, size: size),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final images = tester.widgetList<Image>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName == FinnyCatchAssets.sparkle,
+      ),
+    );
+    expect(images.length, sizes.length);
+    for (final (index, image) in images.indexed) {
+      expect(image.width, sizes[index]);
+      expect(image.height, sizes[index]);
+      expect(image.fit, BoxFit.contain);
+    }
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'countdown holds HUD then gameplay accepts direct drag within bounds',
