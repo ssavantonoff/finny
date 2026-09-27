@@ -84,14 +84,100 @@ void main() {
     expect(() => beforeStart.start(), throwsStateError);
   });
 
-  test('seed fixes geometry, while a different seed may vary the bend', () {
+  test('seed fixes six varied shapes and other seeds vary the route', () {
     expect(_session(17).sections, _session(17, suffix: '-again').sections);
     expect(_session(17).sections, isNot(_session(18).sections));
+    final sections = _session(17).sections;
+    expect(sections.first.shape, CarTrackShape.leadIn);
+    expect(sections.map((section) => section.shape).toSet(), hasLength(6));
+    expect(
+      _session(18).sections.map((section) => section.shape).toList(),
+      isNot(sections.map((section) => section.shape).toList()),
+    );
     expect(
       () => CarSession(seed: 1, sessionId: 'invalid', sections: []),
       throwsArgumentError,
     );
     expect(() => CarSession(seed: 1, sessionId: '   '), throwsArgumentError);
+  });
+
+  test('first section has a safe straight lead-in before a gentle bend', () {
+    for (var seed = 0; seed < 40; seed++) {
+      final session = _session(seed);
+      final first = session.sections.first;
+      expect(first.centerAt(0), 0.5);
+      expect(first.centerAt(0.28), 0.5);
+      expect((first.centerAt(0.4) - 0.5).abs(), lessThan(0.04));
+      expect((first.centerAt(0.68) - 0.5).abs(), greaterThan(0.15));
+      session.advance(const Duration(milliseconds: 950));
+      expect(session.carX, 0.5);
+      expect(session.phase, CarSessionPhase.driving);
+      expect(
+        (first.centerAt(session.sectionProgress) - session.carX).abs(),
+        lessThan(first.halfWidth - CarSession.carHalfWidth),
+      );
+      expect(
+        (first.centerAt(0.29) - first.centerAt(0.28)).abs(),
+        lessThan(0.001),
+      );
+    }
+  });
+
+  test('generated center and borders stay in bounds with smooth joins', () {
+    const epsilon = 0.0001;
+    for (var seed = 0; seed < 80; seed++) {
+      final sections = _session(seed).sections;
+      for (final section in sections) {
+        for (var sample = 0; sample <= 100; sample++) {
+          final progress = sample / 100;
+          final center = section.centerAt(progress);
+          final left = section.leftAt(progress);
+          final right = section.rightAt(progress);
+          expect(center, inInclusiveRange(0.30, 0.70));
+          expect(left, inInclusiveRange(0.0, 1.0));
+          expect(right, inInclusiveRange(0.0, 1.0));
+          expect((left + right) / 2, closeTo(center, 1e-12));
+        }
+      }
+      for (var index = 0; index < sections.length - 1; index++) {
+        final current = sections[index];
+        final next = sections[index + 1];
+        expect(current.centerAt(1), closeTo(next.centerAt(0), 1e-12));
+        expect(current.leftAt(1), closeTo(next.leftAt(0), 1e-12));
+        expect(current.rightAt(1), closeTo(next.rightAt(0), 1e-12));
+        final outgoingSlope =
+            (current.centerAt(1) - current.centerAt(1 - epsilon)) / epsilon;
+        final incomingSlope =
+            (next.centerAt(epsilon) - next.centerAt(0)) / epsilon;
+        expect((outgoingSlope - incomingSlope).abs(), lessThan(0.01));
+      }
+    }
+  });
+
+  test('generated routes can be followed at the existing steering speed', () {
+    for (var seed = 0; seed < 40; seed++) {
+      final session = _session(seed);
+      for (var number = 1; number <= CarSession.sectionCount; number++) {
+        final section = session.currentSection;
+        final start = session.elapsed;
+        final startingX = session.carX;
+        expect(session.beginSteering(1, 0.5, start), isTrue);
+        for (var sample = 1; sample < 240; sample++) {
+          final at = start + Duration(milliseconds: sample * 10);
+          final center = section.centerAt(sample / 240);
+          expect(
+            session.updateSteering(1, 0.5 + center - startingX, at),
+            isTrue,
+          );
+        }
+        session.advance(_driveEnd(number));
+        expect(session.outcomes.last, isNot(CarOutcome.miss));
+        session.advance(_feedbackEnd(number));
+        session.endSteering(1, session.elapsed);
+      }
+      expect(session.phase, CarSessionPhase.completed);
+      expect(session.successfulSections, CarSession.sectionCount);
+    }
   });
 
   test('normalized grading is Perfect, Good, or Miss without random input', () {

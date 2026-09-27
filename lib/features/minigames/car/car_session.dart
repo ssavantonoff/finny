@@ -4,18 +4,48 @@ enum CarOutcome { perfect, good, miss }
 
 enum CarSessionPhase { notStarted, driving, feedback, completed, aborted }
 
+enum CarTrackShape { leadIn, gentleArc, longArc, lateArc, sCurve, nearStraight }
+
 /// One section of a track in coordinates normalized to the playable width.
-/// Each bend starts and ends on the center line so adjacent sections join.
+/// Both position and direction are flat at the ends, so sections join smoothly.
 final class CarTrackSection {
-  const CarTrackSection({required this.bend, this.halfWidth = 0.245})
-    : assert(bend >= -0.24 && bend <= 0.24),
-      assert(halfWidth >= 0.21 && halfWidth <= 0.25);
+  const CarTrackSection({
+    required this.bend,
+    this.shape = CarTrackShape.gentleArc,
+    this.halfWidth = 0.245,
+  }) : assert(bend >= -0.24 && bend <= 0.24),
+       assert(halfWidth >= 0.21 && halfWidth <= 0.25);
 
   final double bend;
+  final CarTrackShape shape;
   final double halfWidth;
 
-  double centerAt(double progress) =>
-      0.5 + bend * sin(pi * progress.clamp(0.0, 1.0));
+  double centerAt(double progress) {
+    final t = progress.clamp(0.0, 1.0);
+    final offset = switch (shape) {
+      CarTrackShape.leadIn => _bump(t, 0.28, 0.68, 1.0),
+      CarTrackShape.gentleArc => _bump(t, 0.0, 0.5, 1.0),
+      CarTrackShape.longArc =>
+        t < 0.25
+            ? _ease(t / 0.25)
+            : t > 0.75
+            ? _ease((1.0 - t) / 0.25)
+            : 1.0,
+      CarTrackShape.lateArc => _bump(t, 0.10, 0.72, 1.0),
+      CarTrackShape.sCurve => sin(2 * pi * t) * sin(pi * t),
+      CarTrackShape.nearStraight => _bump(t, 0.0, 0.5, 1.0),
+    };
+    return 0.5 + bend * offset;
+  }
+
+  static double _ease(double t) => t * t * (3 - 2 * t);
+
+  static double _bump(double t, double start, double peak, double end) {
+    if (t <= start || t >= end) return 0.0;
+    return t <= peak
+        ? _ease((t - start) / (peak - start))
+        : _ease((end - t) / (end - peak));
+  }
 
   double leftAt(double progress) => centerAt(progress) - halfWidth;
   double rightAt(double progress) => centerAt(progress) + halfWidth;
@@ -24,10 +54,11 @@ final class CarTrackSection {
   bool operator ==(Object other) =>
       other is CarTrackSection &&
       other.bend == bend &&
+      other.shape == shape &&
       other.halfWidth == halfWidth;
 
   @override
-  int get hashCode => Object.hash(bend, halfWidth);
+  int get hashCode => Object.hash(bend, shape, halfWidth);
 }
 
 /// Proof of six resolved sections. Only [CarSession] can construct it.
@@ -314,9 +345,36 @@ final class CarSession {
 
   static List<CarTrackSection> _makeSections(int seed) {
     final random = Random(seed);
-    return List.generate(sectionCount, (_) {
-      final magnitude = 0.16 + random.nextDouble() * 0.065;
-      return CarTrackSection(bend: random.nextBool() ? magnitude : -magnitude);
-    });
+    final firstSign = random.nextBool() ? 1.0 : -1.0;
+    final sections = <CarTrackSection>[
+      CarTrackSection(
+        shape: CarTrackShape.leadIn,
+        bend: firstSign * (0.155 + random.nextDouble() * 0.025),
+      ),
+    ];
+    final remaining = <CarTrackShape>[
+      CarTrackShape.gentleArc,
+      CarTrackShape.longArc,
+      CarTrackShape.lateArc,
+      CarTrackShape.sCurve,
+      CarTrackShape.nearStraight,
+    ]..shuffle(random);
+    var arcSign = -firstSign;
+    for (final shape in remaining) {
+      final magnitude = switch (shape) {
+        CarTrackShape.nearStraight => 0.025 + random.nextDouble() * 0.015,
+        CarTrackShape.sCurve => 0.16 + random.nextDouble() * 0.025,
+        _ => 0.145 + random.nextDouble() * 0.035,
+      };
+      final sign = shape == CarTrackShape.sCurve
+          ? (random.nextBool() ? 1.0 : -1.0)
+          : arcSign;
+      sections.add(CarTrackSection(shape: shape, bend: sign * magnitude));
+      if (shape != CarTrackShape.sCurve &&
+          shape != CarTrackShape.nearStraight) {
+        arcSign = -arcSign;
+      }
+    }
+    return sections;
   }
 }
