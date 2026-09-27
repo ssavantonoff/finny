@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/tasks/budget_priority_task_screen.dart';
 import 'package:finny/features/tasks/day_five_task_screens.dart';
@@ -50,10 +51,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               TasksLoad.noProfile => const Center(
                 child: Text('Профиль пока не выбран.'),
               ),
-              TasksLoad.noCurrentDay => _Message(
-                text: 'Сначала начни новый день вместе с Финни.',
-                button: 'К Финни',
-                onPressed: () => context.go('/home'),
+              TasksLoad.noCurrentDay => _BeforeDayStart(
+                profileId: state.profileId!,
+                onHome: () => context.go('/home'),
               ),
               TasksLoad.freePlayCompleted => const Center(
                 child: Padding(
@@ -107,6 +107,93 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       ),
     );
   }
+}
+
+class _BeforeDayStart extends StatelessWidget {
+  const _BeforeDayStart({required this.profileId, required this.onHome});
+
+  final int profileId;
+  final VoidCallback onHome;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxHeight < 730;
+      return SingleChildScrollView(
+        key: const Key('tasks-before-day'),
+        padding: EdgeInsets.fromLTRB(
+          24,
+          compact ? 20 : 30,
+          24,
+          AppTheme.homeContentNavigationClearance + 32,
+        ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Задания',
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Задания появляются каждый новый день.',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: compact ? 18 : 34),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      Icons.assignment_rounded,
+                      size: compact ? 210 : 240,
+                      color: AppColors.primary.withValues(alpha: 0.13),
+                    ),
+                    CurrentFinnyArt(
+                      profileId: profileId,
+                      height: compact ? 230 : 270,
+                    ),
+                  ],
+                ),
+                SizedBox(height: compact ? 12 : 22),
+                const Text(
+                  'Сначала начни новый день',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 30,
+                    height: 1.1,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Начни день вместе с Финни,\nи здесь появятся новые задания.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    height: 1.35,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: compact ? 24 : 36),
+                FinnyFlowButton(label: 'К Финни', onPressed: onHome),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _TaskList extends StatelessWidget {

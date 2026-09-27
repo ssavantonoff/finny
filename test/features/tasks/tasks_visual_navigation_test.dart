@@ -1,5 +1,6 @@
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
+import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/shop/shop_controller.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
@@ -25,6 +26,109 @@ Future<void> _pumpUntil(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets(
+      'Tasks before day shows current Finny and returns Home at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final database = createTestDatabase();
+        final profiles = SqliteProfileRepository(database);
+        final games = SqliteGameRepository(database);
+        final profile = (await tester.runAsync(() async {
+          final profile = await profiles.create(
+            Profile(
+              gameName: 'Игрок',
+              profileType: ProfileType.normal,
+              onboardingCompleted: true,
+              createdAt: DateTime.utc(2026),
+            ),
+          );
+          await games.ensureInitialState(profile.id!);
+          await games.savePet(
+            Pet(
+              profileId: profile.id!,
+              name: 'Финни',
+              colorId: 'blue',
+              patternId: 'spots',
+              developmentStage: 2,
+              growthPoints: 0,
+              satiety: 55,
+              care: 80,
+              mood: 80,
+            ),
+          );
+          return profile;
+        }))!;
+        final container = ProviderContainer(
+          overrides: [
+            appDatabaseProvider.overrideWithValue(database),
+            contentRepositoryProvider.overrideWithValue(
+              TestContentRepository(testPeriodDefinitions(count: 5)),
+            ),
+          ],
+        );
+        addTearDown(() async {
+          container.dispose();
+          await database.close();
+        });
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: const FinnyApp(),
+          ),
+        );
+        await _pumpUntil(tester, find.byType(NavigationBar));
+        await tester.tap(find.byKey(const Key('nav-tasks')));
+        await _pumpUntil(tester, find.byKey(const Key('tasks-before-day')));
+        expect(find.text('Задания'), findsWidgets);
+        expect(find.text('Сначала начни новый день'), findsOneWidget);
+        expect(
+          tester
+              .widget<NavigationBar>(find.byType(NavigationBar))
+              .selectedIndex,
+          3,
+        );
+        final asset = FinnyVisual.assetFor(
+          developmentStage: 2,
+          colorId: 'blue',
+          patternId: 'spots',
+        );
+        await _pumpUntil(
+          tester,
+          find.descendant(
+            of: find.byKey(const Key('tasks-before-day')),
+            matching: find.byType(Image),
+          ),
+        );
+        expect(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Image &&
+                widget.image is AssetImage &&
+                (widget.image as AssetImage).assetName == asset,
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.ensureVisible(find.text('К Финни'));
+        await tester.tap(find.text('К Финни'));
+        await _pumpUntil(tester, find.byKey(const Key('home-start-day')));
+        expect(
+          tester
+              .widget<NavigationBar>(find.byType(NavigationBar))
+              .selectedIndex,
+          0,
+        );
+        expect(
+          await tester.runAsync(() => games.getCurrentPeriod(profile.id!)),
+          isNull,
+        );
+      },
+    );
+  }
   for (final size in [const Size(360, 800), const Size(393, 852)]) {
     for (final day in [1, 2, 3, 4, 5]) {
       testWidgets('Tasks hub and Day $day focused route at $size', (
