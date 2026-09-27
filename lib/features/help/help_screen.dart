@@ -1,4 +1,5 @@
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:finny/features/help/help_controller.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:flutter/material.dart';
@@ -28,15 +29,17 @@ class HelpScreen extends ConsumerWidget {
         ),
         title: const Text('Финансовые термины'),
       ),
-      body: SafeArea(
-        child: glossary.when(
-          data: (entries) => entries.isEmpty
-              ? const _EmptyGlossary()
-              : _GlossaryList(entries: entries),
-          error: (_, _) => _GlossaryError(
-            onRetry: () => ref.invalidate(glossaryEntriesProvider),
+      body: FinnyFlowBackdrop(
+        child: SafeArea(
+          child: glossary.when(
+            data: (entries) => entries.isEmpty
+                ? const _EmptyGlossary()
+                : _GlossaryList(entries: entries),
+            error: (_, _) => _GlossaryError(
+              onRetry: () => ref.invalidate(glossaryEntriesProvider),
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
           ),
-          loading: () => const Center(child: CircularProgressIndicator()),
         ),
       ),
     );
@@ -54,6 +57,11 @@ class _GlossaryList extends StatelessWidget {
       key: const Key('glossary-list'),
       padding: const EdgeInsets.all(AppSpacing.medium),
       children: [
+        const Text(
+          'Слова, которые помогут понимать решения в игре.',
+          style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: AppSpacing.medium),
         for (var index = 0; index < entries.length; index++) ...[
           _GlossaryCard(entry: entries[index]),
           if (index != entries.length - 1)
@@ -73,16 +81,39 @@ class _GlossaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       key: Key('glossary-entry-${entry.id}'),
+      color: Colors.white.withValues(alpha: 0.94),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.medium),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(entry.term, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.small),
-            Text(
-              entry.definition,
-              style: Theme.of(context).textTheme.bodyLarge,
+            const CircleAvatar(
+              backgroundColor: AppColors.primaryLight,
+              child: Icon(Icons.menu_book_rounded, color: AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.term,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    entry.definition,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.3,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

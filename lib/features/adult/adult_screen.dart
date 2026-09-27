@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:finny/features/adult/adult_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -43,9 +44,11 @@ class _AdultScreenState extends ConsumerState<AdultScreen> {
         ),
         title: const Text('Для взрослого'),
       ),
-      body: _unlocked
-          ? _AdultBody(state: ref.watch(adultControllerProvider))
-          : _AdultBarrier(onUnlock: _unlock),
+      body: FinnyFlowBackdrop(
+        child: _unlocked
+            ? _AdultBody(state: ref.watch(adultControllerProvider))
+            : _AdultBarrier(onUnlock: _unlock),
+      ),
     );
   }
 }
@@ -63,11 +66,22 @@ class _AdultBarrier extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.large),
           child: Card(
             key: const Key('adult-barrier'),
+            color: Colors.white.withValues(alpha: 0.94),
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.large),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const CircleAvatar(
+                    radius: 34,
+                    backgroundColor: AppColors.primaryLight,
+                    child: Icon(
+                      Icons.shield_rounded,
+                      size: 36,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.medium),
                   Text(
                     'Раздел для взрослого',
                     style: Theme.of(context).textTheme.headlineSmall,
@@ -75,7 +89,7 @@ class _AdultBarrier extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.small),
                   const Text(
-                    'Нажмите и удерживайте кнопку, чтобы продолжить.',
+                    'Здесь можно посмотреть прогресс и управлять данными. Нажмите и удерживайте кнопку, чтобы продолжить.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.large),
@@ -84,7 +98,7 @@ class _AdultBarrier extends StatelessWidget {
                     label: 'Удерживать',
                     hint: 'Нажмите и удерживайте, чтобы открыть раздел',
                     child: Material(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: AppColors.primary,
                       borderRadius: BorderRadius.circular(AppRadii.button),
                       child: InkWell(
                         key: const Key('adult-unlock'),
@@ -93,12 +107,12 @@ class _AdultBarrier extends StatelessWidget {
                         borderRadius: BorderRadius.circular(AppRadii.button),
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(
-                            minWidth: 160,
-                            minHeight: 48,
+                            minWidth: 200,
+                            minHeight: 56,
                           ),
                           child: const Center(
                             child: Text(
-                              'Удерживать',
+                              'Удерживать для входа',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
@@ -225,7 +239,11 @@ class _AdultOverviewContent extends ConsumerWidget {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.check_circle_outline, size: 20),
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 20,
+                            color: AppColors.primary,
+                          ),
                           const SizedBox(width: AppSpacing.small),
                           Expanded(child: Text(topic)),
                         ],
@@ -248,6 +266,10 @@ class _AdultOverviewContent extends ConsumerWidget {
                   LinearProgressIndicator(
                     key: const Key('adult-campaign-progress'),
                     value: progress,
+                    minHeight: 10,
+                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.primary,
+                    backgroundColor: AppColors.primaryLight,
                   ),
                 ],
               ),
@@ -385,13 +407,40 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final icon = switch (title) {
+      'О проекте' => Icons.auto_stories_rounded,
+      'Чему учится ребёнок' => Icons.school_rounded,
+      'Общий прогресс' => Icons.timeline_rounded,
+      'Финни' => Icons.pets_rounded,
+      'Накопления' => Icons.savings_rounded,
+      _ => Icons.admin_panel_settings_rounded,
+    };
     return Card(
+      color: Colors.white.withValues(alpha: 0.94),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: const BorderSide(color: AppColors.primaryLight),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.medium),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.primaryLight,
+                  child: Icon(icon, color: AppColors.primary),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.small),
             child,
           ],

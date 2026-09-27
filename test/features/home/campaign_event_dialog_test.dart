@@ -39,14 +39,17 @@ GamePeriod _period(int number) => GamePeriod(
   createdAt: DateTime.utc(2026, 1, number),
 );
 
-StoryEventSnapshot _bowl({int wallet = 200}) => StoryEventSnapshot(
+StoryEventSnapshot _bowl({
+  int wallet = 200,
+  StoryEventStatus status = StoryEventStatus.armed,
+}) => StoryEventSnapshot(
   profileId: 1,
   storyId: 'day3_bowl_replacement',
   originPeriodId: 3,
   originPeriodNumber: 3,
   threshold: 1,
   qualifyingInteractionCount: 1,
-  status: StoryEventStatus.armed,
+  status: status,
   currentPeriodId: 3,
   currentPeriodNumber: 3,
   walletBalance: wallet,
@@ -56,14 +59,17 @@ StoryEventSnapshot _bowl({int wallet = 200}) => StoryEventSnapshot(
   wasPostponed: false,
 );
 
-CampaignEventReady _readyBowl({int wallet = 200, String? message}) =>
-    CampaignEventReady(
-      kind: CampaignEventKind.day3Bowl,
-      profileId: 1,
-      period: _period(3),
-      storyEvent: _bowl(wallet: wallet),
-      message: message,
-    );
+CampaignEventReady _readyBowl({
+  int wallet = 200,
+  String? message,
+  StoryEventStatus status = StoryEventStatus.armed,
+}) => CampaignEventReady(
+  kind: CampaignEventKind.day3Bowl,
+  profileId: 1,
+  period: _period(3),
+  storyEvent: _bowl(wallet: wallet, status: status),
+  message: message,
+);
 
 Future<({ProviderContainer container, _FakeCampaignEventController controller})>
 _pumpDialog(
@@ -101,6 +107,28 @@ _pumpDialog(
 }
 
 void main() {
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('bowl result shows resolved state at $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _pumpDialog(
+        tester,
+        initialState: _readyBowl(
+          wallet: 80,
+          status: StoryEventStatus.purchased,
+          message: 'Покупка сохранена.',
+        ),
+      );
+      expect(find.text('Новая миска куплена'), findsOneWidget);
+      expect(find.text('Баланс сейчас: 80 монет'), findsOneWidget);
+      expect(find.textContaining('План остался прежним'), findsOneWidget);
+      expect(find.byKey(const Key('campaign-bowl-understood')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'bowl dialog keeps the last Ready snapshot across transient state',
     (tester) async {
@@ -120,14 +148,14 @@ void main() {
         _readyBowl(wallet: 50, message: 'Проверить ещё раз.'),
       );
       await tester.pump();
-      expect(find.text('Баланс сейчас: 50 монет'), findsOneWidget);
+      expect(find.text('Сейчас — 50 монет'), findsOneWidget);
       expect(find.text('Проверить ещё раз.'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
 
       harness.controller.emit(const CampaignEventFailure());
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.text('Баланс сейчас: 50 монет'), findsOneWidget);
+      expect(find.text('Сейчас — 50 монет'), findsOneWidget);
     },
   );
 }

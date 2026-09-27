@@ -19,72 +19,122 @@ class _StaticSummaryController extends PeriodSummaryController {
 }
 
 void main() {
-  testWidgets('completed period summary renders neutral Plan and Fact', (
-    tester,
-  ) async {
-    final state = PeriodSummaryReady(
-      period: GamePeriod(
-        id: 1,
-        profileId: 1,
-        definitionId: 'period_1',
-        periodNumber: 1,
-        startWalletBalance: 0,
-        baseIncome: 500,
-        extraIncome: 0,
-        plannedNeed: 100,
-        plannedWant: 100,
-        plannedSavings: 100,
-        plannedFree: 200,
-        actualNeed: 80,
-        actualWant: 120,
-        actualSavings: 100,
-        requiredCheckpoints: const [],
-        resolvedCheckpoints: const [],
-        endWalletBalance: 200,
-        growthPointsEarned: 0,
-        status: GamePeriodStatus.completed,
-        createdAt: DateTime.utc(2026, 1, 1),
-        completedAt: DateTime.utc(2026, 1, 2),
-      ),
-      summary: const PeriodSummary(
-        openingWalletBalance: 0,
-        baseIncome: 500,
-        startingBudget: 500,
-        additionalIncome: 0,
-        plannedNeed: 100,
-        plannedWant: 100,
-        plannedSavings: 100,
-        plannedRemainder: 200,
-        factNeed: 80,
-        factWant: 120,
-        factSavings: 100,
-        factRemainder: 200,
-      ),
+  test('summary observations follow actual values without a fixed verdict', () {
+    const higherWantAndSavings = PeriodSummary(
+      openingWalletBalance: 0,
+      baseIncome: 500,
+      startingBudget: 500,
+      additionalIncome: 50,
+      plannedNeed: 100,
+      plannedWant: 100,
+      plannedSavings: 100,
+      plannedRemainder: 200,
+      factNeed: 100,
+      factWant: 150,
+      factSavings: 130,
+      factRemainder: 170,
     );
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          periodSummaryControllerProvider.overrideWith(
-            () => _StaticSummaryController(state),
-          ),
-        ],
-        child: MaterialApp(
-          theme: AppTheme.light,
-          home: const PeriodSummaryScreen(),
-        ),
-      ),
+    expect(summaryObservations(higherWantAndSavings), [
+      'На «Хочу» ушло больше, чем было в плане.',
+      'В копилку получилось отложить больше, чем планировалось.',
+    ]);
+    const matched = PeriodSummary(
+      openingWalletBalance: 0,
+      baseIncome: 500,
+      startingBudget: 500,
+      additionalIncome: 0,
+      plannedNeed: 100,
+      plannedWant: 100,
+      plannedSavings: 100,
+      plannedRemainder: 200,
+      factNeed: 100,
+      factWant: 100,
+      factSavings: 100,
+      factRemainder: 200,
     );
-    await tester.pumpAndSettle();
-
-    expect(find.text('День 1 завершён'), findsOneWidget);
-    expect(find.text('План'), findsOneWidget);
-    expect(find.text('Факт'), findsOneWidget);
-    expect(find.text('Нужное'), findsOneWidget);
-    expect(find.text('Желания'), findsOneWidget);
-    expect(find.text('Накопления'), findsOneWidget);
-    expect(find.text('На потом'), findsOneWidget);
-    expect(find.byKey(const Key('summary-home')), findsOneWidget);
+    expect(summaryObservations(matched), [
+      'План и фактические траты за день совпали.',
+    ]);
   });
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('completed period summary renders Plan and Fact at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final state = PeriodSummaryReady(
+        period: GamePeriod(
+          id: 1,
+          profileId: 1,
+          definitionId: 'period_1',
+          periodNumber: 1,
+          startWalletBalance: 0,
+          baseIncome: 500,
+          extraIncome: 0,
+          plannedNeed: 100,
+          plannedWant: 100,
+          plannedSavings: 100,
+          plannedFree: 200,
+          actualNeed: 80,
+          actualWant: 120,
+          actualSavings: 100,
+          requiredCheckpoints: const [],
+          resolvedCheckpoints: const [],
+          endWalletBalance: 200,
+          growthPointsEarned: 0,
+          status: GamePeriodStatus.completed,
+          createdAt: DateTime.utc(2026, 1, 1),
+          completedAt: DateTime.utc(2026, 1, 2),
+        ),
+        summary: const PeriodSummary(
+          openingWalletBalance: 0,
+          baseIncome: 500,
+          startingBudget: 500,
+          additionalIncome: 0,
+          plannedNeed: 100,
+          plannedWant: 100,
+          plannedSavings: 100,
+          plannedRemainder: 200,
+          factNeed: 80,
+          factWant: 120,
+          factSavings: 100,
+          factRemainder: 200,
+        ),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            periodSummaryControllerProvider.overrideWith(
+              () => _StaticSummaryController(state),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: const PeriodSummaryScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('День 1 завершён!'), findsOneWidget);
+      expect(find.text('План'), findsOneWidget);
+      expect(find.text('Факт'), findsOneWidget);
+      expect(find.text('Нужно'), findsOneWidget);
+      expect(find.text('Хочу'), findsOneWidget);
+      expect(find.text('Копилка'), findsOneWidget);
+      expect(find.text('Свободно'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('summary-home')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.byKey(const Key('summary-home')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('carried bowl expense and savings withdrawal are explicit', (
     tester,

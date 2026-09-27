@@ -1,5 +1,6 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/pet.dart';
@@ -79,101 +80,137 @@ class _FinaleScreenState extends ConsumerState<FinaleScreen> {
         }
         final recap = lifecycle.mode != CampaignMode.finalePending;
         return Scaffold(
-          appBar: AppBar(title: const Text('Итоги истории')),
-          body: SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.large),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        '5 дней вместе!',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: AppSpacing.small),
-                      const Text(
-                        'Ты прошёл всю историю с Финни и помог ему стать взрослее.',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: AppSpacing.large),
-                      if (pet != null)
-                        Center(
-                          child: FinnyPreview(
-                            name: pet.name,
-                            colorId: pet.colorId,
-                            patternId: pet.patternId,
-                            developmentStage: pet.developmentStage,
+          body: FinnyFlowBackdrop(
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 560),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          '5 дней вместе!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 35,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primaryDark,
                           ),
                         ),
-                      const SizedBox(height: AppSpacing.large),
-                      Text(
-                        'Теперь ты умеешь',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const ListTile(
-                        title: Text('Планировать бюджет'),
-                        subtitle: Text('Решать заранее, куда пойдут деньги.'),
-                      ),
-                      const ListTile(
-                        title: Text('Отличать нужное от желаний'),
-                        subtitle: Text(
+                        const SizedBox(height: AppSpacing.small),
+                        const Text(
+                          'Пять дней позади — Финни вырос вместе с тобой.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 17,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.large),
+                        if (pet != null)
+                          Center(
+                            child: FinnyPreview(
+                              name: pet.name,
+                              colorId: pet.colorId,
+                              patternId: pet.patternId,
+                              developmentStage: pet.developmentStage,
+                              height: 210,
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.large),
+                        Text(
+                          'Теперь ты умеешь',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const _SkillCard(
+                          Icons.assignment_rounded,
+                          'Планировать бюджет',
+                          'Решать заранее, куда пойдут монеты.',
+                          AppColors.need,
+                        ),
+                        const _SkillCard(
+                          Icons.favorite_rounded,
+                          'Отличать Нужно от Хочу',
                           'Понимать, что важно сейчас, а что может подождать.',
+                          AppColors.want,
                         ),
-                      ),
-                      const ListTile(
-                        title: Text('Копить на цель'),
-                        subtitle: Text(
-                          'Откладывать часть денег ради чего-то большего.',
+                        const _SkillCard(
+                          Icons.savings_rounded,
+                          'Копить на цель',
+                          'Откладывать часть монет ради чего-то большего.',
+                          AppColors.savings,
                         ),
-                      ),
-                      const ListTile(
-                        title: Text('Менять план'),
-                        subtitle: Text(
+                        const _SkillCard(
+                          Icons.sync_rounded,
+                          'Менять план',
                           'Подстраиваться, когда появляются неожиданные траты.',
+                          AppColors.primary,
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.large),
-                      if (error != null) ...[
-                        Text(error!, textAlign: TextAlign.center),
-                        const SizedBox(height: AppSpacing.small),
-                      ],
-                      if (recap)
-                        FilledButton(
-                          onPressed: () => context.go(
-                            lifecycle.mode == CampaignMode.freePlay
-                                ? '/home'
-                                : '/campaign-complete',
+                        const SizedBox(height: AppSpacing.large),
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
                           ),
-                          child: Text(
-                            lifecycle.mode == CampaignMode.freePlay
-                                ? 'Вернуться к Финни'
-                                : 'Назад',
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'История завершена — но с Финни можно играть дальше!',
+                                style: TextStyle(
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Ухаживай за Финни, играй в мини-игры, покупай вещи, украшай комнату и копи на новые цели.',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
                           ),
-                        )
-                      else ...[
-                        FilledButton(
-                          onPressed: busy ? null : () => _choose(true),
-                          child: const Text('Продолжить с Финни'),
                         ),
-                        const Text(
-                          'Играй, копи на цели и украшай дом.',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: AppSpacing.small),
-                        OutlinedButton(
-                          onPressed: busy ? null : () => _choose(false),
-                          child: const Text('Завершить историю'),
-                        ),
-                        const Text(
-                          'Продолжить играть можно будет позже.',
-                          textAlign: TextAlign.center,
-                        ),
+                        const SizedBox(height: AppSpacing.large),
+                        if (error != null) ...[
+                          Text(error!, textAlign: TextAlign.center),
+                          const SizedBox(height: AppSpacing.small),
+                        ],
+                        if (recap)
+                          FilledButton(
+                            onPressed: () => context.go(
+                              lifecycle.mode == CampaignMode.freePlay
+                                  ? '/home'
+                                  : '/campaign-complete',
+                            ),
+                            child: Text(
+                              lifecycle.mode == CampaignMode.freePlay
+                                  ? 'Вернуться к Финни'
+                                  : 'Назад',
+                            ),
+                          )
+                        else ...[
+                          FinnyFlowButton(
+                            onPressed: busy ? null : () => _choose(true),
+                            label: 'Продолжить с Финни',
+                          ),
+                          const SizedBox(height: AppSpacing.small),
+                          OutlinedButton(
+                            onPressed: busy ? null : () => _choose(false),
+                            child: const Text('Вернуться позже'),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -183,6 +220,56 @@ class _FinaleScreenState extends ConsumerState<FinaleScreen> {
       },
     );
   }
+}
+
+class _SkillCard extends StatelessWidget {
+  const _SkillCard(this.icon, this.title, this.description, this.color);
+  final IconData icon;
+  final String title;
+  final String description;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.09),
+      border: Border.all(color: Colors.white, width: 2),
+      borderRadius: BorderRadius.circular(22),
+    ),
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: 26,
+          backgroundColor: color.withValues(alpha: 0.18),
+          child: Icon(icon, color: color),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 17,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                description,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class CampaignCompleteScreen extends ConsumerStatefulWidget {

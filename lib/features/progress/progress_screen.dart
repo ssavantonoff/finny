@@ -1,7 +1,6 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
-import 'package:finny/features/pet_creation/finny_preview.dart';
-import 'package:finny/models/pet.dart';
+import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,64 +15,97 @@ class ProgressScreen extends ConsumerWidget {
     final profileId = ref.watch(activeProfileIdProvider);
     final stage = completedDay == 5 ? 3 : 2;
     return Scaffold(
-      appBar: AppBar(title: const Text('Рост Финни')),
-      body: SafeArea(
-        child: FutureBuilder<Pet?>(
-          future: profileId == null
-              ? Future<Pet?>.value()
-              : ref.read(gameRepositoryProvider).getPet(profileId),
-          builder: (context, snapshot) {
-            final pet = snapshot.data;
-            return Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.large),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+      body: FinnyFlowBackdrop(
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+                children: [
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 38,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Финни вырос!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'Финни вырос!',
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                      const SizedBox(height: AppSpacing.small),
-                      Text(
-                        'Этап $stage',
-                        key: const Key('progress-stage'),
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: AppSpacing.large),
-                      if (pet != null)
-                        FinnyPreview(
-                          name: pet.name,
-                          colorId: pet.colorId,
-                          patternId: pet.patternId,
-                          developmentStage: pet.developmentStage,
-                        )
-                      else if (snapshot.connectionState != ConnectionState.done)
-                        const CircularProgressIndicator(),
-                      if (completedDay == 5) ...[
-                        const SizedBox(height: AppSpacing.large),
-                        const Text(
-                          'Пять дней позади. Финни вырос вместе с тобой!',
-                          textAlign: TextAlign.center,
+                      for (var i = 1; i <= 3; i++) ...[
+                        if (i > 1)
+                          Container(
+                            width: 36,
+                            height: 3,
+                            color: i <= stage
+                                ? AppColors.primary
+                                : AppColors.border,
+                          ),
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: i <= stage
+                              ? AppColors.primary
+                              : AppColors.primaryLight,
+                          child: Text(
+                            '$i',
+                            style: TextStyle(
+                              color: i <= stage
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ),
                       ],
-                      const SizedBox(height: AppSpacing.large),
-                      FilledButton(
-                        key: const Key('progress-home'),
-                        onPressed: () =>
-                            context.go(completedDay == 5 ? '/finale' : '/home'),
-                        child: Text(
-                          completedDay == 5 ? 'Посмотреть итоги' : 'На главную',
-                        ),
-                      ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Этап $stage из 3',
+                    key: const Key('progress-stage'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 19,
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (profileId != null)
+                    CurrentFinnyArt(profileId: profileId, height: 285),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Твои решения за несколько дней помогли Финни вырасти.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 17,
+                      height: 1.35,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  FinnyFlowButton(
+                    key: const Key('progress-home'),
+                    label: completedDay == 5
+                        ? 'Посмотреть итоги'
+                        : 'Продолжить',
+                    onPressed: () =>
+                        context.go(completedDay == 5 ? '/finale' : '/home'),
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
