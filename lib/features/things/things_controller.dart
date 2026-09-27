@@ -107,6 +107,22 @@ class ThingsState {
             period!.status == GamePeriodStatus.readyToFinish);
   }
 
+  /// Driving stays available after the Car mood reward was used.
+  bool canPlayCar(ShopItem item) {
+    if (item.id != 'toy_plush' ||
+        profileId == null ||
+        load != ThingsLoad.ready ||
+        mutating ||
+        pending != null ||
+        quantityOf(item.id) <= 0) {
+      return false;
+    }
+    if (freePlay) return true;
+    return period != null &&
+        (period!.status == GamePeriodStatus.active ||
+            period!.status == GamePeriodStatus.readyToFinish);
+  }
+
   bool canUse(ShopItem item) {
     if (profileId == null ||
         load != ThingsLoad.ready ||

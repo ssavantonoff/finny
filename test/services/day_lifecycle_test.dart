@@ -491,31 +491,30 @@ void main() {
     },
   );
 
-  for (final unavailableToy in [_car]) {
-    test(
-      'unavailable ${unavailableToy.name} cannot block bedtime fallback',
-      () async {
-        final player = await createPlayer(
-          satiety: 100,
-          care: 100,
-          mood: 35,
-          wallet: 0,
-        );
-        await grant(player.profileId, unavailableToy);
-        final decision = await lifecycle.evaluateBedtime(
-          profileId: player.profileId,
-          periodId: player.period.id!,
-        );
-        expect(decision.type, BedtimeDecisionType.fallbackAllowed);
-        final completed = await lifecycle.sleep(
-          profileId: player.profileId,
-          periodId: player.period.id!,
-          allowFallback: true,
-        );
-        expect(completed.period.status, GamePeriodStatus.completed);
-      },
+  test('Car counts only while its period reward is available', () async {
+    final player = await createPlayer(
+      satiety: 100,
+      care: 100,
+      mood: 35,
+      wallet: 0,
     );
-  }
+    await grant(player.profileId, _car);
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+      )).type,
+      BedtimeDecisionType.carePossible,
+    );
+    await markUsed(player, 'item:toy_plush');
+    expect(
+      (await lifecycle.evaluateBedtime(
+        profileId: player.profileId,
+        periodId: player.period.id!,
+      )).type,
+      BedtimeDecisionType.fallbackAllowed,
+    );
+  });
 
   test('Ball counts only while its period reward is available', () async {
     final player = await createPlayer(

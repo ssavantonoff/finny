@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/models/ball_reward.dart';
+import 'package:finny/models/car_reward.dart';
 import 'package:finny/models/frisbee_reward.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/day_lifecycle.dart';
@@ -298,6 +299,24 @@ abstract interface class FrisbeeRewardPort {
   });
 }
 
+abstract interface class CarRewardPort {
+  Future<CarRewardResult?> confirmCarOperation({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  });
+
+  Future<CarRewardResult> completeCar({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  });
+}
+
 abstract interface class DayLifecyclePort {
   Future<BedtimeDecision> evaluateBedtime({
     required int profileId,
@@ -410,11 +429,13 @@ class SqliteGameRepository implements GameRepository {
     ShopItem? item,
     bool ballCompletion = false,
     bool frisbeeCompletion = false,
+    bool carCompletion = false,
     bool Function()? activeProfileMatches,
   }) async {
     if (item?.displaySection == ShopDisplaySection.toys &&
         !ballCompletion &&
-        !frisbeeCompletion) {
+        !frisbeeCompletion &&
+        !carCompletion) {
       throw PetItemNotUsableException(item!.id);
     }
     _validateOperationId(operationId);
@@ -464,6 +485,21 @@ class SqliteGameRepository implements GameRepository {
           throw PetItemNotOwnedException(item.id);
         }
       }
+      if (carCompletion) {
+        if (item?.id != 'toy_plush' ||
+            actionId != 'item:toy_plush' ||
+            !item!.persistent ||
+            item.usagePolicy != ItemUsagePolicy.oncePerPeriod ||
+            item.petEffects != effects ||
+            item.petEffects.mood <= 0 ||
+            item.petEffects.care != 0 ||
+            item.petEffects.satiety != 0) {
+          throw StateError('Invalid canonical Car action.');
+        }
+        if (await _readInventoryQuantity(txn, profileId, item.id) <= 0) {
+          throw PetItemNotOwnedException(item.id);
+        }
+      }
       final existing = await _readPetActionOperation(
         txn,
         profileId: profileId,
@@ -505,7 +541,7 @@ class SqliteGameRepository implements GameRepository {
         slot: slot,
       );
       if (usagePolicy != ItemUsagePolicy.unlimited && usageCount > 0) {
-        if (ballCompletion || frisbeeCompletion) {
+        if (ballCompletion || frisbeeCompletion || carCompletion) {
           requireActiveProfile();
           return (
             pet: pet,
@@ -2041,6 +2077,116 @@ class SqliteFrisbeeRewardPort implements FrisbeeRewardPort {
           : result.moodDelta == 0
           ? FrisbeeRewardStatus.capped
           : FrisbeeRewardStatus.applied,
+      canonicalMoodEffect: item.petEffects.mood,
+      actualMoodDelta: result.moodDelta,
+      pet: result.pet,
+    );
+  }
+}
+
+class SqliteCarRewardPort implements CarRewardPort {
+  SqliteCarRewardPort(AppDatabase database, this._content)
+    : _core = SqliteGameRepository(database);
+
+  final SqliteGameRepository _core;
+  final ContentRepository _content;
+
+  Future<void> _requireCanonicalItem(ShopItem item) async {
+    final matches = (await _content.loadShopItems()).where(
+      (candidate) => candidate.id == 'toy_plush',
+    );
+    if (matches.length != 1) {
+      throw StateError('Canonical Car item is missing or duplicated.');
+    }
+    final canonical = matches.single;
+    if (item.id != canonical.id ||
+        item.petEffects != canonical.petEffects ||
+        !canonical.persistent ||
+        canonical.usagePolicy != ItemUsagePolicy.oncePerPeriod ||
+        canonical.displaySection != ShopDisplaySection.toys ||
+        canonical.petEffects.mood <= 0 ||
+        canonical.petEffects.care != 0 ||
+        canonical.petEffects.satiety != 0) {
+      throw StateError('Car reward does not match canonical content.');
+    }
+  }
+
+  @override
+  Future<CarRewardResult?> confirmCarOperation({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  }) async {
+    await _requireCanonicalItem(item);
+    if (!operationId.startsWith('toy-car:$profileId:') ||
+        !activeProfileMatches()) {
+      throw StateError('The Car operation identity or profile changed.');
+    }
+    final db = await _core._appDatabase.database;
+    return db.transaction((txn) async {
+      if (!activeProfileMatches()) {
+        throw StateError('The active profile changed during the Car session.');
+      }
+      if (await _core._readInventoryQuantity(txn, profileId, item.id) <= 0) {
+        throw PetItemNotOwnedException(item.id);
+      }
+      final previous = await _core._readPetActionOperation(
+        txn,
+        profileId: profileId,
+        operationId: operationId,
+      );
+      if (previous == null) return null;
+      if (previous['period_id'] != periodId ||
+          previous['action_id'] != 'item:toy_plush' ||
+          previous['usage_slot'] != PetActionSlot.defaultSlot.storageValue) {
+        throw PetOperationConflictException(operationId);
+      }
+      final pet = await _core._requirePet(txn, profileId);
+      if (!activeProfileMatches()) {
+        throw StateError('The active profile changed during the Car session.');
+      }
+      return CarRewardResult(
+        status: CarRewardStatus.confirmedPreviously,
+        canonicalMoodEffect: item.petEffects.mood,
+        actualMoodDelta: 0,
+        pet: pet,
+      );
+    });
+  }
+
+  @override
+  Future<CarRewardResult> completeCar({
+    required int profileId,
+    required int periodId,
+    required ShopItem item,
+    required String operationId,
+    required bool Function() activeProfileMatches,
+  }) async {
+    await _requireCanonicalItem(item);
+    if (!operationId.startsWith('toy-car:$profileId:')) {
+      throw StateError('The Car operation identity changed.');
+    }
+    final result = await _core._applyPetAction(
+      profileId: profileId,
+      periodId: periodId,
+      actionId: 'item:toy_plush',
+      operationId: operationId,
+      slot: PetActionSlot.defaultSlot,
+      effects: item.petEffects,
+      item: item,
+      carCompletion: true,
+      activeProfileMatches: activeProfileMatches,
+    );
+    return CarRewardResult(
+      status: result.duplicateOperation
+          ? CarRewardStatus.confirmedPreviously
+          : result.alreadyUsed
+          ? CarRewardStatus.alreadyRewarded
+          : result.moodDelta == 0
+          ? CarRewardStatus.capped
+          : CarRewardStatus.applied,
       canonicalMoodEffect: item.petEffects.mood,
       actualMoodDelta: result.moodDelta,
       pet: result.pet,
