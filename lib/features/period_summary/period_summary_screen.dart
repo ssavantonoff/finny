@@ -2,7 +2,9 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:finny/features/home/home_visual_components.dart';
+import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:finny/features/period_summary/period_summary_controller.dart';
+import 'package:finny/models/pet.dart';
 import 'package:finny/models/period_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -119,7 +121,10 @@ class _SummaryBody extends StatelessWidget {
           ),
           if (profileId != null) ...[
             const SizedBox(height: 8),
-            CurrentFinnyArt(profileId: profileId!, height: 170),
+            _SummaryFinnyArt(
+              profileId: profileId!,
+              periodNumber: state.period.periodNumber,
+            ),
           ],
           const SizedBox(height: 14),
           _Panel(
@@ -256,6 +261,60 @@ class _SummaryBody extends StatelessWidget {
           ),
         ],
       ),
+    ),
+  );
+}
+
+/// Keep the growth reveal on its dedicated screen after days 2 and 5.
+class _SummaryFinnyArt extends ConsumerStatefulWidget {
+  const _SummaryFinnyArt({required this.profileId, required this.periodNumber});
+
+  final int profileId;
+  final int periodNumber;
+
+  @override
+  ConsumerState<_SummaryFinnyArt> createState() => _SummaryFinnyArtState();
+}
+
+class _SummaryFinnyArtState extends ConsumerState<_SummaryFinnyArt> {
+  late Future<Pet?> _pet;
+
+  @override
+  void initState() {
+    super.initState();
+    _pet = ref.read(gameRepositoryProvider).getPet(widget.profileId);
+  }
+
+  @override
+  void didUpdateWidget(_SummaryFinnyArt oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profileId != widget.profileId) {
+      _pet = ref.read(gameRepositoryProvider).getPet(widget.profileId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 170,
+    child: FutureBuilder<Pet?>(
+      future: _pet,
+      builder: (context, snapshot) {
+        final pet = snapshot.data;
+        if (pet == null) return const SizedBox.shrink();
+        final displayStage = switch (widget.periodNumber) {
+          2 => 1,
+          5 => 2,
+          _ => pet.developmentStage,
+        };
+        return FinnyPreview(
+          key: const Key('summary-finny-art'),
+          name: pet.name,
+          colorId: pet.colorId,
+          patternId: pet.patternId,
+          developmentStage: displayStage,
+          height: 170,
+        );
+      },
     ),
   );
 }

@@ -293,69 +293,119 @@ class _CampaignCompleteScreenState
     return FutureBuilder(
       future: ref.read(gameRepositoryProvider).getPet(profileId),
       builder: (context, snapshot) => Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.large),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (snapshot.data != null)
-                      FinnyPreview(
-                        name: snapshot.data!.name,
-                        colorId: snapshot.data!.colorId,
-                        patternId: snapshot.data!.patternId,
-                        developmentStage: snapshot.data!.developmentStage,
+        body: FinnyFlowBackdrop(
+          child: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'История завершена',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 35,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primaryDark,
+                        ),
                       ),
-                    const SizedBox(height: AppSpacing.large),
-                    Text(
-                      'История завершена',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    const Text(
-                      'Все 5 дней пройдены.\nФинни вырос, а всё, что вы собрали вместе, сохранено.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    const Text('Спасибо за игру!'),
-                    const SizedBox(height: AppSpacing.large),
-                    if (error != null) ...[
-                      Text(error!, textAlign: TextAlign.center),
-                      const SizedBox(height: AppSpacing.small),
-                    ],
-                    FilledButton(
-                      onPressed: busy
-                          ? null
-                          : () async {
-                              setState(() {
-                                busy = true;
-                                error = null;
-                              });
-                              try {
-                                await ref
-                                    .read(campaignLifecycleServiceProvider)
-                                    .startFreePlay(profileId);
-                                if (context.mounted) context.go('/home');
-                              } catch (_) {
-                                if (mounted) {
-                                  setState(
-                                    () => error = 'Не удалось продолжить игру. Попробуй ещё раз.',
-                                  );
+                      const SizedBox(height: AppSpacing.large),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.93),
+                          borderRadius: BorderRadius.circular(32),
+                          border: Border.all(color: Colors.white, width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.12),
+                              blurRadius: 28,
+                              offset: const Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 34,
+                              color: AppColors.primary,
+                            ),
+                            if (snapshot.data != null) ...[
+                              const SizedBox(height: 8),
+                              FinnyPreview(
+                                name: snapshot.data!.name,
+                                colorId: snapshot.data!.colorId,
+                                patternId: snapshot.data!.patternId,
+                                developmentStage:
+                                    snapshot.data!.developmentStage,
+                                height: 210,
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Все 5 дней пройдены. Финни вырос, а ваш прогресс сохранён.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 17,
+                                height: 1.35,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.large),
+                      if (error != null) ...[
+                        Text(error!, textAlign: TextAlign.center),
+                        const SizedBox(height: AppSpacing.small),
+                      ],
+                      FinnyFlowButton(
+                        label: 'Продолжить с Финни',
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                setState(() {
+                                  busy = true;
+                                  error = null;
+                                });
+                                try {
+                                  await ref
+                                      .read(campaignLifecycleServiceProvider)
+                                      .startFreePlay(profileId);
+                                  if (context.mounted) context.go('/home');
+                                } catch (_) {
+                                  if (mounted) {
+                                    setState(
+                                      () => error = 'Не удалось продолжить игру. Попробуй ещё раз.',
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) setState(() => busy = false);
                                 }
-                              } finally {
-                                if (mounted) setState(() => busy = false);
-                              }
-                            },
-                      child: const Text('Продолжить играть'),
-                    ),
-                    OutlinedButton(
-                      onPressed: () => context.go('/finale?mode=recap'),
-                      child: const Text('Посмотреть итоги'),
-                    ),
-                  ],
+                              },
+                      ),
+                      const SizedBox(height: AppSpacing.small),
+                      OutlinedButton(
+                        onPressed: () => context.go('/finale?mode=recap'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          minimumSize: const Size.fromHeight(52),
+                          shape: const StadiumBorder(),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        child: const Text('Посмотреть итоги'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
