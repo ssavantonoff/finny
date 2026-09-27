@@ -268,6 +268,10 @@ void main() {
     ]) {
       expect(find.text(topic), findsOneWidget);
     }
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-campaign-progress')),
+      250,
+    );
     expect(find.text('Пройдено дней: 0 из 5'), findsOneWidget);
     expect(games.readCalls, 3);
   });
@@ -319,6 +323,10 @@ void main() {
     await _pumpAdult(tester, games);
     await _unlock(tester);
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-campaign-progress')),
+      250,
+    );
     expect(find.text('Пройдено дней: 2 из 5'), findsOneWidget);
   });
 
@@ -332,6 +340,10 @@ void main() {
     await _pumpAdult(tester, games);
     await _unlock(tester);
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-campaign-progress')),
+      250,
+    );
     expect(find.text('Пройдено дней: 5 из 5'), findsOneWidget);
     final indicator = tester.widget<LinearProgressIndicator>(
       find.byKey(const Key('adult-campaign-progress')),
@@ -404,6 +416,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('О проекте'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('adult-campaign-progress')),
+      250,
+    );
     expect(find.text('Пройдено дней: 0 из 5'), findsOneWidget);
     expect(games.readCalls, 4);
   });
@@ -450,29 +466,31 @@ void main() {
     expect(find.text('В копилке: 111 монет'), findsNothing);
   });
 
-  testWidgets('loaded content is scrollable without overflow at 360x800', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('loaded content is scrollable without overflow at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final games = _games();
-    await _pumpAdult(tester, games);
-    await _unlock(tester);
+      final games = _games();
+      await _pumpAdult(tester, games);
+      await _unlock(tester);
 
-    expect(find.byType(ListView), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('adult-savings')),
-      300,
-    );
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('adult-data-management')),
-      300,
-    );
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.byType(ListView), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('adult-savings')),
+        300,
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('adult-data-management')),
+        300,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('reset confirmation can be cancelled without mutation', (
     tester,

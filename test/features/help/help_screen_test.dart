@@ -59,24 +59,26 @@ Future<GoRouter> _pumpApp(
 }
 
 void main() {
-  testWidgets('renders glossary terms at 360 dp width', (tester) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('renders glossary terms at $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final router = await _pumpApp(
-      tester,
-      _GlossaryRepository(entries: _entries),
-    );
-    addTearDown(router.dispose);
+      final router = await _pumpApp(
+        tester,
+        _GlossaryRepository(entries: _entries),
+      );
+      addTearDown(router.dispose);
 
-    expect(find.byKey(const Key('glossary-list')), findsOneWidget);
-    expect(find.text('Доход'), findsOneWidget);
-    expect(find.text('Деньги, которые ты получаешь.'), findsOneWidget);
-    expect(find.text('Бюджет'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      expect(find.byKey(const Key('glossary-list')), findsOneWidget);
+      expect(find.text('Доход'), findsOneWidget);
+      expect(find.text('Деньги, которые ты получаешь.'), findsOneWidget);
+      expect(find.text('Бюджет'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('opens help from settings and returns back', (tester) async {
     final router = await _pumpApp(

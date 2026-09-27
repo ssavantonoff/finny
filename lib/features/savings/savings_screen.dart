@@ -3,6 +3,7 @@ import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_art.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/features/savings/savings_controller.dart';
+import 'package:finny/features/savings/savings_goal_visual.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/savings_goal.dart';
 import 'package:flutter/material.dart';
@@ -418,25 +419,24 @@ class _GoalArt extends StatelessWidget {
   final double size;
   @override
   Widget build(BuildContext context) {
-    final icon = switch (goal.rewardAssetId) {
-      'reward_night_light' => Icons.nightlight_round,
-      'reward_scooter' => Icons.electric_scooter_rounded,
-      'reward_play_house' => Icons.cottage_rounded,
-      _ => Icons.card_giftcard_rounded,
-    };
+    final asset = SavingsGoalVisual.assetFor(goal.id);
     return Semantics(
       image: true,
       label: goal.name,
-      child: Container(
+      child: SizedBox(
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFF7F2FF), Color(0xFFE9E3FF)],
-          ),
-          borderRadius: BorderRadius.circular(size * 0.27),
-        ),
-        child: Icon(icon, color: AppColors.primaryDark, size: size * 0.57),
+        child: asset == null
+            ? const Icon(
+                Icons.card_giftcard_rounded,
+                color: AppColors.primaryDark,
+              )
+            : Image.asset(
+                asset,
+                key: Key('savings-goal-art-${goal.id}'),
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
+              ),
       ),
     );
   }

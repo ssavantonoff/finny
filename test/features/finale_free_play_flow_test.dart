@@ -4,6 +4,8 @@ import 'package:finny/app/providers.dart';
 import 'package:finny/app/router.dart';
 import 'package:finny/core/database/app_database.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_flow_visuals.dart';
+import 'package:finny/features/finale/finale_screen.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
@@ -210,7 +212,7 @@ void main() {
         scope.read(routerProvider).routeInformationProvider.value.uri.path,
         '/finale',
       );
-      await tapVisible(tester, find.text('Завершить историю'));
+      await tapVisible(tester, find.text('Вернуться позже'));
       await waitFor(tester, find.text('История завершена'));
       await waitFor(tester, find.byType(FinnyPreview));
       expect(
@@ -248,7 +250,7 @@ void main() {
       expect(find.text('Продолжить с Финни'), findsNothing);
       await tapVisible(tester, find.text('Назад'));
       await waitFor(tester, find.text('История завершена'));
-      await tapVisible(tester, find.text('Продолжить играть'));
+      await tapVisible(tester, find.text('Продолжить с Финни'));
       await waitFor(tester, find.text('Свободный режим'));
       expect(find.byType(HomeWallet), findsOneWidget);
       expect(find.byType(FinnyRoomScene), findsOneWidget);
@@ -266,7 +268,7 @@ void main() {
       expect(find.text('Погладить'), findsOneWidget);
       await tapVisible(tester, find.text('Итоги'));
       await waitFor(tester, find.text('Вернуться к Финни'));
-      expect(find.text('Завершить историю'), findsNothing);
+      expect(find.text('Вернуться позже'), findsNothing);
       await tapVisible(tester, find.text('Вернуться к Финни'));
       await waitFor(tester, find.text('Свободный режим'));
       await tester.pumpWidget(const SizedBox.shrink());
@@ -284,41 +286,101 @@ void main() {
     },
   );
 
-  testWidgets('finale primary enters Free Play and Tasks has completed state', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
-    final (database, content, games) = await completedSave(tester);
-    addTearDown(database.close);
-    final scope = container(database, content, games);
-    await tester.pumpWidget(
-      UncontrolledProviderScope(container: scope, child: const FinnyApp()),
-    );
-    await waitFor(tester, find.text('5 дней вместе!'));
-    await tapVisible(tester, find.text('Продолжить с Финни'));
-    await waitFor(tester, find.text('Свободный режим'));
-    expect(
-      (tester.renderObject(
-        find.text('Свободный режим'),
-      ) as RenderParagraph).didExceedMaxLines,
-      isFalse,
-    );
-    await tester.tap(find.text('Задания').first);
-    await waitFor(tester, find.text('Все задания выполнены!'));
-    expect(find.text('5 / 5 дней ✓'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('nav-shop')));
-    await waitFor(tester, find.byKey(const Key('shop-item-food_treat')));
-    expect(find.text('SALE'), findsNothing);
-    expect(find.text('Сначала начни игровой период.'), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 200)),
-    );
-    scope.dispose();
-  });
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('campaign completion uses production visuals at $size', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final (database, content, games) = await completedSave(tester);
+      addTearDown(database.close);
+      final scope = container(database, content, games);
+      addTearDown(scope.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+      );
+      await waitFor(tester, find.text('5 дней вместе!'));
+      await tapVisible(tester, find.text('Вернуться позже'));
+      await waitFor(tester, find.text('История завершена'));
+      await waitFor(tester, find.byType(FinnyPreview));
+
+      final complete = find.byType(CampaignCompleteScreen);
+      expect(
+        find.descendant(of: complete, matching: find.byType(FinnyFlowBackdrop)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: complete, matching: find.byType(FinnyFlowButton)),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Все 5 дней пройдены. Финни вырос, а ваш прогресс сохранён.'),
+        findsOneWidget,
+      );
+      expect(find.text('Продолжить с Финни'), findsOneWidget);
+      expect(find.text('Посмотреть итоги'), findsOneWidget);
+      expect(
+        (tester
+                    .widget<Image>(
+                      find.descendant(
+                        of: find.byType(FinnyPreview),
+                        matching: find.byType(Image),
+                      ),
+                    )
+                    .image
+                as AssetImage)
+            .assetName,
+        'assets/images/finny/stage3/blue_stripes.png',
+      );
+      await tester.ensureVisible(find.text('Посмотреть итоги'));
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('finale primary enters Free Play at $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final (database, content, games) = await completedSave(tester);
+      addTearDown(database.close);
+      final scope = container(database, content, games);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: scope, child: const FinnyApp()),
+      );
+      await waitFor(tester, find.text('5 дней вместе!'));
+      expect(
+        find.text('Пять дней позади — Финни вырос вместе с тобой.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tapVisible(tester, find.text('Продолжить с Финни'));
+      await waitFor(tester, find.text('Свободный режим'));
+      expect(
+        (tester.renderObject(
+          find.text('Свободный режим'),
+        ) as RenderParagraph).didExceedMaxLines,
+        isFalse,
+      );
+      await tester.tap(find.text('Задания').first);
+      await waitFor(tester, find.text('Все задания выполнены!'));
+      expect(find.text('5 / 5 дней ✓'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('nav-shop')));
+      await waitFor(tester, find.byKey(const Key('shop-item-food_treat')));
+      expect(find.text('SALE'), findsNothing);
+      expect(find.text('Сначала начни игровой период.'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      scope.dispose();
+    });
+  }
 
   testWidgets('Free Play Home and five destinations fit at 360dp', (
     tester,

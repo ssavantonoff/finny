@@ -400,6 +400,33 @@ class _ItemCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          SizedBox(
+            height: 26,
+            child: !item.persistent
+                ? Align(
+                    alignment: Alignment.topRight,
+                    child: Container(
+                      key: Key('things-quantity-${item.id}'),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 3,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.all(Radius.circular(99)),
+                      ),
+                      child: Text(
+                        '×${state.quantityOf(item.id)}',
+                        style: const TextStyle(
+                          color: AppColors.primaryDark,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  )
+                : null,
+          ),
           Expanded(child: ShopItemArt(item: item)),
           Text(
             item.name,

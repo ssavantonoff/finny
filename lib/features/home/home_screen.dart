@@ -1,9 +1,11 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_modal_actions.dart';
 import 'package:finny/core/visual/finny_flow_visuals.dart';
 import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
+import 'package:finny/features/home/finny_sleep_dialog.dart';
 import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/completed_goal.dart';
@@ -464,20 +466,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.ready:
         final confirmed = await showDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Финни готов отдыхать.'),
-            content: const Text('Завершить день?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Вернуться'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Уложить спать'),
-              ),
-            ],
-          ),
+          builder: (context) => const FinnySleepDialog(),
         );
         if (confirmed != true) return;
         break;
@@ -1570,10 +1559,24 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
     return PopScope(
       canPop: false,
       child: AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        icon: Icon(
+          bowlDecisionShown && bowl.status == StoryEventStatus.purchased
+              ? Icons.check_circle_rounded
+              : Icons.pets_rounded,
+          size: 32,
+          color: AppColors.primary,
+        ),
         title: Text(
-          bowl.status == StoryEventStatus.postponed
+          bowlDecisionShown && bowl.status == StoryEventStatus.purchased
+              ? 'Новая миска куплена'
+              : bowl.status == StoryEventStatus.postponed
               ? 'Новая миска'
               : 'Ой! Миска Финни сломалась',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -1583,33 +1586,74 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
               Text(
                 bowlDecisionShown
                     ? bowl.status == StoryEventStatus.purchased
-                          ? 'Новая миска куплена.'
+                          ? 'Теперь у Финни снова есть миска.'
                           : 'Пока Финни будет пользоваться временной миской.'
                     : bowl.status == StoryEventStatus.postponed
                     ? 'Новая миска всё ещё нужна. Пока Финни пользуется временной миской.'
-                    : 'Финни нужна новая миска. Этой покупки не было в плане.',
+                    : 'Финни нужна новая миска. Этой покупки не было в твоём плане.',
               ),
               if (bowlDecisionShown &&
                   bowl.status == StoryEventStatus.purchased) ...[
                 const SizedBox(height: AppSpacing.small),
                 Text('Баланс сейчас: $bowlWallet монет'),
+                const SizedBox(height: 8),
+                const Text(
+                  'План остался прежним, но фактические расходы изменились. '
+                  'Иногда важные траты появляются неожиданно.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
               ],
               if (!bowlDecisionShown) ...[
                 const SizedBox(height: AppSpacing.small),
-                Text('Баланс сейчас: $bowlWallet монет'),
-                Text('Новая миска: -$bowlPrice монет · Нужно'),
-                if (bowlWallet >= bowlPrice)
-                  Text(
-                    'После покупки останется ${bowlWallet - bowlPrice} монет',
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(16),
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Сейчас — $bowlWallet монет'),
+                      Text('Новая миска — −$bowlPrice монет'),
+                      if (bowlWallet >= bowlPrice)
+                        Text('Останется — ${bowlWallet - bowlPrice} монет'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Color(0xFFE4F2FF),
+                      borderRadius: BorderRadius.all(Radius.circular(99)),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 13,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        'Нужно',
+                        style: TextStyle(
+                          color: AppColors.need,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
                 if (bowlWallet < bowlPrice)
                   Text('Не хватает $bowlDeficit монет'),
                 if (bowlCanUseSavings && bowlWallet < bowlPrice)
                   Text('В копилке: ${bowl.savedAmount} монет'),
               ],
-              if (state.message case final message?) ...[
+              if (state.message != null &&
+                  (!bowlDecisionShown ||
+                      bowl.status != StoryEventStatus.purchased)) ...[
                 const SizedBox(height: AppSpacing.small),
-                Semantics(liveRegion: true, child: Text(message)),
+                Semantics(liveRegion: true, child: Text(state.message!)),
               ],
             ],
           ),
@@ -1618,12 +1662,14 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
           if (bowlDecisionShown)
             FilledButton(
               key: const Key('campaign-bowl-understood'),
+              style: FinnyModalActions.primary,
               onPressed: () => Navigator.pop(context),
               child: const Text('Понятно'),
             ),
           if (!bowlDecisionShown && bowlCanUseSavings && bowlWallet < bowlPrice)
             FilledButton(
               key: const Key('campaign-bowl-savings'),
+              style: FinnyModalActions.primary,
               onPressed: state.mutating
                   ? null
                   : () async {
@@ -1638,10 +1684,12 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
                           ),
                           actions: [
                             TextButton(
+                              style: FinnyModalActions.secondary,
                               onPressed: () => Navigator.pop(context, false),
                               child: const Text('Отмена'),
                             ),
                             FilledButton(
+                              style: FinnyModalActions.primary,
                               onPressed: () => Navigator.pop(context, true),
                               child: const Text('Использовать'),
                             ),
@@ -1657,6 +1705,7 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
           if (!bowlDecisionShown)
             TextButton(
               key: const Key('campaign-bowl-postpone'),
+              style: FinnyModalActions.secondary,
               onPressed: state.mutating
                   ? null
                   : () async {
@@ -1666,15 +1715,12 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
                         await controller.postponeBowl();
                       }
                     },
-              child: Text(
-                bowlCanUseSavings && bowlWallet < bowlPrice
-                    ? 'Не трогать копилку'
-                    : 'Отложить покупку',
-              ),
+              child: const Text('Отложить покупку'),
             ),
           if (!bowlDecisionShown && bowlWallet >= bowlPrice)
             FilledButton(
               key: const Key('campaign-buy-bowl'),
+              style: FinnyModalActions.primary,
               onPressed: state.mutating
                   ? null
                   : () async {
@@ -1687,6 +1733,7 @@ class _CampaignEventDialogState extends ConsumerState<CampaignEventDialog> {
               !bowlDecisionShown)
             FilledButton.tonal(
               key: const Key('campaign-retry'),
+              style: FinnyModalActions.primary,
               onPressed: state.mutating
                   ? null
                   : () async {
