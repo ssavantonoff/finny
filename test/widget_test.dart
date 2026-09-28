@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -65,6 +66,10 @@ class _Games extends SqliteGameRepository {
 
   @override
   Future<List<GamePeriod>> getPeriods(int profileId) async => const [];
+
+  @override
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId) async =>
+      const [];
 
   @override
   Future<Pet?> getPet(int profileId) async => pet;

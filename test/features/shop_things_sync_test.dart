@@ -2,6 +2,7 @@ import '../helpers/campaign_only_lifecycle_service.dart';
 
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -59,6 +60,9 @@ class _SyncGames extends SqliteGameRepository {
   Future<GameState?> getGameState(int profileId) async => gameState;
   @override
   Future<List<GamePeriod>> getPeriods(int profileId) async => [period];
+  @override
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId) async =>
+      const [];
   @override
   Future<GamePeriod?> getCurrentPeriod(int profileId) async => period;
   @override

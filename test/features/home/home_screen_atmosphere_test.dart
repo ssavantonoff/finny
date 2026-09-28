@@ -6,6 +6,7 @@ import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/content_entry.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
@@ -54,6 +55,9 @@ class _AtmosphereGames extends SqliteGameRepository {
   @override
   Future<List<GamePeriod>> getPeriods(int profileId) async =>
       periodsOverride ?? (period == null ? const [] : [period!]);
+  @override
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId) async =>
+      const [];
   @override
   Future<Pet?> getPet(int profileId) async => pet;
   @override

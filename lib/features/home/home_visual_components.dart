@@ -1,8 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/core/visual/finny_visual.dart';
+import 'package:finny/features/home/home_room_visual.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_art.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/completed_goal.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -213,14 +218,23 @@ class FinnyRoomScene extends StatelessWidget {
     super.key,
     required this.pet,
     this.showBackground = true,
+    this.equippedAccessories = const {},
+    this.completedGoals = const [],
   });
 
   final Pet pet;
   final bool showBackground;
+  final Map<ShopEquipSlot, String> equippedAccessories;
+  final List<CompletedGoal> completedGoals;
 
   @override
   Widget build(BuildContext context) {
     final stage = pet.developmentStage.clamp(1, 3);
+    final accessories = HomeRoomVisual.accessoriesFor(equippedAccessories);
+    final rewards = HomeRoomVisual.rewardsFor(
+      completedGoals,
+      profileId: pet.profileId,
+    );
     final roomHeight = (MediaQuery.sizeOf(context).height * 0.43).clamp(
       300.0,
       420.0,
@@ -238,35 +252,94 @@ class FinnyRoomScene extends StatelessWidget {
         key: const Key('home-room-scene'),
         height: showBackground ? roomHeight : finnyHeight,
         width: double.infinity,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (showBackground)
-              Image.asset(
-                'assets/images/home/room_base.png',
-                key: const Key('home-room-background'),
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
-            Align(
-              alignment: showBackground
-                  ? const Alignment(0, 0.87)
-                  : Alignment.bottomCenter,
-              child: SizedBox(
-                height: finnyHeight,
-                child: Image.asset(
-                  FinnyVisual.assetForPet(pet),
-                  key: Key('home-finny-stage-$stage'),
-                  fit: BoxFit.contain,
-                  semanticLabel: FinnyVisual.descriptionForPet(pet),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final aspect = HomeRoomVisual.petAspectRatio(stage);
+            // Claimed decor has its own side lanes, outside the pet canvas.
+            final canvasWidth = math.min(
+              finnyHeight * aspect,
+              constraints.maxWidth * (rewards.isEmpty ? 1.0 : 0.60),
+            );
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                if (showBackground)
+                  Image.asset(
+                    'assets/images/home/room_base.png',
+                    key: const Key('home-room-background'),
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  ),
+                for (final reward in rewards)
+                  Positioned.fromRect(
+                    rect: _scaledRect(reward.placement, constraints.biggest),
+                    child: Image.asset(
+                      reward.asset,
+                      key: Key('home-reward-${reward.rewardAssetId}'),
+                      fit: BoxFit.contain,
+                      excludeFromSemantics: true,
+                    ),
+                  ),
+                Align(
+                  alignment: showBackground
+                      ? const Alignment(0, 0.87)
+                      : Alignment.bottomCenter,
+                  child: SizedBox(
+                    key: const Key('home-finny-canvas'),
+                    width: canvasWidth,
+                    height: canvasWidth / aspect,
+                    child: LayoutBuilder(
+                      builder: (context, canvas) => Stack(
+                        clipBehavior: Clip.none,
+                        fit: StackFit.expand,
+                        children: [
+                          for (final visual in accessories.where(
+                            (v) => v.behindPet,
+                          ))
+                            _accessory(visual, stage, canvas.biggest),
+                          Image.asset(
+                            FinnyVisual.assetForPet(pet),
+                            key: Key('home-finny-stage-$stage'),
+                            fit: BoxFit.contain,
+                            semanticLabel: FinnyVisual.descriptionForPet(pet),
+                          ),
+                          for (final visual in accessories.where(
+                            (v) => !v.behindPet,
+                          ))
+                            _accessory(visual, stage, canvas.biggest),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
   }
+
+  static Rect _scaledRect(Rect rect, Size canvas) => Rect.fromLTWH(
+    rect.left * canvas.width,
+    rect.top * canvas.height,
+    rect.width * canvas.width,
+    rect.height * canvas.height,
+  );
+
+  static Widget _accessory(
+    HomeAccessoryVisual visual,
+    int stage,
+    Size canvas,
+  ) => Positioned.fromRect(
+    rect: _scaledRect(visual.anchorFor(stage), canvas),
+    child: Image.asset(
+      visual.asset,
+      key: Key('home-accessory-${visual.itemId}'),
+      fit: BoxFit.fill,
+      excludeFromSemantics: true,
+    ),
+  );
 }
 
 class HomeGoalCard extends StatelessWidget {

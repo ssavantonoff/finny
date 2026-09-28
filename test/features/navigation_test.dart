@@ -18,6 +18,7 @@ import 'package:finny/features/things/things_controller.dart';
 import 'package:finny/features/tasks/tasks_screen.dart';
 import 'package:finny/features/savings/savings_screen.dart';
 import 'package:finny/models/game_period.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
@@ -78,6 +79,10 @@ class _NavGames extends SqliteGameRepository {
 
   @override
   Future<List<GamePeriod>> getPeriods(int profileId) async => const [];
+
+  @override
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId) async =>
+      const [];
 
   @override
   Future<GamePeriod?> getCurrentPeriod(int profileId) async => null;
