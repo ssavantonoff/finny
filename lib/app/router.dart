@@ -11,9 +11,11 @@ import 'package:finny/features/minigames/ball/ball_screen.dart';
 import 'package:finny/features/minigames/car/car_screen.dart';
 import 'package:finny/features/minigames/frisbee/frisbee_screen.dart';
 import 'package:finny/features/onboarding/onboarding_screen.dart';
+import 'package:finny/features/onboarding/how_to_play_screen.dart';
 import 'package:finny/features/period_summary/period_summary_screen.dart';
 import 'package:finny/features/pet_creation/pet_creation_screen.dart';
 import 'package:finny/features/progress/progress_screen.dart';
+import 'package:finny/features/progress/progress_overview_screen.dart';
 import 'package:finny/features/savings/savings_screen.dart';
 import 'package:finny/features/settings/settings_screen.dart';
 import 'package:finny/features/shop/shop_screen.dart';
@@ -139,6 +141,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(path: '/help', builder: (_, _) => const HelpScreen()),
+      GoRoute(path: '/how-to-play', builder: (_, _) => const HowToPlayScreen()),
+      GoRoute(
+        path: '/progress-overview',
+        builder: (_, _) => const ProgressOverviewScreen(),
+      ),
       GoRoute(path: '/adult', builder: (_, _) => const AdultScreen()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
     ],

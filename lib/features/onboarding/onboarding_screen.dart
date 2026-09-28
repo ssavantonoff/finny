@@ -2,6 +2,7 @@ import 'package:finny/app/bootstrap.dart';
 import 'package:finny/app/bootstrap_screen.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/features/onboarding/profile_name.dart';
+import 'package:finny/features/onboarding/finny_concepts.dart';
 import 'package:finny/features/onboarding/welcome_visuals.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
 import 'package:flutter/material.dart';
@@ -192,85 +193,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       const SizedBox(height: 6),
       const FinnyPreview(colorId: 'purple', patternId: 'plain', height: 100),
       const SizedBox(height: 8),
-      _conceptCard(
-        'Нужно',
-        'То, без чего Финни трудно обойтись.',
-        AppColors.need,
-        Icons.restaurant_rounded,
-      ),
-      const SizedBox(height: 10),
-      _conceptCard(
-        'Хочу',
-        'Приятные покупки, которые можно отложить.',
-        AppColors.want,
-        Icons.sports_baseball_rounded,
-      ),
-      const SizedBox(height: 10),
-      _conceptCard(
-        'Копилка',
-        'Монеты, которые ты сохраняешь для будущей цели.',
-        AppColors.savings,
-        Icons.savings_rounded,
-      ),
+      for (var index = 0; index < finnyConcepts.length; index++) ...[
+        if (index > 0) const SizedBox(height: 10),
+        FinnyConceptCard(concept: finnyConcepts[index]),
+      ],
     ],
-  );
-
-  Widget _conceptCard(
-    String title,
-    String description,
-    Color accent,
-    IconData icon,
-  ) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    decoration: BoxDecoration(
-      color: Color.lerp(Colors.white, accent, 0.09),
-      borderRadius: BorderRadius.circular(24),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x14716CD5),
-          blurRadius: 12,
-          offset: Offset(0, 5),
-        ),
-      ],
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Icon(icon, size: 30, color: accent),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: accent,
-                ),
-              ),
-              Text(
-                description,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.2,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
   );
 
   Widget _nameStep(BootstrapState state, ProfileName name) => Column(

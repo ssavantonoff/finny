@@ -23,6 +23,25 @@ class SettingsScreen extends StatelessWidget {
               Card(
                 color: Colors.white.withValues(alpha: 0.94),
                 child: ListTile(
+                  key: const Key('settings-how-to-play'),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.medium,
+                    vertical: AppSpacing.small,
+                  ),
+                  leading: const _SettingsIcon(Icons.lightbulb_rounded),
+                  title: const Text('Как играть'),
+                  subtitle: const Text('Нужно, Хочу и Копилка'),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.primary,
+                  ),
+                  onTap: () => context.push('/how-to-play'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.small),
+              Card(
+                color: Colors.white.withValues(alpha: 0.94),
+                child: ListTile(
                   key: const Key('settings-help'),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.medium,
@@ -36,6 +55,25 @@ class SettingsScreen extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                   onTap: () => context.push('/help'),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.small),
+              Card(
+                color: Colors.white.withValues(alpha: 0.94),
+                child: ListTile(
+                  key: const Key('settings-progress-overview'),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.medium,
+                    vertical: AppSpacing.small,
+                  ),
+                  leading: const _SettingsIcon(Icons.insights_rounded),
+                  title: const Text('Прогресс'),
+                  subtitle: const Text('Задания, цель и последний день'),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.primary,
+                  ),
+                  onTap: () => context.push('/progress-overview'),
                 ),
               ),
               const SizedBox(height: AppSpacing.small),
