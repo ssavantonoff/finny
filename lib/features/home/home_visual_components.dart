@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:finny/core/theme/app_theme.dart';
@@ -213,26 +214,106 @@ class FinnyNameBadge extends StatelessWidget {
   );
 }
 
-class FinnyRoomScene extends StatelessWidget {
+class FinnyRoomScene extends StatefulWidget {
   const FinnyRoomScene({
     super.key,
     required this.pet,
     this.showBackground = true,
     this.equippedAccessories = const {},
     this.completedGoals = const [],
+    this.petReactionToken = 0,
   });
 
   final Pet pet;
   final bool showBackground;
   final Map<ShopEquipSlot, String> equippedAccessories;
   final List<CompletedGoal> completedGoals;
+  final int petReactionToken;
+
+  @override
+  State<FinnyRoomScene> createState() => _FinnyRoomSceneState();
+}
+
+class _FinnyRoomSceneState extends State<FinnyRoomScene>
+    with TickerProviderStateMixin {
+  late final AnimationController _idle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3000),
+  )..addStatusListener(_idleStatus);
+  late final AnimationController _petReaction = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
+  );
+  Timer? _idleTimer;
+  bool _animationsDisabled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disabled = MediaQuery.disableAnimationsOf(context);
+    if (disabled == _animationsDisabled && _idleTimer != null) return;
+    _animationsDisabled = disabled;
+    _idleTimer?.cancel();
+    if (disabled) {
+      _idle.stop();
+      _idle.value = 0;
+      _petReaction.stop();
+      _petReaction.value = 0;
+    } else {
+      _idleTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted && !_animationsDisabled) _idle.forward();
+      });
+    }
+  }
+
+  void _idleStatus(AnimationStatus status) {
+    if (_animationsDisabled || !mounted) return;
+    if (status == AnimationStatus.completed ||
+        status == AnimationStatus.dismissed) {
+      _idleTimer?.cancel();
+      _idleTimer = Timer(const Duration(milliseconds: 16), () {
+        if (!mounted || _animationsDisabled) return;
+        if (status == AnimationStatus.completed) {
+          _idle.reverse();
+        } else {
+          _idle.forward();
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant FinnyRoomScene oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.petReactionToken > oldWidget.petReactionToken &&
+        !_animationsDisabled) {
+      _petReaction.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _idleTimer?.cancel();
+    _idle.dispose();
+    _petReaction.dispose();
+    super.dispose();
+  }
+
+  double get _reactionScale => TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 1, end: 1.03), weight: 40),
+    TweenSequenceItem(tween: Tween(begin: 1.03, end: 0.99), weight: 35),
+    TweenSequenceItem(tween: Tween(begin: 0.99, end: 1), weight: 25),
+  ]).transform(_petReaction.value);
 
   @override
   Widget build(BuildContext context) {
+    final pet = widget.pet;
     final stage = pet.developmentStage.clamp(1, 3);
-    final accessories = HomeRoomVisual.accessoriesFor(equippedAccessories);
+    final accessories = HomeRoomVisual.accessoriesFor(
+      widget.equippedAccessories,
+    );
     final rewards = HomeRoomVisual.rewardsFor(
-      completedGoals,
+      widget.completedGoals,
       profileId: pet.profileId,
     );
     final roomHeight = (MediaQuery.sizeOf(context).height * 0.43).clamp(
@@ -246,44 +327,81 @@ class FinnyRoomScene extends StatelessWidget {
           2 => 0.69,
           _ => 0.76,
         };
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadii.scene),
-      child: SizedBox(
-        key: const Key('home-room-scene'),
-        height: showBackground ? roomHeight : finnyHeight,
-        width: double.infinity,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final aspect = HomeRoomVisual.petAspectRatio(stage);
-            // Claimed decor has its own side lanes, outside the pet canvas.
-            final canvasWidth = math.min(
-              finnyHeight * aspect,
-              constraints.maxWidth * (rewards.isEmpty ? 1.0 : 0.60),
-            );
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                if (showBackground)
-                  Image.asset(
-                    'assets/images/home/room_base.png',
-                    key: const Key('home-room-background'),
-                    fit: BoxFit.cover,
-                    alignment: Alignment.topCenter,
-                  ),
-                for (final reward in rewards)
-                  Positioned.fromRect(
-                    rect: _scaledRect(reward.placement, constraints.biggest),
-                    child: Image.asset(
-                      reward.asset,
-                      key: Key('home-reward-${reward.rewardAssetId}'),
-                      fit: BoxFit.contain,
-                      excludeFromSemantics: true,
+    final scene = SizedBox(
+      key: const Key('home-room-scene'),
+      height: widget.showBackground ? roomHeight : finnyHeight,
+      width: double.infinity,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final aspect = HomeRoomVisual.petAspectRatio(stage);
+          // Keep space on both sides for claimed room objects.
+          final canvasWidth = math.min(
+            finnyHeight * aspect,
+            constraints.maxWidth * (rewards.isEmpty ? 1.0 : 0.60),
+          );
+          return Stack(
+            clipBehavior: Clip.none,
+            fit: StackFit.expand,
+            children: [
+              if (widget.showBackground)
+                Image.asset(
+                  'assets/images/home/room_base.png',
+                  key: const Key('home-room-background'),
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                ),
+              for (final reward in HomeRoomVisual.rewards)
+                Positioned.fromRect(
+                  rect: _scaledRect(reward.placement, constraints.biggest),
+                  child: AnimatedSwitcher(
+                    layoutBuilder: (current, previous) => Stack(
+                      fit: StackFit.expand,
+                      children: [...previous, ?current],
                     ),
+                    duration: _animationsDisabled
+                        ? Duration.zero
+                        : const Duration(milliseconds: 300),
+                    transitionBuilder: (child, animation) => FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(
+                        scale: Tween<double>(
+                          begin: 0.94,
+                          end: 1,
+                        ).animate(animation),
+                        child: child,
+                      ),
+                    ),
+                    child: rewards.contains(reward)
+                        ? Image.asset(
+                            reward.asset,
+                            key: Key('home-reward-${reward.rewardAssetId}'),
+                            fit: BoxFit.contain,
+                            excludeFromSemantics: true,
+                          )
+                        : SizedBox(
+                            key: Key(
+                              'home-reward-empty-${reward.rewardAssetId}',
+                            ),
+                          ),
                   ),
-                Align(
-                  alignment: showBackground
-                      ? const Alignment(0, 0.87)
-                      : Alignment.bottomCenter,
+                ),
+              Align(
+                alignment: widget.showBackground
+                    ? const Alignment(0, 0.87)
+                    : Alignment.bottomCenter,
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([_idle, _petReaction]),
+                  builder: (context, child) {
+                    final sway = Curves.easeInOut.transform(_idle.value);
+                    return Transform.translate(
+                      key: const Key('home-finny-motion'),
+                      offset: Offset(0, -3 * sway),
+                      child: Transform.scale(
+                        scale: (1 + 0.012 * sway) * _reactionScale,
+                        child: child,
+                      ),
+                    );
+                  },
                   child: SizedBox(
                     key: const Key('home-finny-canvas'),
                     width: canvasWidth,
@@ -293,31 +411,44 @@ class FinnyRoomScene extends StatelessWidget {
                         clipBehavior: Clip.none,
                         fit: StackFit.expand,
                         children: [
-                          for (final visual in accessories.where(
-                            (v) => v.behindPet,
-                          ))
-                            _accessory(visual, stage, canvas.biggest),
+                          _accessorySlot(
+                            HomeRoomVisual.accessories.last,
+                            accessories,
+                            stage,
+                            canvas.biggest,
+                          ),
                           Image.asset(
                             FinnyVisual.assetForPet(pet),
                             key: Key('home-finny-stage-$stage'),
                             fit: BoxFit.contain,
                             semanticLabel: FinnyVisual.descriptionForPet(pet),
                           ),
-                          for (final visual in accessories.where(
+                          for (final visual in HomeRoomVisual.accessories.where(
                             (v) => !v.behindPet,
                           ))
-                            _accessory(visual, stage, canvas.biggest),
+                            _accessorySlot(
+                              visual,
+                              accessories,
+                              stage,
+                              canvas.biggest,
+                            ),
                         ],
                       ),
                     ),
                   ),
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
+    return widget.showBackground
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.scene),
+            child: scene,
+          )
+        : scene;
   }
 
   static Rect _scaledRect(Rect rect, Size canvas) => Rect.fromLTWH(
@@ -327,19 +458,68 @@ class FinnyRoomScene extends StatelessWidget {
     rect.height * canvas.height,
   );
 
-  static Widget _accessory(
+  Widget _accessorySlot(
     HomeAccessoryVisual visual,
+    List<HomeAccessoryVisual> equipped,
     int stage,
     Size canvas,
   ) => Positioned.fromRect(
     rect: _scaledRect(visual.anchorFor(stage), canvas),
-    child: Image.asset(
-      visual.asset,
-      key: Key('home-accessory-${visual.itemId}'),
-      fit: BoxFit.fill,
-      excludeFromSemantics: true,
+    child: AnimatedSwitcher(
+      layoutBuilder: (current, previous) =>
+          Stack(fit: StackFit.expand, children: [...previous, ?current]),
+      duration: _animationsDisabled
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.97, end: 1).animate(animation),
+          child: child,
+        ),
+      ),
+      child: equipped.contains(visual)
+          ? visual.itemId == 'accessory_bow'
+                ? ClipPath(
+                    clipper: const _HeadphoneFaceClipper(),
+                    child: Image.asset(
+                      visual.asset,
+                      key: Key('home-accessory-${visual.itemId}'),
+                      fit: BoxFit.fill,
+                      excludeFromSemantics: true,
+                    ),
+                  )
+                : Image.asset(
+                    visual.asset,
+                    key: Key('home-accessory-${visual.itemId}'),
+                    fit: visual.behindPet ? BoxFit.fill : BoxFit.contain,
+                    excludeFromSemantics: true,
+                  )
+          : SizedBox(key: Key('home-accessory-empty-${visual.itemId}')),
     ),
   );
+}
+
+/// Lets the face appear in front of the inner edges of the ear cups.
+class _HeadphoneFaceClipper extends CustomClipper<Path> {
+  const _HeadphoneFaceClipper();
+
+  @override
+  Path getClip(Size size) => Path.combine(
+    PathOperation.difference,
+    Path()..addRect(Offset.zero & size),
+    Path()..addOval(
+      Rect.fromLTWH(
+        size.width * 0.30,
+        size.height * 0.57,
+        size.width * 0.40,
+        size.height * 0.72,
+      ),
+    ),
+  );
+
+  @override
+  bool shouldReclip(covariant _HeadphoneFaceClipper oldClipper) => false;
 }
 
 class HomeGoalCard extends StatelessWidget {

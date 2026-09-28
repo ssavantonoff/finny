@@ -490,6 +490,38 @@ void main() {
       );
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets('reset and delete dialogs fit $size without mutation', (
+      tester,
+    ) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final management = _AdultDataManagementFake();
+      await _pumpAdult(tester, _games(), dataManagement: management);
+      await _unlock(tester);
+      for (final (action, dialog) in [
+        ('adult-reset-progress', 'adult-reset-dialog'),
+        ('adult-delete-profile', 'adult-delete-dialog'),
+      ]) {
+        await tester.scrollUntilVisible(find.byKey(Key(action)), 300);
+        await tester.drag(find.byType(ListView), const Offset(0, -180));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(Key(action)));
+        await tester.pumpAndSettle();
+        final rect = tester.getRect(find.byKey(Key(dialog)));
+        expect(rect.left, greaterThanOrEqualTo(0));
+        expect(rect.right, lessThanOrEqualTo(size.width));
+        expect(rect.top, greaterThanOrEqualTo(0));
+        expect(rect.bottom, lessThanOrEqualTo(size.height));
+        await tester.tap(find.text('Отмена'));
+        await tester.pumpAndSettle();
+      }
+      expect(management.resetCalls, 0);
+      expect(management.deleteCalls, 0);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('reset confirmation can be cancelled without mutation', (
@@ -517,6 +549,21 @@ void main() {
     );
     expect(find.text('Отмена'), findsOneWidget);
     expect(find.text('Сбросить прогресс'), findsOneWidget);
+    final resetDialog = find.byKey(const Key('adult-reset-dialog'));
+    expect(resetDialog, findsOneWidget);
+    final dialog = tester.widget<Dialog>(resetDialog);
+    expect(dialog.backgroundColor, Colors.white);
+    expect(dialog.surfaceTintColor, Colors.transparent);
+    expect(
+      (dialog.shape as RoundedRectangleBorder).borderRadius,
+      BorderRadius.circular(28),
+    );
+    expect(
+      tester
+          .getSize(find.widgetWithText(FilledButton, 'Сбросить прогресс'))
+          .height,
+      greaterThanOrEqualTo(48),
+    );
 
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();
@@ -548,6 +595,20 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Удалить профиль'), findsOneWidget);
+    expect(find.byKey(const Key('adult-delete-dialog')), findsOneWidget);
+    final deleteButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Удалить профиль'),
+    );
+    expect(
+      deleteButton.style!.backgroundColor!.resolve({}),
+      Colors.red.shade700,
+    );
+    expect(
+      tester
+          .getSize(find.widgetWithText(FilledButton, 'Удалить профиль'))
+          .height,
+      greaterThanOrEqualTo(48),
+    );
 
     await tester.tap(find.text('Отмена'));
     await tester.pumpAndSettle();

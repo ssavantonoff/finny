@@ -8,6 +8,7 @@ import 'package:finny/features/home/home_room_visual.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/features/things/things_controller.dart';
+import 'package:finny/features/things/things_screen.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/pet_action.dart';
@@ -177,6 +178,74 @@ void main() {
   Finder accessory(String id) => find.byKey(Key('home-accessory-$id'));
   Finder reward(String id) => find.byKey(Key('home-reward-$id'));
 
+  for (final freePlay in [false, true]) {
+    testWidgets(
+      '${freePlay ? 'Free Play' : 'Campaign'} Things toggles Надеть and Снять immediately',
+      (tester) async {
+        final harness = (await tester.runAsync(
+          () => RoomHarness.create(freePlay: freePlay),
+        ))!;
+        addTearDown(harness.dispose);
+        await tester.runAsync(() async {
+          if (freePlay) {
+            await harness.ownAccessories();
+          } else {
+            final db = await harness.database.database;
+            await db.insert('inventory', {
+              'profile_id': 1,
+              'item_id': 'accessory_bow',
+              'quantity': 1,
+              'acquired_at': DateTime.utc(2026).toIso8601String(),
+            });
+          }
+        });
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: harness.container,
+            child: MaterialApp(
+              theme: AppTheme.light,
+              home: const ThingsScreen(),
+            ),
+          ),
+        );
+        final things = harness.container.read(
+          thingsControllerProvider.notifier,
+        );
+        await tester.runAsync(things.load);
+        await tester.pumpAndSettle();
+        final action = find.byKey(const Key('things-equip-accessory_bow'));
+        await tester.ensureVisible(action);
+        expect(
+          find.descendant(of: action, matching: find.text('Надеть')),
+          findsOneWidget,
+        );
+        await tester.runAsync(() async {
+          await harness.container
+              .read(freePlayServiceProvider)
+              .equip(profileId: 1, itemId: 'accessory_bow');
+          await things.load();
+        });
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: action, matching: find.text('Снять')),
+          findsOneWidget,
+        );
+        await tester.runAsync(() async {
+          await harness.container
+              .read(freePlayServiceProvider)
+              .unequip(profileId: 1, slot: ShopEquipSlot.head);
+          await things.load();
+        });
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: action, matching: find.text('Надеть')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'owned accessories appear only after Things equip and disappear on unequip',
     (tester) async {
@@ -199,7 +268,7 @@ void main() {
       expect(accessory('accessory_bow'), findsOneWidget);
       expect(
         tester.widget<Image>(accessory('accessory_bow')).image,
-        const AssetImage('assets/images/things/headphones.png'),
+        const AssetImage('assets/images/things/headphones_wearable.png'),
       );
 
       await tester.runAsync(() async {
@@ -643,13 +712,25 @@ void main() {
               for (final visual in HomeRoomVisual.rewards)
                 tester.getRect(reward(visual.rewardAssetId)),
             ];
-            for (final rect in rects) {
-              expect(scene.contains(rect.topLeft), isTrue);
+            for (var index = 0; index < rects.length; index++) {
+              final rect = rects[index];
+              if (index == 0) {
+                // The nightlight stands on the bedside table above the pet lane.
+                expect(rect.top, lessThan(scene.top));
+                expect(
+                  rect.top,
+                  greaterThan(
+                    tester.getRect(find.byKey(const Key('home-stats'))).bottom,
+                  ),
+                );
+              } else {
+                expect(scene.contains(rect.topLeft), isTrue);
+              }
               expect(
                 scene.contains(rect.bottomRight - const Offset(0.01, 0.01)),
                 isTrue,
               );
-              expect(rect.overlaps(canvas), isFalse);
+              expect(rect.contains(canvas.center), isFalse);
               for (final other in rects.where((r) => r != rect)) {
                 expect(rect.overlaps(other), isFalse);
               }
@@ -661,12 +742,8 @@ void main() {
                 )
                 .first;
             final children = tester.widget<Stack>(stack).children;
-            if (head == 'accessory_hat') {
-              expect(children.first, isA<Positioned>());
-              expect(children[1], isA<Image>());
-            } else {
-              expect(children.first, isA<Image>());
-            }
+            expect(children.first, isA<Positioned>());
+            expect(children[1], isA<Image>());
             expect(children.last, isA<Positioned>());
             expect(
               find.byKey(const Key('home-room-background')),

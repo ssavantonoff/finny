@@ -164,7 +164,7 @@ Home, мини-игры, Progress и Finale используют сохранё�
 Рост меняет стадию, сохраняя цвет и узор, без дополнительного поля в SQLite.
 
 Home snapshot дополнительно читает экипировку через `FreePlayService.equipped`
-(только в Free Play) и claimed rewards через `GameRepository.getCompletedGoals`.
+(в Campaign и Free Play) и claimed rewards через `GameRepository.getCompletedGoals`.
 Эти immutable поля сохраняются в `HomeReady.copyWith`; смена профиля запускает
 новую загрузку, а устаревшая generation не публикуется. `FinnyRoomScene` и текст
 коллекции используют один snapshot и mapping `HomeRoomVisual`: крылья позади
@@ -173,12 +173,11 @@ Home snapshot дополнительно читает экипировку че�
 цель сама по себе декор не включает. Декор занимает отдельные боковые области
 сцены, привязки аксессуаров нормализованы для Stage 1/2/3. Unknown IDs игнорируются.
 
-`glasses.png` и `wings.png` извлечены из production `accessories_sheet.png`
-(2172×724), без перерисовки и изменения исходного sheet. Основные alpha-компоненты
-с шестипиксельным запасом для antialiasing ограничены source bounding boxes
-`(713,267)-(1429,593)` и `(1409,165)-(2155,611)`; соседние предметы исключены
-прозрачной маской. Наушники используют существующий `headphones.png`, награды —
-существующие PNG из `assets/images/goals/` через `SavingsGoalVisual`.
+Home использует утверждённые прозрачные wearable PNG
+`headphones_wearable.png` и `glasses_wearable.png`; изображения магазина остаются
+отдельными. Крылья используют прежний `wings.png` позади Финни. Награды берутся
+из `assets/images/goals/` через `SavingsGoalVisual` и размещаются по фиксированным
+координатам независимо от порядка получения.
 
 ## Как добавлять feature
 

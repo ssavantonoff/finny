@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/core/visual/finny_flow_visuals.dart';
+import 'package:finny/core/visual/finny_modal_actions.dart';
 import 'package:finny/features/adult/adult_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -339,22 +340,15 @@ class _AdultOverviewContent extends ConsumerWidget {
   Future<void> _confirmReset(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Сбросить игровой прогресс?'),
-        content: const Text(
-          'Дни, монеты, накопления, покупки и задания будут удалены. '
-          'Имя профиля и внешний вид Финни сохранятся.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Сбросить прогресс'),
-          ),
-        ],
+      builder: (dialogContext) => _AdultConfirmDialog(
+        icon: Icons.restart_alt_rounded,
+        title: 'Сбросить игровой прогресс?',
+        body:
+            'Дни, монеты, накопления, покупки и задания будут удалены. '
+            'Имя профиля и внешний вид Финни сохранятся.',
+        confirmLabel: 'Сбросить прогресс',
+        onCancel: () => Navigator.of(dialogContext).pop(false),
+        onConfirm: () => Navigator.of(dialogContext).pop(true),
       ),
     );
     if (confirmed != true || !context.mounted) return;
@@ -370,22 +364,16 @@ class _AdultOverviewContent extends ConsumerWidget {
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Удалить локальный профиль?'),
-        content: const Text(
-          'Будут удалены профиль, Финни и весь игровой прогресс на этом '
-          'устройстве. После удаления восстановить данные нельзя.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Удалить профиль'),
-          ),
-        ],
+      builder: (dialogContext) => _AdultConfirmDialog(
+        icon: Icons.delete_forever_rounded,
+        title: 'Удалить локальный профиль?',
+        body:
+            'Будут удалены профиль, Финни и весь игровой прогресс на этом '
+            'устройстве. После удаления восстановить данные нельзя.',
+        confirmLabel: 'Удалить профиль',
+        destructive: true,
+        onCancel: () => Navigator.of(dialogContext).pop(false),
+        onConfirm: () => Navigator.of(dialogContext).pop(true),
       ),
     );
     if (confirmed != true || !context.mounted) return;
@@ -397,6 +385,100 @@ class _AdultOverviewContent extends ConsumerWidget {
     ref.read(activeProfileIdProvider.notifier).clear();
     context.go('/startup');
   }
+}
+
+class _AdultConfirmDialog extends StatelessWidget {
+  const _AdultConfirmDialog({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.confirmLabel,
+    required this.onCancel,
+    required this.onConfirm,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+  final String confirmLabel;
+  final VoidCallback onCancel;
+  final VoidCallback onConfirm;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+    key: Key(destructive ? 'adult-delete-dialog' : 'adult-reset-dialog'),
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 30,
+              backgroundColor: destructive
+                  ? const Color(0xFFFFE8E8)
+                  : AppColors.primaryLight,
+              child: Icon(
+                icon,
+                size: 30,
+                color: destructive ? Colors.red.shade700 : AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              body,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                height: 1.4,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton(
+                style: destructive
+                    ? FinnyModalActions.primary.copyWith(
+                        backgroundColor: WidgetStatePropertyAll(
+                          Colors.red.shade700,
+                        ),
+                      )
+                    : FinnyModalActions.primary,
+                onPressed: onConfirm,
+                child: Text(confirmLabel),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: TextButton(
+                style: FinnyModalActions.secondary,
+                onPressed: onCancel,
+                child: const Text('Отмена'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _SectionCard extends StatelessWidget {

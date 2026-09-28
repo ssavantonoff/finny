@@ -9,23 +9,23 @@ abstract final class HomeRoomVisual {
     HomeAccessoryVisual(
       itemId: 'accessory_bow',
       slot: ShopEquipSlot.head,
-      asset: 'assets/images/things/headphones.png',
+      asset: 'assets/images/things/headphones_wearable.png',
       behindPet: false,
       anchors: [
-        Rect.fromLTWH(0.09, 0.08, 0.82, 0.42),
-        Rect.fromLTWH(0.07, 0.04, 0.86, 0.39),
-        Rect.fromLTWH(0.06, 0.05, 0.88, 0.37),
+        Rect.fromLTWH(-0.19, 0.06, 1.38, 0.57),
+        Rect.fromLTWH(-0.17, 0.07, 1.34, 0.51),
+        Rect.fromLTWH(-0.16, 0.08, 1.32, 0.48),
       ],
     ),
     HomeAccessoryVisual(
       itemId: 'accessory_collar',
       slot: ShopEquipSlot.neck,
-      asset: 'assets/images/things/glasses.png',
+      asset: 'assets/images/things/glasses_wearable.png',
       behindPet: false,
       anchors: [
-        Rect.fromLTWH(0.23, 0.45, 0.54, 0.22),
-        Rect.fromLTWH(0.21, 0.39, 0.58, 0.22),
-        Rect.fromLTWH(0.20, 0.39, 0.60, 0.22),
+        Rect.fromLTWH(0.25, 0.48, 0.50, 0.20),
+        Rect.fromLTWH(0.24, 0.44, 0.52, 0.20),
+        Rect.fromLTWH(0.23, 0.43, 0.54, 0.20),
       ],
     ),
     HomeAccessoryVisual(
@@ -45,17 +45,17 @@ abstract final class HomeRoomVisual {
     HomeRewardVisual(
       goalId: 'goal_night_light',
       rewardAssetId: 'reward_night_light',
-      placement: Rect.fromLTWH(0.01, 0.20, 0.17, 0.27),
+      placement: Rect.fromLTWH(0.12, -0.22, 0.20, 0.36),
     ),
     HomeRewardVisual(
       goalId: 'goal_scooter',
       rewardAssetId: 'reward_scooter',
-      placement: Rect.fromLTWH(0.00, 0.60, 0.19, 0.36),
+      placement: Rect.fromLTWH(0.00, 0.58, 0.34, 0.40),
     ),
     HomeRewardVisual(
       goalId: 'goal_play_house',
       rewardAssetId: 'reward_play_house',
-      placement: Rect.fromLTWH(0.81, 0.48, 0.19, 0.36),
+      placement: Rect.fromLTWH(0.65, 0.10, 0.35, 0.72),
     ),
   ];
 

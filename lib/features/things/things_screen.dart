@@ -378,7 +378,7 @@ class _ItemCard extends StatelessWidget {
     final actionLabel = isToy
         ? 'Играть'
         : isAccessory
-        ? state.equipped[item.equipSlot] == item.id && state.freePlay
+        ? state.equipped[item.equipSlot] == item.id
               ? 'Снять'
               : 'Надеть'
         : 'Использовать';

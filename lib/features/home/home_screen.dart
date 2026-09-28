@@ -369,6 +369,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _incomeSheetOpen = false;
   bool _eventDialogOpen = false;
   String? _eventLoadKey;
+  int _petReactionToken = 0;
+
+  Future<void> _pet(FreePetInteraction interaction) async {
+    final succeeded = await ref
+        .read(homeControllerProvider.notifier)
+        .performFreeInteraction(interaction);
+    if (succeeded && mounted) {
+      setState(() => _petReactionToken++);
+    }
+  }
 
   bool get _isHomeVisible {
     if (!mounted) return false;
@@ -690,10 +700,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       HomeReady(freePlay: true) => _FreePlayHome(
         state: state,
         controller: controller,
+        petReactionToken: _petReactionToken,
+        onPet: _pet,
       ),
       HomeReady() => _HomeContent(
         state: state,
         controller: controller,
+        petReactionToken: _petReactionToken,
+        onPet: _pet,
         onStartDay: _startDay,
         onFinishDay: _finishDay,
         onOpenBowl: _openBowlPurchase,
@@ -704,9 +718,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 class _FreePlayHome extends StatelessWidget {
-  const _FreePlayHome({required this.state, required this.controller});
+  const _FreePlayHome({
+    required this.state,
+    required this.controller,
+    required this.petReactionToken,
+    required this.onPet,
+  });
   final HomeReady state;
   final HomeController controller;
+  final int petReactionToken;
+  final Future<void> Function(FreePetInteraction) onPet;
 
   (int, int, int, int) get _collection {
     final canonicalIds = state.goals.map((goal) => goal.id).toSet();
@@ -749,6 +770,7 @@ class _FreePlayHome extends StatelessWidget {
               showBackground: false,
               equippedAccessories: state.equippedAccessories,
               completedGoals: state.completedGoals,
+              petReactionToken: petReactionToken,
             ),
             Center(
               child: FinnyNameBadge(
@@ -764,9 +786,7 @@ class _FreePlayHome extends StatelessWidget {
                 style: _petActionStyle(context, compact: compact),
                 onPressed: state.interacting
                     ? null
-                    : () => controller.performFreeInteraction(
-                        FreePetInteraction.pet,
-                      ),
+                    : () => onPet(FreePetInteraction.pet),
                 icon: const Icon(Icons.favorite_outline),
                 label: const Text('Погладить'),
               ),
@@ -921,6 +941,8 @@ class _HomeContent extends StatelessWidget {
   const _HomeContent({
     required this.state,
     required this.controller,
+    required this.petReactionToken,
+    required this.onPet,
     required this.onStartDay,
     required this.onFinishDay,
     required this.onOpenBowl,
@@ -928,6 +950,8 @@ class _HomeContent extends StatelessWidget {
 
   final HomeReady state;
   final HomeController controller;
+  final int petReactionToken;
+  final Future<void> Function(FreePetInteraction) onPet;
   final VoidCallback onStartDay;
   final VoidCallback onFinishDay;
   final VoidCallback onOpenBowl;
@@ -1005,6 +1029,7 @@ class _HomeContent extends StatelessWidget {
                 showBackground: false,
                 completedGoals: state.completedGoals,
                 equippedAccessories: state.equippedAccessories,
+                petReactionToken: petReactionToken,
               ),
               Center(
                 child: FinnyNameBadge(
@@ -1019,9 +1044,7 @@ class _HomeContent extends StatelessWidget {
                   key: const Key('home-free-pet'),
                   style: _petActionStyle(context, compact: compact),
                   onPressed: canPet
-                      ? () => controller.performFreeInteraction(
-                          FreePetInteraction.pet,
-                        )
+                      ? () => onPet(FreePetInteraction.pet)
                       : null,
                   icon: const Icon(Icons.favorite_outline),
                   label: Text(
