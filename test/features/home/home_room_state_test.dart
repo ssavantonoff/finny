@@ -10,6 +10,7 @@ import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/features/things/things_controller.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
@@ -364,33 +365,121 @@ void main() {
     },
   );
 
-  test(
-    'Campaign still rejects equip and hides legacy Free Play equip state',
-    () async {
-      final harness = await RoomHarness.create(freePlay: false);
+  testWidgets(
+    'Campaign accessories stay unequipped until toggled and persist by slot',
+    (tester) async {
+      final harness = (await tester.runAsync(
+        () => RoomHarness.create(freePlay: false),
+      ))!;
       addTearDown(harness.dispose);
-      final db = await harness.database.database;
-      await db.insert('inventory', {
-        'profile_id': 1,
-        'item_id': 'accessory_bow',
-        'quantity': 1,
-        'acquired_at': DateTime.utc(2026).toIso8601String(),
+      await tester.runAsync(() async {
+        await expectLater(
+          harness.container
+              .read(freePlayServiceProvider)
+              .equip(profileId: 1, itemId: 'accessory_bow'),
+          throwsA(isA<PetItemNotOwnedException>()),
+        );
+        final db = await harness.database.database;
+        for (final itemId in [
+          'accessory_bow',
+          'accessory_hat',
+          'accessory_collar',
+        ]) {
+          await db.insert('inventory', {
+            'profile_id': 1,
+            'item_id': itemId,
+            'quantity': 1,
+            'acquired_at': DateTime.utc(2026).toIso8601String(),
+          });
+        }
       });
-      await db.insert('free_play_equipped_accessories', {
-        'profile_id': 1,
-        'slot': 'head',
-        'item_id': 'accessory_bow',
-      });
-      await expectLater(
-        harness.container
-            .read(freePlayServiceProvider)
-            .equip(profileId: 1, itemId: 'accessory_bow'),
-        throwsStateError,
-      );
-      await harness.home.load();
+      await mount(tester, harness);
       expect(harness.ready.freePlay, isFalse);
       expect(harness.ready.equippedAccessories, isEmpty);
-      await harness.claim('goal_night_light');
+      expect(accessory('accessory_bow'), findsNothing);
+
+      final things = harness.container.read(thingsControllerProvider.notifier);
+      final bow = harness.ready.shopItems.singleWhere(
+        (item) => item.id == 'accessory_bow',
+      );
+      final hat = harness.ready.shopItems.singleWhere(
+        (item) => item.id == 'accessory_hat',
+      );
+      final collar = harness.ready.shopItems.singleWhere(
+        (item) => item.id == 'accessory_collar',
+      );
+      await tester.runAsync(() async {
+        await things.load();
+        expect(things.state.freePlay, isFalse);
+        expect(things.state.quantityOf(bow.id), 1);
+        await things.toggleAccessory(bow);
+        await things.toggleAccessory(collar);
+        await things.toggleAccessory(hat);
+        await harness.home.load();
+      });
+      await tester.pumpAndSettle();
+      expect(accessory('accessory_bow'), findsNothing);
+      expect(accessory('accessory_hat'), findsOneWidget);
+      expect(accessory('accessory_collar'), findsOneWidget);
+      expect(harness.ready.equippedAccessories, {
+        ShopEquipSlot.head: 'accessory_hat',
+        ShopEquipSlot.neck: 'accessory_collar',
+      });
+
+      await tester.runAsync(() async {
+        await things.toggleAccessory(hat);
+        await harness.home.load();
+      });
+      await tester.pumpAndSettle();
+      expect(accessory('accessory_hat'), findsNothing);
+      expect(accessory('accessory_collar'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(() async {
+        harness.container.dispose();
+        harness.restart();
+        await harness.home.load();
+        expect(harness.ready.equippedAccessories, {
+          ShopEquipSlot.neck: 'accessory_collar',
+        });
+        final db = await harness.database.database;
+        final periods = await harness.content.loadPeriods();
+        for (final period in periods) {
+          await db.insert('game_periods', {
+            'profile_id': 1,
+            'definition_id': period.id,
+            'period_number': period.number,
+            'start_wallet_balance': 100,
+            'status': 'completed',
+            'created_at': DateTime.utc(2026).toIso8601String(),
+            'completed_at': DateTime.utc(2026).toIso8601String(),
+          });
+        }
+        final lifecycle = harness.container.read(
+          campaignLifecycleServiceProvider,
+        );
+        await lifecycle.finishStory(1);
+        await lifecycle.startFreePlay(1);
+        await harness.home.load();
+        expect(harness.ready.freePlay, isTrue);
+        expect(harness.ready.equippedAccessories, {
+          ShopEquipSlot.neck: 'accessory_collar',
+        });
+        await harness.addProfile(2, freePlay: false);
+        harness.container
+            .read(activeProfileIdProvider.notifier)
+            .setActiveProfileId(2);
+        await harness.home.load();
+        expect(harness.ready.equippedAccessories, isEmpty);
+        harness.container
+            .read(activeProfileIdProvider.notifier)
+            .setActiveProfileId(1);
+        await harness.home.load();
+        expect(harness.ready.equippedAccessories, {
+          ShopEquipSlot.neck: 'accessory_collar',
+        });
+        await harness.claim('goal_night_light');
+      });
       expect(
         HomeRoomVisual.rewardsFor(harness.ready.completedGoals, profileId: 1),
         hasLength(1),

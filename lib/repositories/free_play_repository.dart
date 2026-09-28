@@ -42,11 +42,7 @@ class FreePlayRepository {
     };
   }
 
-  Future<void> equip({
-    required int profileId,
-    required ShopItem item,
-    required List<PeriodDefinition> definitions,
-  }) async {
+  Future<void> equip({required int profileId, required ShopItem item}) async {
     final slot = item.equipSlot;
     if (!item.persistent ||
         item.displaySection != ShopDisplaySection.accessories ||
@@ -55,7 +51,6 @@ class FreePlayRepository {
     }
     final db = await _database.database;
     await db.transaction((txn) async {
-      await _requireFreePlay(txn, profileId, definitions);
       final owned = await txn.query(
         'inventory',
         columns: ['quantity'],
@@ -77,11 +72,9 @@ class FreePlayRepository {
   Future<void> unequip({
     required int profileId,
     required ShopEquipSlot slot,
-    required List<PeriodDefinition> definitions,
   }) async {
     final db = await _database.database;
     await db.transaction((txn) async {
-      await _requireFreePlay(txn, profileId, definitions);
       await txn.delete(
         'free_play_equipped_accessories',
         where: 'profile_id = ? AND slot = ?',

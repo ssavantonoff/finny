@@ -461,9 +461,9 @@ class HomeController extends Notifier<HomeViewState> {
                 )
           : null;
 
-      final equippedAccessories = freePlay
-          ? await ref.read(freePlayServiceProvider).equipped(profileId)
-          : const <ShopEquipSlot, String>{};
+      final equippedAccessories = await ref
+          .read(freePlayServiceProvider)
+          .equipped(profileId);
       var ownedPersistentItemCount = 0;
       if (freePlay) {
         for (final item in shopItems.where((item) => item.persistent)) {

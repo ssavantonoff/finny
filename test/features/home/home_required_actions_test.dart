@@ -1,6 +1,8 @@
 import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
+import 'package:finny/core/visual/finny_modal_actions.dart';
 import 'package:finny/features/home/home_controller.dart';
+import 'package:finny/features/home/finny_sleep_dialog.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/models/content_entry.dart';
 import 'package:finny/models/pet.dart';
@@ -56,8 +58,11 @@ void main() {
     bool bedtime = false,
     int day = 1,
     bool legacyDayFiveCompleted = false,
+    Size size = const Size(360, 800),
+    int petSatiety = 80,
+    int walletBalance = 1000,
   }) async {
-    tester.view.physicalSize = const Size(360, 800);
+    tester.view.physicalSize = size;
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -86,7 +91,7 @@ void main() {
           patternId: 'plain',
           developmentStage: 1,
           growthPoints: 0,
-          satiety: 80,
+          satiety: petSatiety,
           care: 80,
           mood: 80,
         ),
@@ -114,8 +119,8 @@ void main() {
           checkpointId: checkpoint,
         );
       }
+      final db = await database.database;
       if (bedtime) {
-        final db = await database.database;
         await db.update(
           'game_periods',
           {'day_progress': 76},
@@ -123,6 +128,12 @@ void main() {
           whereArgs: [started.id],
         );
       }
+      await db.update(
+        'game_states',
+        {'wallet_balance': walletBalance},
+        where: 'profile_id = ?',
+        whereArgs: [profileId],
+      );
       if (legacyDayFiveCompleted) {
         final db = await database.database;
         await db.insert('task_progress', {
@@ -175,6 +186,20 @@ void main() {
             );
           })
         : null;
+    final dayOneBedtimeContent = day == 1 && petSatiety < 70
+        ? await tester.runAsync(() async {
+            final assets = AssetContentRepository();
+            return TestContentRepository([
+              PeriodDefinition(
+                id: 'period_1',
+                number: 1,
+                title: 'День 1',
+                baseIncome: 500,
+                requiredCheckpoints: required,
+              ),
+            ], shopItems: await assets.loadShopItems());
+          })
+        : null;
     final container = ProviderContainer(
       overrides: [
         appDatabaseProvider.overrideWithValue(database),
@@ -184,15 +209,16 @@ void main() {
         contentRepositoryProvider.overrideWithValue(
           day == 5
               ? dayFiveContent!
-              : TestContentRepository([
-                  PeriodDefinition(
-                    id: 'period_1',
-                    number: 1,
-                    title: 'День 1',
-                    baseIncome: 500,
-                    requiredCheckpoints: required,
-                  ),
-                ]),
+              : dayOneBedtimeContent ??
+                    TestContentRepository([
+                      PeriodDefinition(
+                        id: 'period_1',
+                        number: 1,
+                        title: 'День 1',
+                        baseIncome: 500,
+                        requiredCheckpoints: required,
+                      ),
+                    ]),
         ),
       ],
     );
@@ -211,6 +237,18 @@ void main() {
         GoRoute(
           path: '/budget',
           builder: (_, _) => const Scaffold(body: Text('Budget target')),
+        ),
+        GoRoute(
+          path: '/things',
+          builder: (_, _) => const Scaffold(body: Text('Things target')),
+        ),
+        GoRoute(
+          path: '/shop',
+          builder: (_, _) => const Scaffold(body: Text('Shop target')),
+        ),
+        GoRoute(
+          path: '/period-summary',
+          builder: (_, _) => const Scaffold(body: Text('Summary target')),
         ),
       ],
     );
@@ -525,4 +563,172 @@ void main() {
     expect(find.byKey(const Key('home-blocker-go-savings')), findsNothing);
     expect(find.text('Вернуться'), findsOneWidget);
   });
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('blocked bedtime dialog fits and routes at $size', (
+      tester,
+    ) async {
+      final fixture = await mountHome(tester, bedtime: true, size: size);
+      await tapVisible(tester, 'home-finish-day');
+      await waitFor(tester, find.text('Перед сном осталось важное дело'));
+      expect(find.text('Вернуться'), findsOneWidget);
+      expect(find.text('К заданию'), findsOneWidget);
+      expect(find.text('К накоплениям'), findsOneWidget);
+      expectFinnyDialogVisuals(tester);
+      for (final buttonFinder in [
+        find.widgetWithText(TextButton, 'Вернуться'),
+        find.widgetWithText(FilledButton, 'К заданию'),
+        find.widgetWithText(FilledButton, 'К накоплениям'),
+      ]) {
+        expect(tester.getSize(buttonFinder).height, greaterThanOrEqualTo(48));
+      }
+      final route = size.width == 360 ? '/tasks' : '/savings';
+      await tester.tap(
+        find.text(route == '/tasks' ? 'К заданию' : 'К накоплениям'),
+      );
+      await tester.pumpAndSettle();
+      expect(fixture.router.routeInformationProvider.value.uri.path, route);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('care bedtime dialog is Finny styled and routes at $size', (
+      tester,
+    ) async {
+      final fixture = await mountHome(
+        tester,
+        bedtime: true,
+        resolved: ['financial_task', 'savings_decision'],
+        petSatiety: 20,
+        walletBalance: 1000,
+        size: size,
+      );
+      await tapVisible(tester, 'home-finish-day');
+      await waitFor(tester, find.text('Финни ещё не готов спать'));
+      expect(find.text('Подними Сытость в зелёную зону.'), findsOneWidget);
+      expect(find.text('Вернуться'), findsOneWidget);
+      expect(find.text('Открыть Вещи'), findsOneWidget);
+      expect(find.text('Открыть Магазин'), findsOneWidget);
+      expectFinnyDialogVisuals(tester);
+      for (final buttonFinder in [
+        find.widgetWithText(TextButton, 'Вернуться'),
+        find.widgetWithText(FilledButton, 'Открыть Вещи'),
+        find.widgetWithText(TextButton, 'Открыть Магазин'),
+      ]) {
+        expect(tester.getSize(buttonFinder).height, greaterThanOrEqualTo(48));
+      }
+      final route = size.width == 360 ? '/things' : '/shop';
+      await tester.tap(
+        find.text(route == '/things' ? 'Открыть Вещи' : 'Открыть Магазин'),
+      );
+      await tester.pumpAndSettle();
+      expect(fixture.router.routeInformationProvider.value.uri.path, route);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('fallback bedtime dialog preserves finish action at $size', (
+      tester,
+    ) async {
+      final fixture = await mountHome(
+        tester,
+        bedtime: true,
+        resolved: ['financial_task', 'savings_decision'],
+        petSatiety: 20,
+        walletBalance: 0,
+        size: size,
+      );
+      await tapVisible(tester, 'home-finish-day');
+      await waitFor(tester, find.text('Сегодня Финни нужна помощь'));
+      expect(find.text('Вернуться'), findsOneWidget);
+      expect(find.text('Завершить день'), findsOneWidget);
+      expectFinnyDialogVisuals(tester);
+      await tester.tap(find.text('Завершить день'));
+      await tester.pump();
+      await waitFor(tester, find.text('Summary target'));
+      expect(
+        fixture.router.routeInformationProvider.value.uri.path,
+        '/period-summary',
+      );
+      expect(find.text('Summary target'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'too early bedtime dialog fits and uses purple actions at $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.light,
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: FilledButton(
+                    onPressed: () {
+                      showDialog<void>(
+                        context: context,
+                        builder: (_) => FinnyBedtimeDialog(
+                          icon: Icons.wb_sunny_rounded,
+                          title: 'Ещё рано спать',
+                          body: 'У Финни ещё есть время для дел и заботы. Вернись к нему позже.',
+                          actions: [
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: FilledButton(
+                                style: FinnyModalActions.primary,
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Хорошо'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: const Text('Open'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        expect(find.text('Ещё рано спать'), findsOneWidget);
+        expect(find.text('Хорошо'), findsOneWidget);
+        expectFinnyDialogVisuals(tester);
+        expect(
+          tester.getSize(find.widgetWithText(FilledButton, 'Хорошо')).height,
+          greaterThanOrEqualTo(48),
+        );
+        await tester.tap(find.text('Хорошо'));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+}
+
+void expectFinnyDialogVisuals(WidgetTester tester) {
+  final dialog = tester.widget<Dialog>(find.byType(Dialog));
+  expect(dialog.backgroundColor, Colors.white);
+  expect(dialog.surfaceTintColor, Colors.transparent);
+  for (final button in tester.widgetList<FilledButton>(
+    find.descendant(
+      of: find.byType(Dialog),
+      matching: find.byType(FilledButton),
+    ),
+  )) {
+    expect(
+      button.style?.backgroundColor?.resolve({}),
+      anyOf(AppColors.primary, AppColors.primaryLight),
+    );
+  }
+  for (final button in tester.widgetList<TextButton>(
+    find.descendant(of: find.byType(Dialog), matching: find.byType(TextButton)),
+  )) {
+    expect(button.style?.backgroundColor?.resolve({}), AppColors.primaryLight);
+  }
 }

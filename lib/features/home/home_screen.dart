@@ -412,15 +412,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.tooEarly:
         await showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Ещё рано спать'),
-            content: const Text(
-              'У Финни ещё есть время для дел и заботы. Вернись к нему позже.',
-            ),
+          builder: (context) => FinnyBedtimeDialog(
+            icon: Icons.wb_sunny_rounded,
+            title: 'Ещё рано спать',
+            body: 'У Финни ещё есть время для дел и заботы. Вернись к нему позже.',
             actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Хорошо'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  style: FinnyModalActions.primary,
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Хорошо'),
+                ),
               ),
             ],
           ),
@@ -429,29 +433,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.blockedByCheckpoints:
         final action = await showDialog<String>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Перед сном осталось важное дело'),
-            content: Text(
-              decision.unresolvedCheckpoints
-                  .map(_checkpointBlockerText)
-                  .join('\n\n'),
-            ),
+          builder: (context) => FinnyBedtimeDialog(
+            icon: Icons.checklist_rounded,
+            title: 'Перед сном осталось важное дело',
+            body: decision.unresolvedCheckpoints
+                .map(_checkpointBlockerText)
+                .join('\n\n'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Вернуться'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  style: FinnyModalActions.secondary,
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Вернуться'),
+                ),
               ),
               if (decision.unresolvedCheckpoints.contains('financial_task'))
-                FilledButton(
-                  key: const Key('home-blocker-go-task'),
-                  onPressed: () => Navigator.pop(context, 'tasks'),
-                  child: const Text('К заданию'),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    key: const Key('home-blocker-go-task'),
+                    style: FinnyModalActions.primary,
+                    onPressed: () => Navigator.pop(context, 'tasks'),
+                    child: const Text('К заданию'),
+                  ),
                 ),
               if (decision.unresolvedCheckpoints.contains('savings_decision'))
-                FilledButton(
-                  key: const Key('home-blocker-go-savings'),
-                  onPressed: () => Navigator.pop(context, 'savings'),
-                  child: const Text('К накоплениям'),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    key: const Key('home-blocker-go-savings'),
+                    style:
+                        decision.unresolvedCheckpoints.contains(
+                          'financial_task',
+                        )
+                        ? FinnyModalActions.secondary
+                        : FinnyModalActions.primary,
+                    onPressed: () => Navigator.pop(context, 'savings'),
+                    child: const Text('К накоплениям'),
+                  ),
                 ),
             ],
           ),
@@ -470,24 +493,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.carePossible:
         final action = await showDialog<String>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Финни ещё не готов спать.'),
-            content: Text(
-              'Подними ${_statLabels(decision.statsNeedingCare)} '
-              'в зелёную зону.',
-            ),
+          builder: (context) => FinnyBedtimeDialog(
+            icon: Icons.favorite_rounded,
+            title: 'Финни ещё не готов спать',
+            body:
+                'Подними ${_statLabels(decision.statsNeedingCare)} '
+                'в зелёную зону.',
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Вернуться'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  style: FinnyModalActions.secondary,
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Вернуться'),
+                ),
               ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, 'things'),
-                child: const Text('Открыть Вещи'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  style: FinnyModalActions.primary,
+                  onPressed: () => Navigator.pop(context, 'things'),
+                  child: const Text('Открыть Вещи'),
+                ),
               ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, 'shop'),
-                child: const Text('Открыть Магазин'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  style: FinnyModalActions.secondary,
+                  onPressed: () => Navigator.pop(context, 'shop'),
+                  child: const Text('Открыть Магазин'),
+                ),
               ),
             ],
           ),
@@ -499,22 +537,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.fallbackAllowed:
         final confirmed = await showDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Сегодня Финни нужна помощь'),
-            content: const Text(
-              'Сегодня уже не хватает доступных вещей и монет, чтобы '
-              'привести все показатели Финни в зелёную зону.\n\n'
-              'Можно завершить день сейчас. Завтра Финни начнёт день '
-              'с более низким состоянием.',
-            ),
+          builder: (context) => FinnyBedtimeDialog(
+            icon: Icons.nightlight_rounded,
+            title: 'Сегодня Финни нужна помощь',
+            body:
+                'Сегодня уже не хватает доступных вещей и монет, чтобы '
+                'привести все показатели Финни в зелёную зону.\n\n'
+                'Можно завершить день сейчас. Завтра Финни начнёт день '
+                'с более низким состоянием.',
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Вернуться'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  style: FinnyModalActions.secondary,
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Вернуться'),
+                ),
               ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Завершить день'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  style: FinnyModalActions.primary,
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Завершить день'),
+                ),
               ),
             ],
           ),
@@ -956,6 +1004,7 @@ class _HomeContent extends StatelessWidget {
                 pet: state.pet,
                 showBackground: false,
                 completedGoals: state.completedGoals,
+                equippedAccessories: state.equippedAccessories,
               ),
               Center(
                 child: FinnyNameBadge(

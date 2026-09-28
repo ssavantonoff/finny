@@ -471,7 +471,7 @@ class _ItemCard extends StatelessWidget {
                 ? FilledButton.tonal(
                     key: Key('things-equip-${item.id}'),
                     style: _thingsActionStyle,
-                    onPressed: state.freePlay && !state.mutating
+                    onPressed: !state.mutating
                         ? () => controller.toggleAccessory(item)
                         : null,
                     child: Text(

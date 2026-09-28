@@ -21,21 +21,13 @@ class FreePlayService {
     final items = await _content.loadShopItems();
     final matches = items.where((item) => item.id == itemId);
     if (matches.length != 1) throw StateError('Unknown shop item $itemId.');
-    await _repository.equip(
-      profileId: profileId,
-      item: matches.single,
-      definitions: await _content.loadPeriods(),
-    );
+    await _repository.equip(profileId: profileId, item: matches.single);
   }
 
   Future<void> unequip({
     required int profileId,
     required ShopEquipSlot slot,
-  }) async => _repository.unequip(
-    profileId: profileId,
-    slot: slot,
-    definitions: await _content.loadPeriods(),
-  );
+  }) async => _repository.unequip(profileId: profileId, slot: slot);
 
   Future<GameState> purchase({
     required int profileId,
