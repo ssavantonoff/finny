@@ -280,7 +280,7 @@ void main() {
       expect(accessory('accessory_bow'), findsOneWidget);
       expect(
         tester.widget<Image>(accessory('accessory_bow')).image,
-        const AssetImage('assets/images/things/cap_wearable.png'),
+        const AssetImage('assets/images/things/cap_overlay.png'),
       );
 
       await tester.runAsync(() async {

@@ -170,6 +170,8 @@ class HomeSceneBackdrop extends StatelessWidget {
     children: [
       AnimatedSwitcher(
         key: const Key('home-room-background'),
+        layoutBuilder: (current, previous) =>
+            Stack(fit: StackFit.expand, children: [...previous, ?current]),
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : const Duration(milliseconds: 300),

@@ -8,23 +8,23 @@ abstract final class HomeRoomVisual {
     HomeAccessoryVisual(
       itemId: 'accessory_bow',
       slot: ShopEquipSlot.head,
-      asset: 'assets/images/things/cap_wearable.png',
+      asset: 'assets/images/things/cap_overlay.png',
       behindPet: false,
       anchors: [
-        Rect.fromLTWH(0.19, 0.18, 0.62, 0.40),
-        Rect.fromLTWH(0.19, 0.17, 0.62, 0.37),
-        Rect.fromLTWH(0.18, 0.16, 0.64, 0.35),
+        Rect.fromLTWH(0.23, 0.08, 0.54, 0.384),
+        Rect.fromLTWH(0.22, 0.07, 0.56, 0.341),
+        Rect.fromLTWH(0.21, 0.06, 0.58, 0.327),
       ],
     ),
     HomeAccessoryVisual(
       itemId: 'accessory_collar',
       slot: ShopEquipSlot.neck,
-      asset: 'assets/images/things/bandana_wearable.png',
+      asset: 'assets/images/things/bandana_overlay.png',
       behindPet: false,
       anchors: [
-        Rect.fromLTWH(0.28, 0.62, 0.44, 0.29),
-        Rect.fromLTWH(0.29, 0.64, 0.42, 0.27),
-        Rect.fromLTWH(0.30, 0.65, 0.40, 0.25),
+        Rect.fromLTWH(0.37, 0.74, 0.26, 0.185),
+        Rect.fromLTWH(0.355, 0.683, 0.29, 0.177),
+        Rect.fromLTWH(0.35, 0.685, 0.30, 0.169),
       ],
     ),
     HomeAccessoryVisual(

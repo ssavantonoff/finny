@@ -116,15 +116,24 @@ void main() {
         ),
       );
       final canvas = tester.getRect(find.byKey(const Key('home-finny-canvas')));
+      final motion = find.byKey(const Key('home-finny-motion'));
+      expect(
+        find.descendant(
+          of: motion,
+          matching: find.byKey(Key('home-finny-stage-$stage')),
+        ),
+        findsOneWidget,
+      );
       for (final (id, asset) in [
-        ('accessory_bow', 'assets/images/things/cap_wearable.png'),
-        ('accessory_collar', 'assets/images/things/bandana_wearable.png'),
+        ('accessory_bow', 'assets/images/things/cap_overlay.png'),
+        ('accessory_collar', 'assets/images/things/bandana_overlay.png'),
         ('accessory_hat', 'assets/images/things/wings.png'),
       ]) {
         final visual = HomeRoomVisual.accessories.singleWhere(
           (v) => v.itemId == id,
         );
         final finder = find.byKey(Key('home-accessory-$id'));
+        expect(find.descendant(of: motion, matching: finder), findsOneWidget);
         expect(
           (tester.widget<Image>(finder).image as AssetImage).assetName,
           asset,
@@ -145,6 +154,21 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  test('cap and bandana have distinct normalized placements per stage', () {
+    for (final id in ['accessory_bow', 'accessory_collar']) {
+      final visual = HomeRoomVisual.accessories.singleWhere(
+        (item) => item.itemId == id,
+      );
+      expect(visual.anchors.toSet(), hasLength(3));
+      for (final anchor in visual.anchors) {
+        expect(anchor.left, greaterThanOrEqualTo(0));
+        expect(anchor.top, greaterThanOrEqualTo(0));
+        expect(anchor.right, lessThanOrEqualTo(1));
+        expect(anchor.bottom, lessThanOrEqualTo(1));
+      }
+    }
+  });
 
   testWidgets('all accessory slot combinations remain independent', (
     tester,
@@ -234,6 +258,18 @@ void main() {
           ),
         );
         expect((image.image as AssetImage).assetName, asset);
+        final backdrop = find.byWidgetPredicate(
+          (widget) =>
+              widget is AnimatedSwitcher &&
+              widget.key == const Key('home-room-background'),
+        );
+        final imageFinder = find.descendant(
+          of: backdrop,
+          matching: find.byType(Image),
+        );
+        expect(tester.getRect(imageFinder), tester.getRect(backdrop));
+        expect(image.fit, BoxFit.cover);
+        expect(image.alignment, Alignment.topCenter);
         final width = tester
             .getSize(find.byKey(const Key('home-finny-canvas')))
             .width;
