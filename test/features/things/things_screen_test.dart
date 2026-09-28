@@ -14,6 +14,8 @@ import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/content_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
+import 'package:finny/repositories/free_play_repository.dart';
+import 'package:finny/services/free_play_service.dart';
 import 'package:finny/services/item_use_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
@@ -65,7 +67,7 @@ const itemBall = ShopItem(
 
 const itemBow = ShopItem(
   id: 'accessory_bow',
-  name: 'Наушники',
+  name: 'Кепка',
   category: ShopItemCategory.want,
   price: 80,
   persistent: true,
@@ -176,6 +178,31 @@ class _ThingsMockItemUse extends ItemUseService {
     required String operationId,
     PetActionSlot slot = PetActionSlot.defaultSlot,
   }) => onUse(itemId, slot);
+}
+
+class _ThingsAccessoryReadRepository extends FreePlayRepository {
+  _ThingsAccessoryReadRepository(super.database);
+
+  @override
+  Future<Map<ShopEquipSlot, String>> equipped(int profileId) async => const {};
+}
+
+Future<void> settleThingsScreen(
+  WidgetTester tester,
+  ProviderContainer container,
+) async {
+  await tester.runAsync(() async {
+    for (var attempt = 0; attempt < 400; attempt++) {
+      if (container.read(thingsControllerProvider).load != ThingsLoad.loading) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+  });
+  await tester.pump();
+  expect(container.read(thingsControllerProvider).load, ThingsLoad.ready);
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 400));
 }
 
 void main() {
@@ -400,7 +427,7 @@ void main() {
           child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
         ),
       );
-      await tester.pumpAndSettle();
+      await settleThingsScreen(tester, container);
 
       expect(find.byKey(const Key('things-grid')), findsOneWidget);
       expect(find.byKey(const Key('things-item-food_apple')), findsOneWidget);
@@ -422,7 +449,9 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Мяч'), findsOneWidget);
-      expect(find.text('Наушники'), findsOneWidget);
+      expect(find.text('Кепка'), findsOneWidget);
+      expect(find.text('Наушники'), findsNothing);
+      expect(find.text('Очки'), findsNothing);
       expect(find.byKey(const Key('things-use-accessory_bow')), findsNothing);
       expect(
         tester
@@ -430,7 +459,7 @@ void main() {
               find.byKey(const Key('things-equip-accessory_bow')),
             )
             .onPressed,
-        isNull,
+        isNotNull,
       );
     },
   );
@@ -636,6 +665,13 @@ void main() {
             shopItems: [itemApple, itemBrush, itemBall, itemBow, itemFrisbee],
           ),
         ),
+        freePlayServiceProvider.overrideWith(
+          (ref) => FreePlayService(
+            _ThingsAccessoryReadRepository(ref.read(appDatabaseProvider)),
+            ref.read(contentRepositoryProvider),
+            ref.read(gameRepositoryProvider),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -645,7 +681,7 @@ void main() {
         child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
       ),
     );
-    await tester.pumpAndSettle();
+    await settleThingsScreen(tester, container);
 
     expect(find.byKey(const Key('things-item-toy_frisbee')), findsNothing);
     expect(find.byKey(const Key('things-item-toy_plush')), findsNothing);
@@ -655,7 +691,8 @@ void main() {
       ('toys', itemBall.id),
     ]) {
       await tester.tap(find.byKey(Key('things-filter-$filter')));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.byKey(Key('things-item-$itemId')), findsOneWidget);
       expect(find.byKey(const Key('things-item-toy_frisbee')), findsNothing);
       expect(
@@ -667,23 +704,28 @@ void main() {
       find.byKey(const Key('things-filters')),
       const Offset(-450, 0),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const Key('things-filter-room')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(
       find.text('В категории «Комната» пока нет твоих вещей.'),
       findsOneWidget,
     );
     await tester.tap(find.byKey(const Key('things-filter-accessories')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('things-item-accessory_bow')), findsOneWidget);
     await tester.drag(
       find.byKey(const Key('things-filters')),
       const Offset(500, 0),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byKey(const Key('things-filter-all')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('things-item-food_apple')), findsOneWidget);
     expect(find.byKey(const Key('things-item-toy_ball')), findsOneWidget);
   });
@@ -908,6 +950,13 @@ void main() {
         contentRepositoryProvider.overrideWithValue(
           TestContentRepository(const [], shopItems: catalog),
         ),
+        freePlayServiceProvider.overrideWith(
+          (ref) => FreePlayService(
+            _ThingsAccessoryReadRepository(ref.read(appDatabaseProvider)),
+            ref.read(contentRepositoryProvider),
+            ref.read(gameRepositoryProvider),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -917,7 +966,7 @@ void main() {
         child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
       ),
     );
-    await tester.pumpAndSettle();
+    await settleThingsScreen(tester, container);
 
     for (final (filter, section) in [
       ('food', ShopDisplaySection.food),
@@ -970,6 +1019,13 @@ void main() {
             contentRepositoryProvider.overrideWithValue(
               TestContentRepository(const [], shopItems: canonicalItems),
             ),
+            freePlayServiceProvider.overrideWith(
+              (ref) => FreePlayService(
+                _ThingsAccessoryReadRepository(ref.read(appDatabaseProvider)),
+                ref.read(contentRepositoryProvider),
+                ref.read(gameRepositoryProvider),
+              ),
+            ),
           ],
         );
         addTearDown(container.dispose);
@@ -982,7 +1038,7 @@ void main() {
             ),
           ),
         );
-        await tester.pumpAndSettle();
+        await settleThingsScreen(tester, container);
 
         final row = find.byKey(const Key('things-filters'));
         final position = tester
@@ -1077,6 +1133,13 @@ void main() {
               shopItems: [itemApple, itemBrush, itemBall, itemBow],
             ),
           ),
+          freePlayServiceProvider.overrideWith(
+            (ref) => FreePlayService(
+              _ThingsAccessoryReadRepository(ref.read(appDatabaseProvider)),
+              ref.read(contentRepositoryProvider),
+              ref.read(gameRepositoryProvider),
+            ),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -1086,7 +1149,7 @@ void main() {
           child: MaterialApp(theme: AppTheme.light, home: const ThingsScreen()),
         ),
       );
-      await tester.pumpAndSettle();
+      await settleThingsScreen(tester, container);
       expect(tester.takeException(), isNull);
       final grid = tester.widget<GridView>(
         find.byKey(const Key('things-grid')),

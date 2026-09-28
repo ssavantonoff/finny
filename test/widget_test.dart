@@ -5,12 +5,16 @@ import 'dart:async';
 import 'package:finny/app/app.dart';
 import 'package:finny/app/providers.dart';
 import 'package:finny/features/pet_creation/finny_preview.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
+import 'package:finny/models/shop_item.dart';
+import 'package:finny/repositories/free_play_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
+import 'package:finny/services/free_play_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -67,7 +71,18 @@ class _Games extends SqliteGameRepository {
   Future<List<GamePeriod>> getPeriods(int profileId) async => const [];
 
   @override
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId) async =>
+      const [];
+
+  @override
   Future<Pet?> getPet(int profileId) async => pet;
+}
+
+class _WidgetAccessoryRepository extends FreePlayRepository {
+  _WidgetAccessoryRepository(super.database);
+
+  @override
+  Future<Map<ShopEquipSlot, String>> equipped(int profileId) async => const {};
 }
 
 void main() {
@@ -150,6 +165,13 @@ void main() {
         appDatabaseProvider.overrideWithValue(database),
         profileRepositoryProvider.overrideWithValue(profiles),
         gameRepositoryProvider.overrideWithValue(games),
+        freePlayServiceProvider.overrideWith(
+          (ref) => FreePlayService(
+            _WidgetAccessoryRepository(ref.read(appDatabaseProvider)),
+            ref.read(contentRepositoryProvider),
+            ref.read(gameRepositoryProvider),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);

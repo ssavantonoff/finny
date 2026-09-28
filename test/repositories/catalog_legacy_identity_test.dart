@@ -32,8 +32,8 @@ void main() {
         'food_treat': 'Звёздное печенье',
         'care_comb': 'Полотенце',
         'toy_plush': 'Машинка',
-        'accessory_bow': 'Наушники',
-        'accessory_collar': 'Очки',
+        'accessory_bow': 'Кепка',
+        'accessory_collar': 'Бандана',
         'accessory_hat': 'Крылья',
       };
       for (final id in renamed.keys) {
@@ -54,6 +54,11 @@ void main() {
         'slot': 'neck',
         'item_id': 'accessory_collar',
       });
+      await db.insert('free_play_equipped_accessories', {
+        'profile_id': profileId,
+        'slot': 'back',
+        'item_id': 'accessory_hat',
+      });
 
       final content = {
         for (final item in await AssetContentRepository().loadShopItems())
@@ -65,9 +70,11 @@ void main() {
       }
       expect(content['accessory_bow']!.equipSlot, ShopEquipSlot.head);
       expect(content['accessory_collar']!.equipSlot, ShopEquipSlot.neck);
+      expect(content['accessory_hat']!.equipSlot, ShopEquipSlot.back);
       expect(await FreePlayRepository(database).equipped(profileId), {
         ShopEquipSlot.head: 'accessory_bow',
         ShopEquipSlot.neck: 'accessory_collar',
+        ShopEquipSlot.back: 'accessory_hat',
       });
     },
   );

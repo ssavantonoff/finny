@@ -6,17 +6,21 @@ import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/home_screen.dart';
 import 'package:finny/features/home/home_visual_components.dart';
 import 'package:finny/models/content_entry.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/savings_goal.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/game_repository.dart';
+import 'package:finny/repositories/free_play_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/models/story_event.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:finny/services/story_event_service.dart';
+import 'package:finny/services/free_play_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -55,6 +59,9 @@ class _AtmosphereGames extends SqliteGameRepository {
   Future<List<GamePeriod>> getPeriods(int profileId) async =>
       periodsOverride ?? (period == null ? const [] : [period!]);
   @override
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId) async =>
+      const [];
+  @override
   Future<Pet?> getPet(int profileId) async => pet;
   @override
   Future<int> getPetDailyUsageCount({
@@ -80,6 +87,13 @@ class _NoopStoryEventService extends StoryEventService {
   @override
   Future<StoryEventSnapshot?> loadDay3Bowl({required int profileId}) async =>
       null;
+}
+
+class _AtmosphereAccessoryRepository extends FreePlayRepository {
+  _AtmosphereAccessoryRepository(super.database);
+
+  @override
+  Future<Map<ShopEquipSlot, String>> equipped(int profileId) async => const {};
 }
 
 void main() {
@@ -196,6 +210,13 @@ void main() {
           ),
           gameRepositoryProvider.overrideWithValue(games),
           contentRepositoryProvider.overrideWithValue(content),
+          freePlayServiceProvider.overrideWith(
+            (ref) => FreePlayService(
+              _AtmosphereAccessoryRepository(ref.read(appDatabaseProvider)),
+              ref.read(contentRepositoryProvider),
+              ref.read(gameRepositoryProvider),
+            ),
+          ),
         ],
       );
       addTearDown(container.dispose);
@@ -299,6 +320,13 @@ void main() {
                 requiredCheckpoints: requiredCheckpoints,
               ),
             ]),
+          ),
+          freePlayServiceProvider.overrideWith(
+            (ref) => FreePlayService(
+              _AtmosphereAccessoryRepository(ref.read(appDatabaseProvider)),
+              ref.read(contentRepositoryProvider),
+              ref.read(gameRepositoryProvider),
+            ),
           ),
         ],
       );
@@ -601,6 +629,13 @@ void main() {
             profileRepositoryProvider.overrideWithValue(profiles),
             gameRepositoryProvider.overrideWithValue(games),
             contentRepositoryProvider.overrideWithValue(content),
+            freePlayServiceProvider.overrideWith(
+              (ref) => FreePlayService(
+                _AtmosphereAccessoryRepository(ref.read(appDatabaseProvider)),
+                ref.read(contentRepositoryProvider),
+                ref.read(gameRepositoryProvider),
+              ),
+            ),
           ],
         );
         addTearDown(container.dispose);
@@ -656,7 +691,10 @@ void main() {
         expect(find.byKey(const Key('home-room-background')), findsOneWidget);
         expect(find.byType(HomeSceneBackdrop), findsOneWidget);
         final room = tester.widget<Image>(
-          find.byKey(const Key('home-room-background')),
+          find.descendant(
+            of: find.byKey(const Key('home-room-background')),
+            matching: find.byType(Image),
+          ),
         );
         expect(room.fit, BoxFit.cover);
         final name = tester.widget<Text>(
@@ -1001,6 +1039,13 @@ void main() {
                   requiredCheckpoints: [],
                 ),
               ]),
+            ),
+            freePlayServiceProvider.overrideWith(
+              (ref) => FreePlayService(
+                _AtmosphereAccessoryRepository(ref.read(appDatabaseProvider)),
+                ref.read(contentRepositoryProvider),
+                ref.read(gameRepositoryProvider),
+              ),
             ),
           ],
         );

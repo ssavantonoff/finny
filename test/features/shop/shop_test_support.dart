@@ -77,7 +77,7 @@ const brush = ShopItem(
 );
 const bow = ShopItem(
   id: 'accessory_bow',
-  name: 'Наушники',
+  name: 'Кепка',
   category: ShopItemCategory.want,
   price: 80,
   persistent: true,

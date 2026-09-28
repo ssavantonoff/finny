@@ -247,7 +247,7 @@ class _FinnyCatchScreenState extends ConsumerState<FinnyCatchScreen>
                   type: FinnyCatchObjectType.sparkle,
                   size: 38,
                 ),
-                label: 'Очки',
+                label: 'Баллы',
                 value: '${state.score}',
               ),
             ),

@@ -7,7 +7,7 @@ class AppDatabase {
   AppDatabase({sqflite.DatabaseFactory? factory, this.databasePath})
     : _factory = factory ?? sqflite.databaseFactory;
 
-  static const schemaVersion = 13;
+  static const schemaVersion = 14;
 
   final sqflite.DatabaseFactory _factory;
   final String? databasePath;
@@ -278,6 +278,38 @@ class AppDatabase {
     if (oldVersion < 13) {
       await _createPostCampaignTables(db);
     }
+    // Earlier schemas create this table above with the current constraint.
+    if (oldVersion == 13) {
+      await _migrateAccessorySlotsV14(db);
+    }
+  }
+
+  static Future<void> _migrateAccessorySlotsV14(
+    sqflite.DatabaseExecutor db,
+  ) async {
+    await db.execute('''
+      CREATE TABLE free_play_equipped_accessories_v14 (
+        profile_id INTEGER NOT NULL,
+        slot TEXT NOT NULL CHECK (slot IN ('head', 'neck', 'back')),
+        item_id TEXT NOT NULL,
+        PRIMARY KEY (profile_id, slot),
+        FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,
+        FOREIGN KEY (profile_id, item_id)
+          REFERENCES inventory(profile_id, item_id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO free_play_equipped_accessories_v14 (profile_id, slot, item_id)
+      SELECT profile_id,
+        CASE WHEN item_id = 'accessory_hat' THEN 'back' ELSE slot END,
+        item_id
+      FROM free_play_equipped_accessories
+    ''');
+    await db.execute('DROP TABLE free_play_equipped_accessories');
+    await db.execute('''
+      ALTER TABLE free_play_equipped_accessories_v14
+      RENAME TO free_play_equipped_accessories
+    ''');
   }
 
   static Future<void> _createPostCampaignTables(
@@ -305,7 +337,7 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS free_play_equipped_accessories (
         profile_id INTEGER NOT NULL,
-        slot TEXT NOT NULL CHECK (slot IN ('head', 'neck')),
+        slot TEXT NOT NULL CHECK (slot IN ('head', 'neck', 'back')),
         item_id TEXT NOT NULL,
         PRIMARY KEY (profile_id, slot),
         FOREIGN KEY (profile_id) REFERENCES profiles(id) ON DELETE CASCADE,

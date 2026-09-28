@@ -18,13 +18,17 @@ import 'package:finny/features/things/things_controller.dart';
 import 'package:finny/features/tasks/tasks_screen.dart';
 import 'package:finny/features/savings/savings_screen.dart';
 import 'package:finny/models/game_period.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_state.dart';
 import 'package:finny/models/pet.dart';
 import 'package:finny/models/profile.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/repositories/content_repository.dart';
+import 'package:finny/repositories/free_play_repository.dart';
 import 'package:finny/repositories/game_repository.dart';
 import 'package:finny/repositories/profile_repository.dart';
 import 'package:finny/services/special_purchase_service.dart';
+import 'package:finny/services/free_play_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,6 +84,10 @@ class _NavGames extends SqliteGameRepository {
   Future<List<GamePeriod>> getPeriods(int profileId) async => const [];
 
   @override
+  Future<List<CompletedGoal>> getCompletedGoals(int profileId) async =>
+      const [];
+
+  @override
   Future<GamePeriod?> getCurrentPeriod(int profileId) async => null;
 
   @override
@@ -87,6 +95,13 @@ class _NavGames extends SqliteGameRepository {
 
   @override
   Future<int> getInventoryQuantity(int profileId, String itemId) async => 0;
+}
+
+class _NavAccessoryRepository extends FreePlayRepository {
+  _NavAccessoryRepository(super.database);
+
+  @override
+  Future<Map<ShopEquipSlot, String>> equipped(int profileId) async => const {};
 }
 
 void main() {
@@ -187,6 +202,13 @@ void main() {
         ),
         appDatabaseProvider.overrideWithValue(database),
         contentRepositoryProvider.overrideWithValue(promoContent),
+        freePlayServiceProvider.overrideWith(
+          (ref) => FreePlayService(
+            _NavAccessoryRepository(ref.read(appDatabaseProvider)),
+            ref.read(contentRepositoryProvider),
+            ref.read(gameRepositoryProvider),
+          ),
+        ),
       ],
     );
     return _PromoNavFixture(database, games, profileId, container);
@@ -690,6 +712,13 @@ void main() {
           gameRepositoryProvider.overrideWithValue(games),
           contentRepositoryProvider.overrideWithValue(
             TestContentRepository(testPeriodDefinitions()),
+          ),
+          freePlayServiceProvider.overrideWith(
+            (ref) => FreePlayService(
+              _NavAccessoryRepository(ref.read(appDatabaseProvider)),
+              ref.read(contentRepositoryProvider),
+              ref.read(gameRepositoryProvider),
+            ),
           ),
         ],
       );

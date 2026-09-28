@@ -1,6 +1,9 @@
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/core/visual/finny_visual.dart';
 import 'package:finny/features/home/home_visual_components.dart';
+import 'package:finny/features/home/home_room_visual.dart';
+import 'package:finny/models/completed_goal.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/pet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -91,6 +94,254 @@ void main() {
     await tester.pump();
     expect(find.byType(HomeWallet), findsOneWidget);
     expect(find.byKey(const Key('home-room-scene')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final stage in [1, 2, 3]) {
+    testWidgets('wearable assets use stage $stage anchors in the pet canvas', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: FinnyRoomScene(
+              pet: pet.copyWith(developmentStage: stage),
+              equippedAccessories: const {
+                ShopEquipSlot.head: 'accessory_bow',
+                ShopEquipSlot.neck: 'accessory_collar',
+                ShopEquipSlot.back: 'accessory_hat',
+              },
+            ),
+          ),
+        ),
+      );
+      final canvas = tester.getRect(find.byKey(const Key('home-finny-canvas')));
+      final motion = find.byKey(const Key('home-finny-motion'));
+      expect(
+        find.descendant(
+          of: motion,
+          matching: find.byKey(Key('home-finny-stage-$stage')),
+        ),
+        findsOneWidget,
+      );
+      for (final (id, asset) in [
+        ('accessory_bow', 'assets/images/things/cap_overlay.png'),
+        ('accessory_collar', 'assets/images/things/bandana_overlay.png'),
+        ('accessory_hat', 'assets/images/things/wings.png'),
+      ]) {
+        final visual = HomeRoomVisual.accessories.singleWhere(
+          (v) => v.itemId == id,
+        );
+        final finder = find.byKey(Key('home-accessory-$id'));
+        expect(find.descendant(of: motion, matching: finder), findsOneWidget);
+        expect(
+          (tester.widget<Image>(finder).image as AssetImage).assetName,
+          asset,
+        );
+        final expected = visual.anchorFor(stage);
+        final actual = tester.getRect(finder);
+        expect(
+          actual.left,
+          closeTo(canvas.left + expected.left * canvas.width, 0.1),
+        );
+        expect(
+          actual.top,
+          closeTo(canvas.top + expected.top * canvas.height, 0.1),
+        );
+        expect(actual.width, closeTo(expected.width * canvas.width, 0.1));
+        expect(actual.height, closeTo(expected.height * canvas.height, 0.1));
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  test('cap and bandana have distinct normalized placements per stage', () {
+    for (final id in ['accessory_bow', 'accessory_collar']) {
+      final visual = HomeRoomVisual.accessories.singleWhere(
+        (item) => item.itemId == id,
+      );
+      expect(visual.anchors.toSet(), hasLength(3));
+      for (final anchor in visual.anchors) {
+        expect(anchor.left, greaterThanOrEqualTo(0));
+        expect(anchor.top, greaterThanOrEqualTo(0));
+        expect(anchor.right, lessThanOrEqualTo(1));
+        expect(anchor.bottom, lessThanOrEqualTo(1));
+      }
+    }
+  });
+
+  testWidgets('all accessory slot combinations remain independent', (
+    tester,
+  ) async {
+    const entries = [
+      (ShopEquipSlot.head, 'accessory_bow'),
+      (ShopEquipSlot.neck, 'accessory_collar'),
+      (ShopEquipSlot.back, 'accessory_hat'),
+    ];
+    for (var mask = 0; mask < 8; mask++) {
+      final equipped = {
+        for (var i = 0; i < entries.length; i++)
+          if (mask & (1 << i) != 0) entries[i].$1: entries[i].$2,
+      };
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey(mask),
+          home: Scaffold(
+            body: FinnyRoomScene(pet: pet, equippedAccessories: equipped),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      for (var i = 0; i < entries.length; i++) {
+        expect(
+          find.byKey(Key('home-accessory-${entries[i].$2}')),
+          mask & (1 << i) != 0 ? findsOneWidget : findsNothing,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    }
+  });
+
+  for (final size in [const Size(360, 800), const Size(393, 852)]) {
+    testWidgets('all eight canonical room composites at $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const expected = [
+        'room_base.png',
+        'room_night_light.png',
+        'room_scooter.png',
+        'room_night_light_scooter.png',
+        'room_play_house.png',
+        'room_night_light_play_house.png',
+        'room_scooter_play_house.png',
+        'room_all_rewards.png',
+      ];
+      final visuals = HomeRoomVisual.rewards;
+      double? initialWidth;
+      for (var mask = 0; mask < 8; mask++) {
+        final selected = [
+          for (var i = 0; i < 3; i++)
+            if (mask & (1 << i) != 0)
+              CompletedGoal(
+                profileId: 1,
+                goalId: visuals[i].goalId,
+                rewardAssetId: visuals[i].rewardAssetId,
+                pricePaid: 1,
+                completedAt: DateTime.utc(2026),
+                claimOperationId: 'claim:$i',
+              ),
+        ];
+        final asset = HomeRoomVisual.roomAssetFor(selected, profileId: 1);
+        expect(asset, 'assets/images/home/${expected[mask]}');
+        expect(
+          HomeRoomVisual.roomAssetFor(selected.reversed.toList(), profileId: 1),
+          asset,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            key: ValueKey(mask),
+            home: Scaffold(
+              body: HomeSceneBackdrop(
+                roomAsset: asset,
+                child: FinnyRoomScene(pet: pet),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final image = tester.widget<Image>(
+          find.descendant(
+            of: find.byKey(const Key('home-room-background')),
+            matching: find.byType(Image),
+          ),
+        );
+        expect((image.image as AssetImage).assetName, asset);
+        final backdrop = find.byWidgetPredicate(
+          (widget) =>
+              widget is AnimatedSwitcher &&
+              widget.key == const Key('home-room-background'),
+        );
+        final imageFinder = find.descendant(
+          of: backdrop,
+          matching: find.byType(Image),
+        );
+        expect(tester.getRect(imageFinder), tester.getRect(backdrop));
+        expect(image.fit, BoxFit.cover);
+        expect(image.alignment, Alignment.topCenter);
+        final width = tester
+            .getSize(find.byKey(const Key('home-finny-canvas')))
+            .width;
+        initialWidth ??= width;
+        expect(width, initialWidth);
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
+
+  testWidgets('idle and pet reaction animate and dispose safely', (
+    tester,
+  ) async {
+    Widget scene(int token, {bool disabled = false}) => MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: disabled),
+        child: Scaffold(
+          body: FinnyRoomScene(pet: pet, petReactionToken: token),
+        ),
+      ),
+    );
+    await tester.pumpWidget(scene(0));
+    final finder = find.byKey(const Key('home-finny-motion'));
+    expect(tester.widget<Transform>(finder).transform.storage[13], 0);
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 1500));
+    expect(tester.widget<Transform>(finder).transform.storage[13], lessThan(0));
+    await tester.pumpWidget(scene(1));
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(tester.widget<Transform>(finder).transform.storage[13], lessThan(0));
+    await tester.pumpWidget(scene(2, disabled: true));
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.widget<Transform>(finder).transform.storage[13], 0);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 5));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('equipment and room composites transition without losing state', (
+    tester,
+  ) async {
+    Widget scene(bool visible, {bool disabled = false}) => MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: disabled),
+        child: Scaffold(
+          body: HomeSceneBackdrop(
+            roomAsset: visible
+                ? 'assets/images/home/room_scooter.png'
+                : 'assets/images/home/room_base.png',
+            child: FinnyRoomScene(
+              pet: pet,
+              equippedAccessories: visible
+                  ? const {ShopEquipSlot.head: 'accessory_bow'}
+                  : const {},
+            ),
+          ),
+        ),
+      ),
+    );
+    final accessory = find.byKey(const Key('home-accessory-accessory_bow'));
+    await tester.pumpWidget(scene(false));
+    expect(accessory, findsNothing);
+    await tester.pumpWidget(scene(true));
+    expect(accessory, findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpWidget(scene(false));
+    await tester.pump(const Duration(milliseconds: 350));
+    expect(accessory, findsNothing);
+    await tester.pumpWidget(scene(true, disabled: true));
+    await tester.pumpWidget(scene(false, disabled: true));
+    await tester.pump();
+    expect(accessory, findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

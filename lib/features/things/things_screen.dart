@@ -378,7 +378,7 @@ class _ItemCard extends StatelessWidget {
     final actionLabel = isToy
         ? 'Играть'
         : isAccessory
-        ? state.equipped[item.equipSlot] == item.id && state.freePlay
+        ? state.equipped[item.equipSlot] == item.id
               ? 'Снять'
               : 'Надеть'
         : 'Использовать';
@@ -471,7 +471,7 @@ class _ItemCard extends StatelessWidget {
                 ? FilledButton.tonal(
                     key: Key('things-equip-${item.id}'),
                     style: _thingsActionStyle,
-                    onPressed: state.freePlay && !state.mutating
+                    onPressed: !state.mutating
                         ? () => controller.toggleAccessory(item)
                         : null,
                     child: Text(

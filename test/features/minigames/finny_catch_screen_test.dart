@@ -190,7 +190,7 @@ void main() {
       await mount(tester);
       expectMountainBackground(tester, const Size(360, 800));
       expect(find.text('Лови монеты'), findsOneWidget);
-      expect(find.text('Очки'), findsOneWidget);
+      expect(find.text('Баллы'), findsOneWidget);
       expect(find.text('30 сек'), findsOneWidget);
       expect(find.text('Приготовься!'), findsOneWidget);
       expect(

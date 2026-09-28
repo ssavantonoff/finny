@@ -112,10 +112,10 @@ Map<String, Object?> _validBudgetPriorityTaskJson() => {
       },
       <String, Object?>{
         'id': 'bow',
-        'label': 'Наушники',
+        'label': 'Кепка',
         'price': 80,
         'correctDecision': 'later',
-        'feedback': 'Наушники могут подождать.',
+        'feedback': 'Кепка могут подождать.',
       },
     ],
     'incorrectExplanation': 'Проверь важность и бюджет.',
@@ -404,7 +404,7 @@ void main() {
             null,
           ),
           'accessory_bow': (
-            'Наушники',
+            'Кепка',
             ShopDisplaySection.accessories,
             ShopItemCategory.want,
             80,
@@ -416,7 +416,7 @@ void main() {
             ShopEquipSlot.head,
           ),
           'accessory_collar': (
-            'Очки',
+            'Бандана',
             ShopDisplaySection.accessories,
             ShopItemCategory.want,
             150,
@@ -437,7 +437,7 @@ void main() {
             0,
             0,
             0,
-            ShopEquipSlot.head,
+            ShopEquipSlot.back,
           ),
         };
     expect(items, hasLength(expected.length));

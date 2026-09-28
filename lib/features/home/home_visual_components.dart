@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/core/visual/finny_visual.dart';
+import 'package:finny/features/home/home_room_visual.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_art.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/models/pet.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -141,10 +146,16 @@ class HomeWallet extends StatelessWidget {
 }
 
 class HomeSceneBackdrop extends StatelessWidget {
-  const HomeSceneBackdrop({super.key, required this.child, this.phase});
+  const HomeSceneBackdrop({
+    super.key,
+    required this.child,
+    this.phase,
+    this.roomAsset = 'assets/images/home/room_base.png',
+  });
 
   final Widget child;
   final VirtualDayPhase? phase;
+  final String roomAsset;
 
   List<Color> get _tintColors => switch (phase) {
     VirtualDayPhase.morning => const [Color(0x14FFE1EE), Color(0x0CFFE8DE)],
@@ -157,11 +168,20 @@ class HomeSceneBackdrop extends StatelessWidget {
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
     children: [
-      Image.asset(
-        'assets/images/home/room_base.png',
+      AnimatedSwitcher(
         key: const Key('home-room-background'),
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
+        layoutBuilder: (current, previous) =>
+            Stack(fit: StackFit.expand, children: [...previous, ?current]),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        child: Image.asset(
+          roomAsset,
+          key: ValueKey(roomAsset),
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          excludeFromSemantics: true,
+        ),
       ),
       DecoratedBox(
         key: const Key('home-room-phase-tint'),
@@ -208,19 +228,102 @@ class FinnyNameBadge extends StatelessWidget {
   );
 }
 
-class FinnyRoomScene extends StatelessWidget {
+class FinnyRoomScene extends StatefulWidget {
   const FinnyRoomScene({
     super.key,
     required this.pet,
     this.showBackground = true,
+    this.equippedAccessories = const {},
+    this.petReactionToken = 0,
   });
 
   final Pet pet;
   final bool showBackground;
+  final Map<ShopEquipSlot, String> equippedAccessories;
+  final int petReactionToken;
+
+  @override
+  State<FinnyRoomScene> createState() => _FinnyRoomSceneState();
+}
+
+class _FinnyRoomSceneState extends State<FinnyRoomScene>
+    with TickerProviderStateMixin {
+  late final AnimationController _idle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 3000),
+  )..addStatusListener(_idleStatus);
+  late final AnimationController _petReaction = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 400),
+  );
+  Timer? _idleTimer;
+  bool _animationsDisabled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disabled = MediaQuery.disableAnimationsOf(context);
+    if (disabled == _animationsDisabled && _idleTimer != null) return;
+    _animationsDisabled = disabled;
+    _idleTimer?.cancel();
+    if (disabled) {
+      _idle.stop();
+      _idle.value = 0;
+      _petReaction.stop();
+      _petReaction.value = 0;
+    } else {
+      _idleTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted && !_animationsDisabled) _idle.forward();
+      });
+    }
+  }
+
+  void _idleStatus(AnimationStatus status) {
+    if (_animationsDisabled || !mounted) return;
+    if (status == AnimationStatus.completed ||
+        status == AnimationStatus.dismissed) {
+      _idleTimer?.cancel();
+      _idleTimer = Timer(const Duration(milliseconds: 16), () {
+        if (!mounted || _animationsDisabled) return;
+        if (status == AnimationStatus.completed) {
+          _idle.reverse();
+        } else {
+          _idle.forward();
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant FinnyRoomScene oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.petReactionToken > oldWidget.petReactionToken &&
+        !_animationsDisabled) {
+      _petReaction.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _idleTimer?.cancel();
+    _idle.dispose();
+    _petReaction.dispose();
+    super.dispose();
+  }
+
+  double get _reactionScale => TweenSequence<double>([
+    TweenSequenceItem(tween: Tween(begin: 1, end: 1.03), weight: 40),
+    TweenSequenceItem(tween: Tween(begin: 1.03, end: 0.99), weight: 35),
+    TweenSequenceItem(tween: Tween(begin: 0.99, end: 1), weight: 25),
+  ]).transform(_petReaction.value);
 
   @override
   Widget build(BuildContext context) {
+    final pet = widget.pet;
     final stage = pet.developmentStage.clamp(1, 3);
+    final accessories = HomeRoomVisual.accessoriesFor(
+      widget.equippedAccessories,
+    );
     final roomHeight = (MediaQuery.sizeOf(context).height * 0.43).clamp(
       300.0,
       420.0,
@@ -232,41 +335,140 @@ class FinnyRoomScene extends StatelessWidget {
           2 => 0.69,
           _ => 0.76,
         };
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(AppRadii.scene),
-      child: SizedBox(
-        key: const Key('home-room-scene'),
-        height: showBackground ? roomHeight : finnyHeight,
-        width: double.infinity,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (showBackground)
-              Image.asset(
-                'assets/images/home/room_base.png',
-                key: const Key('home-room-background'),
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
-            Align(
-              alignment: showBackground
-                  ? const Alignment(0, 0.87)
-                  : Alignment.bottomCenter,
-              child: SizedBox(
-                height: finnyHeight,
-                child: Image.asset(
-                  FinnyVisual.assetForPet(pet),
-                  key: Key('home-finny-stage-$stage'),
-                  fit: BoxFit.contain,
-                  semanticLabel: FinnyVisual.descriptionForPet(pet),
+    final scene = SizedBox(
+      key: const Key('home-room-scene'),
+      height: widget.showBackground ? roomHeight : finnyHeight,
+      width: double.infinity,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final aspect = HomeRoomVisual.petAspectRatio(stage);
+          final canvasWidth = math.min(
+            finnyHeight * aspect,
+            constraints.maxWidth,
+          );
+          return Stack(
+            clipBehavior: Clip.none,
+            fit: StackFit.expand,
+            children: [
+              if (widget.showBackground)
+                Image.asset(
+                  'assets/images/home/room_base.png',
+                  key: const Key('home-room-background'),
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                ),
+              Align(
+                alignment: widget.showBackground
+                    ? const Alignment(0, 0.87)
+                    : Alignment.bottomCenter,
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([_idle, _petReaction]),
+                  builder: (context, child) {
+                    final sway = Curves.easeInOut.transform(_idle.value);
+                    return Transform.translate(
+                      key: const Key('home-finny-motion'),
+                      offset: Offset(0, -3 * sway),
+                      child: Transform.scale(
+                        scale: (1 + 0.012 * sway) * _reactionScale,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: SizedBox(
+                    key: const Key('home-finny-canvas'),
+                    width: canvasWidth,
+                    height: canvasWidth / aspect,
+                    child: LayoutBuilder(
+                      builder: (context, canvas) => Stack(
+                        clipBehavior: Clip.none,
+                        fit: StackFit.expand,
+                        children: [
+                          for (final visual in HomeRoomVisual.accessories.where(
+                            (visual) => visual.behindPet,
+                          ))
+                            _accessorySlot(
+                              visual,
+                              accessories,
+                              stage,
+                              canvas.biggest,
+                            ),
+                          Image.asset(
+                            FinnyVisual.assetForPet(pet),
+                            key: Key('home-finny-stage-$stage'),
+                            fit: BoxFit.contain,
+                            semanticLabel: FinnyVisual.descriptionForPet(pet),
+                          ),
+                          for (final slot in [
+                            ShopEquipSlot.neck,
+                            ShopEquipSlot.head,
+                          ])
+                            for (final visual
+                                in HomeRoomVisual.accessories.where(
+                                  (visual) =>
+                                      visual.slot == slot && !visual.behindPet,
+                                ))
+                              _accessorySlot(
+                                visual,
+                                accessories,
+                                stage,
+                                canvas.biggest,
+                              ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
+    return widget.showBackground
+        ? ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadii.scene),
+            child: scene,
+          )
+        : scene;
   }
+
+  static Rect _scaledRect(Rect rect, Size canvas) => Rect.fromLTWH(
+    rect.left * canvas.width,
+    rect.top * canvas.height,
+    rect.width * canvas.width,
+    rect.height * canvas.height,
+  );
+
+  Widget _accessorySlot(
+    HomeAccessoryVisual visual,
+    List<HomeAccessoryVisual> equipped,
+    int stage,
+    Size canvas,
+  ) => Positioned.fromRect(
+    rect: _scaledRect(visual.anchorFor(stage), canvas),
+    child: AnimatedSwitcher(
+      layoutBuilder: (current, previous) =>
+          Stack(fit: StackFit.expand, children: [...previous, ?current]),
+      duration: _animationsDisabled
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.97, end: 1).animate(animation),
+          child: child,
+        ),
+      ),
+      child: equipped.contains(visual)
+          ? Image.asset(
+              visual.asset,
+              key: Key('home-accessory-${visual.itemId}'),
+              fit: visual.behindPet ? BoxFit.fill : BoxFit.contain,
+              excludeFromSemantics: true,
+            )
+          : SizedBox(key: Key('home-accessory-empty-${visual.itemId}')),
+    ),
+  );
 }
 
 class HomeGoalCard extends StatelessWidget {

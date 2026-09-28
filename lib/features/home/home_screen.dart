@@ -1,4 +1,3 @@
-import 'package:finny/app/providers.dart';
 import 'package:finny/core/theme/app_theme.dart';
 import 'package:finny/core/visual/finny_modal_actions.dart';
 import 'package:finny/core/visual/finny_flow_visuals.dart';
@@ -7,13 +6,11 @@ import 'package:finny/features/home/home_controller.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/features/home/finny_sleep_dialog.dart';
 import 'package:finny/features/home/home_visual_components.dart';
+import 'package:finny/features/home/home_room_visual.dart';
 import 'package:finny/models/day_lifecycle.dart';
-import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/game_period.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/pet.dart';
-import 'package:finny/models/savings_goal.dart';
-import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/story_event.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
@@ -372,6 +369,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _incomeSheetOpen = false;
   bool _eventDialogOpen = false;
   String? _eventLoadKey;
+  int _petReactionToken = 0;
+
+  Future<void> _pet(FreePetInteraction interaction) async {
+    final succeeded = await ref
+        .read(homeControllerProvider.notifier)
+        .performFreeInteraction(interaction);
+    if (succeeded && mounted) {
+      setState(() => _petReactionToken++);
+    }
+  }
 
   bool get _isHomeVisible {
     if (!mounted) return false;
@@ -415,15 +422,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.tooEarly:
         await showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Ещё рано спать'),
-            content: const Text(
-              'У Финни ещё есть время для дел и заботы. Вернись к нему позже.',
-            ),
+          builder: (context) => FinnyBedtimeDialog(
+            icon: Icons.wb_sunny_rounded,
+            title: 'Ещё рано спать',
+            body: 'У Финни ещё есть время для дел и заботы. Вернись к нему позже.',
             actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Хорошо'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  style: FinnyModalActions.primary,
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Хорошо'),
+                ),
               ),
             ],
           ),
@@ -432,29 +443,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.blockedByCheckpoints:
         final action = await showDialog<String>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Перед сном осталось важное дело'),
-            content: Text(
-              decision.unresolvedCheckpoints
-                  .map(_checkpointBlockerText)
-                  .join('\n\n'),
-            ),
+          builder: (context) => FinnyBedtimeDialog(
+            icon: Icons.checklist_rounded,
+            title: 'Перед сном осталось важное дело',
+            body: decision.unresolvedCheckpoints
+                .map(_checkpointBlockerText)
+                .join('\n\n'),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Вернуться'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  style: FinnyModalActions.secondary,
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Вернуться'),
+                ),
               ),
               if (decision.unresolvedCheckpoints.contains('financial_task'))
-                FilledButton(
-                  key: const Key('home-blocker-go-task'),
-                  onPressed: () => Navigator.pop(context, 'tasks'),
-                  child: const Text('К заданию'),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    key: const Key('home-blocker-go-task'),
+                    style: FinnyModalActions.primary,
+                    onPressed: () => Navigator.pop(context, 'tasks'),
+                    child: const Text('К заданию'),
+                  ),
                 ),
               if (decision.unresolvedCheckpoints.contains('savings_decision'))
-                FilledButton(
-                  key: const Key('home-blocker-go-savings'),
-                  onPressed: () => Navigator.pop(context, 'savings'),
-                  child: const Text('К накоплениям'),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: FilledButton(
+                    key: const Key('home-blocker-go-savings'),
+                    style:
+                        decision.unresolvedCheckpoints.contains(
+                          'financial_task',
+                        )
+                        ? FinnyModalActions.secondary
+                        : FinnyModalActions.primary,
+                    onPressed: () => Navigator.pop(context, 'savings'),
+                    child: const Text('К накоплениям'),
+                  ),
                 ),
             ],
           ),
@@ -473,24 +503,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.carePossible:
         final action = await showDialog<String>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Финни ещё не готов спать.'),
-            content: Text(
-              'Подними ${_statLabels(decision.statsNeedingCare)} '
-              'в зелёную зону.',
-            ),
+          builder: (context) => FinnyBedtimeDialog(
+            icon: Icons.favorite_rounded,
+            title: 'Финни ещё не готов спать',
+            body:
+                'Подними ${_statLabels(decision.statsNeedingCare)} '
+                'в зелёную зону.',
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Вернуться'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  style: FinnyModalActions.secondary,
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Вернуться'),
+                ),
               ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, 'things'),
-                child: const Text('Открыть Вещи'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  style: FinnyModalActions.primary,
+                  onPressed: () => Navigator.pop(context, 'things'),
+                  child: const Text('Открыть Вещи'),
+                ),
               ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, 'shop'),
-                child: const Text('Открыть Магазин'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  style: FinnyModalActions.secondary,
+                  onPressed: () => Navigator.pop(context, 'shop'),
+                  child: const Text('Открыть Магазин'),
+                ),
               ),
             ],
           ),
@@ -502,22 +547,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case BedtimeDecisionType.fallbackAllowed:
         final confirmed = await showDialog<bool>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Сегодня Финни нужна помощь'),
-            content: const Text(
-              'Сегодня уже не хватает доступных вещей и монет, чтобы '
-              'привести все показатели Финни в зелёную зону.\n\n'
-              'Можно завершить день сейчас. Завтра Финни начнёт день '
-              'с более низким состоянием.',
-            ),
+          builder: (context) => FinnyBedtimeDialog(
+            icon: Icons.nightlight_rounded,
+            title: 'Сегодня Финни нужна помощь',
+            body:
+                'Сегодня уже не хватает доступных вещей и монет, чтобы '
+                'привести все показатели Финни в зелёную зону.\n\n'
+                'Можно завершить день сейчас. Завтра Финни начнёт день '
+                'с более низким состоянием.',
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Вернуться'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: TextButton(
+                  style: FinnyModalActions.secondary,
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Вернуться'),
+                ),
               ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Завершить день'),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: FilledButton(
+                  style: FinnyModalActions.primary,
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Завершить день'),
+                ),
               ),
             ],
           ),
@@ -617,10 +672,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     });
 
-    ref.listen<int?>(activeProfileIdProvider, (_, _) {
-      controller.load();
-    });
-
     if (state is HomeNeedsBootstrap) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.go('/startup');
@@ -649,10 +700,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       HomeReady(freePlay: true) => _FreePlayHome(
         state: state,
         controller: controller,
+        petReactionToken: _petReactionToken,
+        onPet: _pet,
       ),
       HomeReady() => _HomeContent(
         state: state,
         controller: controller,
+        petReactionToken: _petReactionToken,
+        onPet: _pet,
         onStartDay: _startDay,
         onFinishDay: _finishDay,
         onOpenBowl: _openBowlPurchase,
@@ -662,37 +717,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-class _FreePlayHome extends ConsumerWidget {
-  const _FreePlayHome({required this.state, required this.controller});
+class _FreePlayHome extends StatelessWidget {
+  const _FreePlayHome({
+    required this.state,
+    required this.controller,
+    required this.petReactionToken,
+    required this.onPet,
+  });
   final HomeReady state;
   final HomeController controller;
+  final int petReactionToken;
+  final Future<void> Function(FreePetInteraction) onPet;
 
-  Future<(int, int, int, int)> _collection(WidgetRef ref) async {
-    final id = state.profile.id!;
-    final content = ref.read(contentRepositoryProvider);
-    final games = ref.read(gameRepositoryProvider);
-    final goals = await content.loadGoals();
-    final completed = await games.getCompletedGoals(id);
-    final persistent = (await content.loadShopItems())
-        .where((item) => item.persistent)
-        .toList();
-    var owned = 0;
-    for (final item in persistent) {
-      if (await games.getInventoryQuantity(id, item.id) > 0) owned++;
-    }
-    final canonicalIds = goals.map((goal) => goal.id).toSet();
+  (int, int, int, int) get _collection {
+    final canonicalIds = state.goals.map((goal) => goal.id).toSet();
     return (
-      completed.where((goal) => canonicalIds.contains(goal.goalId)).length,
-      goals.length,
-      owned,
-      persistent.length,
+      state.completedGoals
+          .where((goal) => canonicalIds.contains(goal.goalId))
+          .length,
+      state.goals.length,
+      state.ownedPersistentItemCount,
+      state.shopItems.where((item) => item.persistent).length,
     );
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+  Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.transparent,
     body: HomeSceneBackdrop(
+      roomAsset: HomeRoomVisual.roomAssetFor(
+        state.completedGoals,
+        profileId: state.pet.profileId,
+      ),
       child: _HomeViewport(
         builder: (context, compact, _) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -716,6 +772,8 @@ class _FreePlayHome extends ConsumerWidget {
               key: const Key('free-play-daylight'),
               pet: state.pet,
               showBackground: false,
+              equippedAccessories: state.equippedAccessories,
+              petReactionToken: petReactionToken,
             ),
             Center(
               child: FinnyNameBadge(
@@ -731,9 +789,7 @@ class _FreePlayHome extends ConsumerWidget {
                 style: _petActionStyle(context, compact: compact),
                 onPressed: state.interacting
                     ? null
-                    : () => controller.performFreeInteraction(
-                        FreePetInteraction.pet,
-                      ),
+                    : () => onPet(FreePetInteraction.pet),
                 icon: const Icon(Icons.favorite_outline),
                 label: const Text('Погладить'),
               ),
@@ -749,12 +805,9 @@ class _FreePlayHome extends ConsumerWidget {
                 compact: compact,
               )
             else
-              FutureBuilder(
-                future: _collection(ref),
-                builder: (context, snapshot) {
-                  final allGoalsReached =
-                      snapshot.hasData &&
-                      snapshot.data!.$1 == snapshot.data!.$2;
+              Builder(
+                builder: (context) {
+                  final allGoalsReached = _collection.$1 == _collection.$2;
                   return HomeNoGoalCard(
                     saved: state.gameState.savedAmount,
                     title: allGoalsReached
@@ -768,49 +821,36 @@ class _FreePlayHome extends ConsumerWidget {
                 },
               ),
             SizedBox(height: compact ? 2 : AppSpacing.tiny),
-            FutureBuilder(
-              future: Future.wait<Object?>([
-                _collection(ref),
-                ref.read(freePlayServiceProvider).equipped(state.profile.id!),
-                ref.read(contentRepositoryProvider).loadShopItems(),
-                ref
-                    .read(gameRepositoryProvider)
-                    .getCompletedGoals(state.profile.id!),
-                ref.read(contentRepositoryProvider).loadGoals(),
-              ]),
-              builder: (context, snapshot) {
-                String? collectionLabel;
-                String? inventoryLabel;
-                var collectionComplete = false;
-                if (snapshot.hasData) {
-                  final collection = snapshot.data![0] as (int, int, int, int);
-                  final (goalCount, totalGoals, ownedCount, totalItems) =
-                      collection;
-                  final equipped =
-                      snapshot.data![1] as Map<ShopEquipSlot, String>;
-                  final items = snapshot.data![2] as List<ShopItem>;
-                  final completed = snapshot.data![3] as List<CompletedGoal>;
-                  final goals = snapshot.data![4] as List<SavingsGoal>;
-                  final worn = items
-                      .where((item) => equipped.values.contains(item.id))
-                      .map((item) => item.name)
-                      .toList();
-                  final rewards = goals
-                      .where(
-                        (goal) =>
-                            completed.any((done) => done.goalId == goal.id),
-                      )
-                      .map((goal) => goal.name)
-                      .toList();
-                  collectionLabel =
-                      'Цели $goalCount/$totalGoals · Предметы $ownedCount/$totalItems';
-                  inventoryLabel = [
-                    if (worn.isNotEmpty) 'На Финни: ${worn.join(', ')}',
-                    if (rewards.isNotEmpty) 'В доме: ${rewards.join(', ')}',
-                  ].join(' · ');
-                  collectionComplete =
-                      goalCount == totalGoals && ownedCount == totalItems;
-                }
+            Builder(
+              builder: (context) {
+                final collection = _collection;
+                final (goalCount, totalGoals, ownedCount, totalItems) =
+                    collection;
+                final visibleAccessories = HomeRoomVisual.accessoriesFor(
+                  state.equippedAccessories,
+                ).map((visual) => visual.itemId).toSet();
+                final visibleRewards = HomeRoomVisual.rewardsFor(
+                  state.completedGoals,
+                  profileId: state.profile.id!,
+                ).map((visual) => visual.goalId).toSet();
+                final items = state.shopItems;
+                final goals = state.goals;
+                final worn = items
+                    .where((item) => visibleAccessories.contains(item.id))
+                    .map((item) => item.name)
+                    .toList();
+                final rewards = goals
+                    .where((goal) => visibleRewards.contains(goal.id))
+                    .map((goal) => goal.name)
+                    .toList();
+                final collectionLabel =
+                    'Цели $goalCount/$totalGoals · Предметы $ownedCount/$totalItems';
+                final inventoryLabel = [
+                  if (worn.isNotEmpty) 'На Финни: ${worn.join(', ')}',
+                  if (rewards.isNotEmpty) 'В доме: ${rewards.join(', ')}',
+                ].join(' · ');
+                final collectionComplete =
+                    goalCount == totalGoals && ownedCount == totalItems;
                 return Card(
                   key: const Key('free-play-collection'),
                   color: AppColors.surface.withValues(alpha: 0.84),
@@ -849,16 +889,15 @@ class _FreePlayHome extends ConsumerWidget {
                                     ?.copyWith(color: AppColors.textPrimary),
                               ),
                               Text(
-                                collectionLabel ?? 'Загружаем коллекцию…',
+                                collectionLabel,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: Theme.of(context).textTheme.bodySmall
                                     ?.copyWith(color: AppColors.textSecondary),
                               ),
-                              if (!compact &&
-                                  inventoryLabel?.isNotEmpty == true)
+                              if (!compact && inventoryLabel.isNotEmpty)
                                 Text(
-                                  inventoryLabel!,
+                                  inventoryLabel,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodySmall
@@ -905,6 +944,8 @@ class _HomeContent extends StatelessWidget {
   const _HomeContent({
     required this.state,
     required this.controller,
+    required this.petReactionToken,
+    required this.onPet,
     required this.onStartDay,
     required this.onFinishDay,
     required this.onOpenBowl,
@@ -912,6 +953,8 @@ class _HomeContent extends StatelessWidget {
 
   final HomeReady state;
   final HomeController controller;
+  final int petReactionToken;
+  final Future<void> Function(FreePetInteraction) onPet;
   final VoidCallback onStartDay;
   final VoidCallback onFinishDay;
   final VoidCallback onOpenBowl;
@@ -962,6 +1005,10 @@ class _HomeContent extends StatelessWidget {
       backgroundColor: Colors.transparent,
       body: HomeSceneBackdrop(
         phase: phase,
+        roomAsset: HomeRoomVisual.roomAssetFor(
+          state.completedGoals,
+          profileId: state.pet.profileId,
+        ),
         child: _HomeViewport(
           builder: (context, compact, stableCampaignLayout) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -987,6 +1034,8 @@ class _HomeContent extends StatelessWidget {
                 key: const Key('home-day-sky'),
                 pet: state.pet,
                 showBackground: false,
+                equippedAccessories: state.equippedAccessories,
+                petReactionToken: petReactionToken,
               ),
               Center(
                 child: FinnyNameBadge(
@@ -1001,9 +1050,7 @@ class _HomeContent extends StatelessWidget {
                   key: const Key('home-free-pet'),
                   style: _petActionStyle(context, compact: compact),
                   onPressed: canPet
-                      ? () => controller.performFreeInteraction(
-                          FreePetInteraction.pet,
-                        )
+                      ? () => onPet(FreePetInteraction.pet)
                       : null,
                   icon: const Icon(Icons.favorite_outline),
                   label: Text(

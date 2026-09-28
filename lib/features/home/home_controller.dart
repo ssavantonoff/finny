@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:finny/app/providers.dart';
 import 'package:finny/features/home/campaign_event_controller.dart';
 import 'package:finny/models/content_entry.dart';
+import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/campaign_lifecycle.dart';
 import 'package:finny/models/day_lifecycle.dart';
 import 'package:finny/models/day_five_task.dart';
@@ -12,6 +13,7 @@ import 'package:finny/models/pet.dart';
 import 'package:finny/models/pet_action.dart';
 import 'package:finny/models/profile.dart';
 import 'package:finny/models/savings_goal.dart';
+import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/story_event.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -32,7 +34,7 @@ class HomeFailure extends HomeViewState {
 }
 
 class HomeReady extends HomeViewState {
-  const HomeReady({
+  HomeReady({
     required this.profile,
     required this.pet,
     required this.gameState,
@@ -52,7 +54,15 @@ class HomeReady extends HomeViewState {
     this.startFailed = false,
     this.finishingDay = false,
     this.finishFailed = false,
-  });
+    Map<ShopEquipSlot, String> equippedAccessories = const {},
+    List<CompletedGoal> completedGoals = const [],
+    List<ShopItem> shopItems = const [],
+    List<SavingsGoal> goals = const [],
+    this.ownedPersistentItemCount = 0,
+  }) : equippedAccessories = Map.unmodifiable(equippedAccessories),
+       completedGoals = List.unmodifiable(completedGoals),
+       shopItems = List.unmodifiable(shopItems),
+       goals = List.unmodifiable(goals);
 
   final Profile profile;
   final Pet pet;
@@ -74,6 +84,11 @@ class HomeReady extends HomeViewState {
   final bool startFailed;
   final bool finishingDay;
   final bool finishFailed;
+  final Map<ShopEquipSlot, String> equippedAccessories;
+  final List<CompletedGoal> completedGoals;
+  final List<ShopItem> shopItems;
+  final List<SavingsGoal> goals;
+  final int ownedPersistentItemCount;
 
   HomeReady copyWith({
     SavingsGoal? activeGoal,
@@ -112,6 +127,11 @@ class HomeReady extends HomeViewState {
     startFailed: startFailed ?? this.startFailed,
     finishingDay: finishingDay ?? this.finishingDay,
     finishFailed: finishFailed ?? this.finishFailed,
+    equippedAccessories: equippedAccessories,
+    completedGoals: completedGoals,
+    shopItems: shopItems,
+    goals: goals,
+    ownedPersistentItemCount: ownedPersistentItemCount,
   );
 }
 
@@ -136,7 +156,10 @@ class HomeController extends Notifier<HomeViewState> {
   ({FreePetInteraction interaction, String operationId})? _pendingInteraction;
 
   @override
-  HomeViewState build() => const HomeLoading();
+  HomeViewState build() {
+    ref.listen<int?>(activeProfileIdProvider, (_, _) => unawaited(load()));
+    return const HomeLoading();
+  }
 
   Future<void> load() async {
     final generation = ++_loadGeneration;
@@ -350,6 +373,8 @@ class HomeController extends Notifier<HomeViewState> {
         ref.read(gameRepositoryProvider).getPeriods(profileId),
         ref.read(contentRepositoryProvider).loadPeriods(),
         ref.read(contentRepositoryProvider).loadGoals(),
+        ref.read(contentRepositoryProvider).loadShopItems(),
+        ref.read(gameRepositoryProvider).getCompletedGoals(profileId),
       ]);
       if (!ref.mounted) return const HomeFailure();
       final profile = values[0] as Profile?;
@@ -358,6 +383,8 @@ class HomeController extends Notifier<HomeViewState> {
       final periods = values[3] as List<GamePeriod>;
       final definitions = values[4] as List<PeriodDefinition>;
       final goals = values[5] as List<SavingsGoal>;
+      final shopItems = values[6] as List<ShopItem>;
+      final completedGoals = values[7] as List<CompletedGoal>;
       final freePlay =
           periods.length >= 5 &&
           (await ref.read(campaignLifecycleServiceProvider).load(profileId))
@@ -434,6 +461,24 @@ class HomeController extends Notifier<HomeViewState> {
                 )
           : null;
 
+      final equippedAccessories = await ref
+          .read(freePlayServiceProvider)
+          .equipped(profileId);
+      var ownedPersistentItemCount = 0;
+      if (freePlay) {
+        for (final item in shopItems.where((item) => item.persistent)) {
+          if (await ref
+                  .read(gameRepositoryProvider)
+                  .getInventoryQuantity(profileId, item.id) >
+              0) {
+            ownedPersistentItemCount++;
+          }
+        }
+      }
+      if (!ref.mounted || ref.read(activeProfileIdProvider) != profileId) {
+        return const HomeFailure();
+      }
+
       return HomeReady(
         profile: profile,
         pet: pet,
@@ -453,6 +498,13 @@ class HomeController extends Notifier<HomeViewState> {
         dayFiveTaskCompletion: dayFiveTaskCompletion,
         petUsageCount: petUsageCount,
         pendingInteraction: _pendingInteraction,
+        equippedAccessories: equippedAccessories,
+        completedGoals: completedGoals
+            .where((goal) => goal.profileId == profileId)
+            .toList(growable: false),
+        shopItems: shopItems,
+        goals: goals,
+        ownedPersistentItemCount: ownedPersistentItemCount,
       );
     } catch (_) {
       return const HomeFailure();

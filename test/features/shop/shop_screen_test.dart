@@ -214,6 +214,9 @@ void main() {
           find.byKey(const Key('shop-item-accessory_bow')),
           findsOneWidget,
         );
+        expect(find.text('Кепка'), findsOneWidget);
+        expect(find.text('Бандана'), findsOneWidget);
+        expect(find.text('Крылья'), findsOneWidget);
         expect(tester.takeException(), isNull);
       },
     );

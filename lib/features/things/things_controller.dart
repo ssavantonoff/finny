@@ -323,6 +323,12 @@ class ThingsController extends Notifier<ThingsState> {
         }
       }
 
+      final hasOwnedAccessory = ownedItems.any(
+        (item) =>
+            item.displaySection == ShopDisplaySection.accessories &&
+            item.equipSlot != null,
+      );
+
       return ThingsState(
         load: ThingsLoad.ready,
         profileId: profileId,
@@ -331,7 +337,7 @@ class ThingsController extends Notifier<ThingsState> {
         items: List.unmodifiable(ownedItems),
         quantities: Map.unmodifiable(quantities),
         usageCounts: Map.unmodifiable(usageCounts),
-        equipped: freePlay
+        equipped: hasOwnedAccessory
             ? Map.unmodifiable(
                 await ref.read(freePlayServiceProvider).equipped(profileId),
               )
@@ -346,7 +352,6 @@ class ThingsController extends Notifier<ThingsState> {
     final current = state;
     final slot = item.equipSlot;
     if (current.load != ThingsLoad.ready ||
-        !current.freePlay ||
         current.mutating ||
         current.profileId == null ||
         slot == null ||
