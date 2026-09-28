@@ -49,9 +49,9 @@
         },
         {
           "id": "bow",
-          "label": "Наушники",
+          "label": "Кепка",
           "correctCategoryId": "want",
-          "feedback": "Наушники радуют Финни, но без них можно обойтись."
+          "feedback": "Кепка радует Финни, но без неё можно обойтись."
         },
         {
           "id": "room_decoration",
@@ -73,7 +73,7 @@
     "period": 2,
     "requiredForCheckpoint": true,
     "scenarioData": {
-      "prompt": "У Финни 150 монет на покупки.\nКорм закончился, шампунь почти закончился,\nа наушники очень понравились Финни.",
+      "prompt": "У Финни 150 монет на покупки.\nКорм закончился, шампунь почти закончился,\nа кепка очень понравилась Финни.",
       "budget": 150,
       "buyNowLabel": "Купить сейчас",
       "buyNowDescription": "То, что берём в этот раз.",
@@ -96,10 +96,10 @@
         },
         {
           "id": "bow",
-          "label": "Наушники",
+          "label": "Кепка",
           "price": 80,
           "correctDecision": "later",
-          "feedback": "Наушники хочется купить, но сейчас важнее корм и шампунь."
+          "feedback": "Кепку хочется купить, но сейчас важнее корм и шампунь."
         }
       ],
       "incorrectExplanation": "Проверь, что сначала выбраны важные покупки и бюджет не превышен.",
@@ -125,7 +125,7 @@
   },
   {
     "id":"task_independent_budget_05","title":"Собери свой бюджет","topic":"independent_planning","description":"Выбери покупки и сумму на цель.","type":"independent_budget","reward":25,"dayProgressCost":15,"period":5,"requiredForCheckpoint":true,
-    "scenarioData":{"prompt":"У тебя 350 монет. Составь свой план для Финни.","budget":350,"minimumSavings":50,"requiredItemIds":["food_feed","care_comb"],"items":[{"id":"food_feed","label":"Корм","context":"Корм у Финни закончился."},{"id":"care_comb","label":"Полотенце","context":"После ухода Финни нужно вытереть шерсть."},{"id":"toy_ball","label":"Мяч","context":"Финни понравился новый мяч."},{"id":"accessory_bow","label":"Наушники","context":"Финни понравились новые наушники."}],"successExplanation":"Ты позаботился о Финни, оставил монеты на цель и уложился в бюджет. Дополнительные покупки ты выбрал сам."}
+    "scenarioData":{"prompt":"У тебя 350 монет. Составь свой план для Финни.","budget":350,"minimumSavings":50,"requiredItemIds":["food_feed","care_comb"],"items":[{"id":"food_feed","label":"Корм","context":"Корм у Финни закончился."},{"id":"care_comb","label":"Полотенце","context":"После ухода Финни нужно вытереть шерсть."},{"id":"toy_ball","label":"Мяч","context":"Финни понравился новый мяч."},{"id":"accessory_bow","label":"Кепка","context":"Финни понравилась новая кепка."}],"successExplanation":"Ты позаботился о Финни, оставил монеты на цель и уложился в бюджет. Дополнительные покупки ты выбрал сам."}
   },
   {
     "id":"task_plan_repair_05","title":"План изменился","topic":"plan_repair","description":"Измени готовый план после неожиданной траты.","type":"plan_repair","reward":25,"dayProgressCost":15,"period":5,"requiredForCheckpoint":true,

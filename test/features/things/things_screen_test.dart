@@ -67,7 +67,7 @@ const itemBall = ShopItem(
 
 const itemBow = ShopItem(
   id: 'accessory_bow',
-  name: 'Наушники',
+  name: 'Кепка',
   category: ShopItemCategory.want,
   price: 80,
   persistent: true,
@@ -449,7 +449,9 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Мяч'), findsOneWidget);
-      expect(find.text('Наушники'), findsOneWidget);
+      expect(find.text('Кепка'), findsOneWidget);
+      expect(find.text('Наушники'), findsNothing);
+      expect(find.text('Очки'), findsNothing);
       expect(find.byKey(const Key('things-use-accessory_bow')), findsNothing);
       expect(
         tester

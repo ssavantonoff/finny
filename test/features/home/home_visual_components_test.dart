@@ -109,6 +109,7 @@ void main() {
               equippedAccessories: const {
                 ShopEquipSlot.head: 'accessory_bow',
                 ShopEquipSlot.neck: 'accessory_collar',
+                ShopEquipSlot.back: 'accessory_hat',
               },
             ),
           ),
@@ -116,8 +117,9 @@ void main() {
       );
       final canvas = tester.getRect(find.byKey(const Key('home-finny-canvas')));
       for (final (id, asset) in [
-        ('accessory_bow', 'assets/images/things/headphones_wearable.png'),
-        ('accessory_collar', 'assets/images/things/glasses_wearable.png'),
+        ('accessory_bow', 'assets/images/things/cap_wearable.png'),
+        ('accessory_collar', 'assets/images/things/bandana_wearable.png'),
+        ('accessory_hat', 'assets/images/things/wings.png'),
       ]) {
         final visual = HomeRoomVisual.accessories.singleWhere(
           (v) => v.itemId == id,
@@ -144,69 +146,102 @@ void main() {
     });
   }
 
+  testWidgets('all accessory slot combinations remain independent', (
+    tester,
+  ) async {
+    const entries = [
+      (ShopEquipSlot.head, 'accessory_bow'),
+      (ShopEquipSlot.neck, 'accessory_collar'),
+      (ShopEquipSlot.back, 'accessory_hat'),
+    ];
+    for (var mask = 0; mask < 8; mask++) {
+      final equipped = {
+        for (var i = 0; i < entries.length; i++)
+          if (mask & (1 << i) != 0) entries[i].$1: entries[i].$2,
+      };
+      await tester.pumpWidget(
+        MaterialApp(
+          key: ValueKey(mask),
+          home: Scaffold(
+            body: FinnyRoomScene(pet: pet, equippedAccessories: equipped),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      for (var i = 0; i < entries.length; i++) {
+        expect(
+          find.byKey(Key('home-accessory-${entries[i].$2}')),
+          mask & (1 << i) != 0 ? findsOneWidget : findsNothing,
+        );
+      }
+      expect(tester.takeException(), isNull);
+    }
+  });
+
   for (final size in [const Size(360, 800), const Size(393, 852)]) {
-    testWidgets(
-      'all reward subsets have stable independent positions at $size',
-      (tester) async {
-        tester.view.physicalSize = size;
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-        final visuals = HomeRoomVisual.rewards;
-        for (var mask = 1; mask < 8; mask++) {
-          final selected = [
-            for (var i = 2; i >= 0; i--)
-              if (mask & (1 << i) != 0)
-                CompletedGoal(
-                  profileId: 1,
-                  goalId: visuals[i].goalId,
-                  rewardAssetId: visuals[i].rewardAssetId,
-                  pricePaid: 1,
-                  completedAt: DateTime.utc(2026),
-                  claimOperationId: 'claim:$i',
-                ),
-          ];
-          await tester.pumpWidget(
-            MaterialApp(
-              key: ValueKey(mask),
-              home: Scaffold(
-                body: FinnyRoomScene(pet: pet, completedGoals: selected),
+    testWidgets('all eight canonical room composites at $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      const expected = [
+        'room_base.png',
+        'room_night_light.png',
+        'room_scooter.png',
+        'room_night_light_scooter.png',
+        'room_play_house.png',
+        'room_night_light_play_house.png',
+        'room_scooter_play_house.png',
+        'room_all_rewards.png',
+      ];
+      final visuals = HomeRoomVisual.rewards;
+      double? initialWidth;
+      for (var mask = 0; mask < 8; mask++) {
+        final selected = [
+          for (var i = 0; i < 3; i++)
+            if (mask & (1 << i) != 0)
+              CompletedGoal(
+                profileId: 1,
+                goalId: visuals[i].goalId,
+                rewardAssetId: visuals[i].rewardAssetId,
+                pricePaid: 1,
+                completedAt: DateTime.utc(2026),
+                claimOperationId: 'claim:$i',
+              ),
+        ];
+        final asset = HomeRoomVisual.roomAssetFor(selected, profileId: 1);
+        expect(asset, 'assets/images/home/${expected[mask]}');
+        expect(
+          HomeRoomVisual.roomAssetFor(selected.reversed.toList(), profileId: 1),
+          asset,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            key: ValueKey(mask),
+            home: Scaffold(
+              body: HomeSceneBackdrop(
+                roomAsset: asset,
+                child: FinnyRoomScene(pet: pet),
               ),
             ),
-          );
-          for (var i = 0; i < 3; i++) {
-            final finder = find.byKey(
-              Key('home-reward-${visuals[i].rewardAssetId}'),
-            );
-            expect(
-              finder,
-              mask & (1 << i) != 0 ? findsOneWidget : findsNothing,
-            );
-            if (mask & (1 << i) != 0) {
-              final scene = tester.getRect(
-                find.byKey(const Key('home-room-scene')),
-              );
-              final rect = tester.getRect(finder);
-              expect(
-                rect.left,
-                closeTo(
-                  scene.left + visuals[i].placement.left * scene.width,
-                  0.1,
-                ),
-              );
-              expect(
-                rect.top,
-                closeTo(
-                  scene.top + visuals[i].placement.top * scene.height,
-                  0.1,
-                ),
-              );
-            }
-          }
-          expect(tester.takeException(), isNull);
-        }
-      },
-    );
+          ),
+        );
+        await tester.pump();
+        final image = tester.widget<Image>(
+          find.descendant(
+            of: find.byKey(const Key('home-room-background')),
+            matching: find.byType(Image),
+          ),
+        );
+        expect((image.image as AssetImage).assetName, asset);
+        final width = tester
+            .getSize(find.byKey(const Key('home-finny-canvas')))
+            .width;
+        initialWidth ??= width;
+        expect(width, initialWidth);
+        expect(tester.takeException(), isNull);
+      }
+    });
   }
 
   testWidgets('idle and pet reaction animate and dispose safely', (
@@ -237,51 +272,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('new equipment and rewards fade in and out only on changes', (
+  testWidgets('equipment and room composites transition without losing state', (
     tester,
   ) async {
-    final completed = CompletedGoal(
-      profileId: 1,
-      goalId: 'goal_scooter',
-      rewardAssetId: 'reward_scooter',
-      pricePaid: 1,
-      completedAt: DateTime.utc(2026),
-      claimOperationId: 'claim:scooter',
-    );
     Widget scene(bool visible, {bool disabled = false}) => MaterialApp(
       home: MediaQuery(
         data: MediaQueryData(disableAnimations: disabled),
         child: Scaffold(
-          body: FinnyRoomScene(
-            pet: pet,
-            equippedAccessories: visible
-                ? const {ShopEquipSlot.head: 'accessory_bow'}
-                : const {},
-            completedGoals: visible ? [completed] : const [],
+          body: HomeSceneBackdrop(
+            roomAsset: visible
+                ? 'assets/images/home/room_scooter.png'
+                : 'assets/images/home/room_base.png',
+            child: FinnyRoomScene(
+              pet: pet,
+              equippedAccessories: visible
+                  ? const {ShopEquipSlot.head: 'accessory_bow'}
+                  : const {},
+            ),
           ),
         ),
       ),
     );
     final accessory = find.byKey(const Key('home-accessory-accessory_bow'));
-    final reward = find.byKey(const Key('home-reward-reward_scooter'));
     await tester.pumpWidget(scene(false));
     expect(accessory, findsNothing);
-    expect(reward, findsNothing);
     await tester.pumpWidget(scene(true));
     expect(accessory, findsOneWidget);
-    expect(reward, findsOneWidget);
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpWidget(scene(false));
-    expect(accessory, findsOneWidget);
-    expect(reward, findsOneWidget);
     await tester.pump(const Duration(milliseconds: 350));
     expect(accessory, findsNothing);
-    expect(reward, findsNothing);
     await tester.pumpWidget(scene(true, disabled: true));
     await tester.pumpWidget(scene(false, disabled: true));
     await tester.pump();
     expect(accessory, findsNothing);
-    expect(reward, findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

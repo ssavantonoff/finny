@@ -745,6 +745,10 @@ class _FreePlayHome extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.transparent,
     body: HomeSceneBackdrop(
+      roomAsset: HomeRoomVisual.roomAssetFor(
+        state.completedGoals,
+        profileId: state.pet.profileId,
+      ),
       child: _HomeViewport(
         builder: (context, compact, _) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -769,7 +773,6 @@ class _FreePlayHome extends StatelessWidget {
               pet: state.pet,
               showBackground: false,
               equippedAccessories: state.equippedAccessories,
-              completedGoals: state.completedGoals,
               petReactionToken: petReactionToken,
             ),
             Center(
@@ -1002,6 +1005,10 @@ class _HomeContent extends StatelessWidget {
       backgroundColor: Colors.transparent,
       body: HomeSceneBackdrop(
         phase: phase,
+        roomAsset: HomeRoomVisual.roomAssetFor(
+          state.completedGoals,
+          profileId: state.pet.profileId,
+        ),
         child: _HomeViewport(
           builder: (context, compact, stableCampaignLayout) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1027,7 +1034,6 @@ class _HomeContent extends StatelessWidget {
                 key: const Key('home-day-sky'),
                 pet: state.pet,
                 showBackground: false,
-                completedGoals: state.completedGoals,
                 equippedAccessories: state.equippedAccessories,
                 petReactionToken: petReactionToken,
               ),

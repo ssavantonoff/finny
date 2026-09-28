@@ -44,17 +44,13 @@ void main() {
       'assets/images/things/toys_sheet.png',
       Alignment.centerRight,
     ),
-    'accessory_bow': ('Наушники', 'assets/images/things/headphones.png', null),
+    'accessory_bow': ('Кепка', 'assets/images/things/cap_wearable.png', null),
     'accessory_collar': (
-      'Очки',
-      'assets/images/things/accessories_sheet.png',
-      Alignment.center,
+      'Бандана',
+      'assets/images/things/bandana_wearable.png',
+      null,
     ),
-    'accessory_hat': (
-      'Крылья',
-      'assets/images/things/accessories_sheet.png',
-      Alignment.centerRight,
-    ),
+    'accessory_hat': ('Крылья', 'assets/images/things/wings.png', null),
   };
 
   testWidgets(
@@ -90,19 +86,6 @@ void main() {
             alignment,
           );
         }
-        if (item.id == 'accessory_bow') {
-          expect(
-            find.byKey(const Key('shop-item-art-headphones')),
-            findsOneWidget,
-          );
-          expect(image.alignment, Alignment.center);
-        } else {
-          expect(
-            find.byKey(const Key('shop-item-art-headphones')),
-            findsNothing,
-          );
-        }
-
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(body: ShopItemIcon(item: item)),
@@ -115,7 +98,8 @@ void main() {
 
   test('standalone product art keeps transparent pixels', () async {
     for (final asset in [
-      'assets/images/things/headphones.png',
+      'assets/images/things/cap_wearable.png',
+      'assets/images/things/bandana_wearable.png',
       'assets/images/things/shampoo.png',
       'assets/images/things/towel.png',
     ]) {

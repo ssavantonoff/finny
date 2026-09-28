@@ -23,7 +23,8 @@ enum ShopDisplaySection {
 
 enum ShopEquipSlot {
   head,
-  neck;
+  neck,
+  back;
 
   static ShopEquipSlot fromJson(String value) => values.firstWhere(
     (slot) => slot.name == value,

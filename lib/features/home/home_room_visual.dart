@@ -1,36 +1,35 @@
-import 'package:finny/features/savings/savings_goal_visual.dart';
 import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:flutter/painting.dart';
 
-/// Production artwork and normalized placement, shared by Home and its summary.
+/// Canonical room state and wearable artwork shared by Home and its summary.
 abstract final class HomeRoomVisual {
   static const accessories = [
     HomeAccessoryVisual(
       itemId: 'accessory_bow',
       slot: ShopEquipSlot.head,
-      asset: 'assets/images/things/headphones_wearable.png',
+      asset: 'assets/images/things/cap_wearable.png',
       behindPet: false,
       anchors: [
-        Rect.fromLTWH(0.00, 0.02, 1.00, 0.44),
-        Rect.fromLTWH(0.01, 0.03, 0.98, 0.42),
-        Rect.fromLTWH(0.02, 0.03, 0.96, 0.40),
+        Rect.fromLTWH(0.19, 0.18, 0.62, 0.40),
+        Rect.fromLTWH(0.19, 0.17, 0.62, 0.37),
+        Rect.fromLTWH(0.18, 0.16, 0.64, 0.35),
       ],
     ),
     HomeAccessoryVisual(
       itemId: 'accessory_collar',
       slot: ShopEquipSlot.neck,
-      asset: 'assets/images/things/glasses_wearable.png',
+      asset: 'assets/images/things/bandana_wearable.png',
       behindPet: false,
       anchors: [
-        Rect.fromLTWH(0.25, 0.48, 0.50, 0.20),
-        Rect.fromLTWH(0.24, 0.44, 0.52, 0.20),
-        Rect.fromLTWH(0.23, 0.43, 0.54, 0.20),
+        Rect.fromLTWH(0.28, 0.62, 0.44, 0.29),
+        Rect.fromLTWH(0.29, 0.64, 0.42, 0.27),
+        Rect.fromLTWH(0.30, 0.65, 0.40, 0.25),
       ],
     ),
     HomeAccessoryVisual(
       itemId: 'accessory_hat',
-      slot: ShopEquipSlot.head,
+      slot: ShopEquipSlot.back,
       asset: 'assets/images/things/wings.png',
       behindPet: true,
       anchors: [
@@ -45,17 +44,11 @@ abstract final class HomeRoomVisual {
     HomeRewardVisual(
       goalId: 'goal_night_light',
       rewardAssetId: 'reward_night_light',
-      placement: Rect.fromLTWH(0.12, -0.22, 0.20, 0.36),
     ),
-    HomeRewardVisual(
-      goalId: 'goal_scooter',
-      rewardAssetId: 'reward_scooter',
-      placement: Rect.fromLTWH(0.00, 0.58, 0.34, 0.40),
-    ),
+    HomeRewardVisual(goalId: 'goal_scooter', rewardAssetId: 'reward_scooter'),
     HomeRewardVisual(
       goalId: 'goal_play_house',
       rewardAssetId: 'reward_play_house',
-      placement: Rect.fromLTWH(0.65, 0.10, 0.35, 0.72),
     ),
   ];
 
@@ -79,6 +72,31 @@ abstract final class HomeRoomVisual {
       ))
         visual,
   ];
+
+  static String roomAssetFor(
+    List<CompletedGoal> completed, {
+    required int profileId,
+  }) {
+    final claimed = rewardsFor(
+      completed,
+      profileId: profileId,
+    ).map((reward) => reward.goalId).toSet();
+    return switch ((
+      claimed.contains('goal_night_light'),
+      claimed.contains('goal_scooter'),
+      claimed.contains('goal_play_house'),
+    )) {
+      (false, false, false) => 'assets/images/home/room_base.png',
+      (true, false, false) => 'assets/images/home/room_night_light.png',
+      (false, true, false) => 'assets/images/home/room_scooter.png',
+      (false, false, true) => 'assets/images/home/room_play_house.png',
+      (true, true, false) => 'assets/images/home/room_night_light_scooter.png',
+      (true, false, true) =>
+        'assets/images/home/room_night_light_play_house.png',
+      (false, true, true) => 'assets/images/home/room_scooter_play_house.png',
+      (true, true, true) => 'assets/images/home/room_all_rewards.png',
+    };
+  }
 
   static double petAspectRatio(int stage) => switch (stage.clamp(1, 3)) {
     1 => 1295 / 1215,
@@ -106,15 +124,8 @@ class HomeAccessoryVisual {
 }
 
 class HomeRewardVisual {
-  const HomeRewardVisual({
-    required this.goalId,
-    required this.rewardAssetId,
-    required this.placement,
-  });
+  const HomeRewardVisual({required this.goalId, required this.rewardAssetId});
 
   final String goalId;
   final String rewardAssetId;
-  final Rect placement;
-
-  String get asset => SavingsGoalVisual.assetFor(goalId)!;
 }

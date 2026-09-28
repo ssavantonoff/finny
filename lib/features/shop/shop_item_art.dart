@@ -14,21 +14,14 @@ class ShopItemArt extends StatelessWidget {
   Widget build(BuildContext context) {
     final standaloneAsset = switch (item.id) {
       'toy_ball' => 'assets/minigames/ball/ball.png',
-      'accessory_bow' => 'assets/images/things/headphones.png',
+      'accessory_bow' => 'assets/images/things/cap_wearable.png',
+      'accessory_collar' => 'assets/images/things/bandana_wearable.png',
+      'accessory_hat' => 'assets/images/things/wings.png',
       'care_shampoo' => 'assets/images/things/shampoo.png',
       'care_comb' => 'assets/images/things/towel.png',
       _ => null,
     };
     if (standaloneAsset != null) {
-      if (item.id == 'accessory_bow') {
-        return Image.asset(
-          standaloneAsset,
-          key: const Key('shop-item-art-headphones'),
-          fit: BoxFit.contain,
-          alignment: Alignment.center,
-          semanticLabel: item.name,
-        );
-      }
       return Image.asset(
         standaloneAsset,
         fit: BoxFit.contain,
@@ -44,9 +37,6 @@ class ShopItemArt extends StatelessWidget {
       'care_toothbrush' => ('assets/images/things/care_sheet.png', 0),
       'care_shampoo' => ('assets/images/things/care_sheet.png', 1),
       'care_comb' => ('assets/images/things/care_sheet.png', 2),
-      'accessory_bow' => ('assets/images/things/accessories_sheet.png', 0),
-      'accessory_collar' => ('assets/images/things/accessories_sheet.png', 1),
-      'accessory_hat' => ('assets/images/things/accessories_sheet.png', 2),
       _ => (null, -1),
     };
     if (sheet == null) return const SizedBox.expand();

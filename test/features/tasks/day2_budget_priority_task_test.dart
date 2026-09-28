@@ -238,7 +238,7 @@ void main() {
         expect(find.text('90'), findsOneWidget);
         expect(find.text('Шампунь'), findsOneWidget);
         expect(find.text('60'), findsOneWidget);
-        expect(find.text('Наушники'), findsOneWidget);
+        expect(find.text('Кепка'), findsOneWidget);
         expect(find.text('80'), findsOneWidget);
         await _reveal(
           tester,

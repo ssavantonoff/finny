@@ -176,7 +176,19 @@ void main() {
   }
 
   Finder accessory(String id) => find.byKey(Key('home-accessory-$id'));
-  Finder reward(String id) => find.byKey(Key('home-reward-$id'));
+  String roomAsset(WidgetTester tester) =>
+      (tester
+                  .widget<Image>(
+                    find
+                        .descendant(
+                          of: find.byKey(const Key('home-room-background')),
+                          matching: find.byType(Image),
+                        )
+                        .last,
+                  )
+                  .image
+              as AssetImage)
+          .assetName;
 
   for (final freePlay in [false, true]) {
     testWidgets(
@@ -268,7 +280,7 @@ void main() {
       expect(accessory('accessory_bow'), findsOneWidget);
       expect(
         tester.widget<Image>(accessory('accessory_bow')).image,
-        const AssetImage('assets/images/things/headphones_wearable.png'),
+        const AssetImage('assets/images/things/cap_wearable.png'),
       );
 
       await tester.runAsync(() async {
@@ -282,7 +294,7 @@ void main() {
   );
 
   testWidgets(
-    'head replacement, glasses coexistence and reload use persisted slots',
+    'cap, bandana and wings coexist and reload from persisted slots',
     (tester) async {
       final harness = (await tester.runAsync(RoomHarness.create))!;
       addTearDown(harness.dispose);
@@ -291,29 +303,26 @@ void main() {
         final free = harness.container.read(freePlayServiceProvider);
         await free.equip(profileId: 1, itemId: 'accessory_bow');
         await free.equip(profileId: 1, itemId: 'accessory_collar');
+        await free.equip(profileId: 1, itemId: 'accessory_hat');
       });
       await mount(tester, harness);
       expect(accessory('accessory_bow'), findsOneWidget);
       expect(accessory('accessory_collar'), findsOneWidget);
+      expect(accessory('accessory_hat'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
       await tester.runAsync(() async {
-        await harness.container
-            .read(freePlayServiceProvider)
-            .equip(profileId: 1, itemId: 'accessory_hat');
+        harness.container.dispose();
+        harness.restart();
         await harness.home.load();
       });
-      await tester.pumpAndSettle();
-      expect(accessory('accessory_bow'), findsNothing);
-      expect(accessory('accessory_hat'), findsOneWidget);
-      expect(accessory('accessory_collar'), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-      harness.container.dispose();
-      harness.restart();
       await mount(tester, harness);
       expect(harness.ready.equippedAccessories, {
-        ShopEquipSlot.head: 'accessory_hat',
+        ShopEquipSlot.head: 'accessory_bow',
         ShopEquipSlot.neck: 'accessory_collar',
+        ShopEquipSlot.back: 'accessory_hat',
       });
       expect(accessory('accessory_hat'), findsOneWidget);
+      expect(accessory('accessory_bow'), findsOneWidget);
       expect(accessory('accessory_collar'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
@@ -331,7 +340,7 @@ void main() {
       await harness.home.load();
     });
     await mount(tester, harness);
-    expect(reward('reward_night_light'), findsNothing);
+    expect(roomAsset(tester), 'assets/images/home/room_base.png');
     await tester.runAsync(() async {
       final db = await harness.database.database;
       await db.update(
@@ -344,7 +353,7 @@ void main() {
     });
     await tester.pumpAndSettle();
     expect(harness.ready.gameState.savedAmount, 400);
-    expect(reward('reward_night_light'), findsNothing);
+    expect(roomAsset(tester), 'assets/images/home/room_base.png');
     await tester.runAsync(() async {
       await harness.container
           .read(savingsServiceProvider)
@@ -356,11 +365,7 @@ void main() {
       await harness.home.load();
     });
     await tester.pumpAndSettle();
-    expect(reward('reward_night_light'), findsOneWidget);
-    expect(
-      tester.widget<Image>(reward('reward_night_light')).image,
-      const AssetImage('assets/images/goals/night_light.png'),
-    );
+    expect(roomAsset(tester), 'assets/images/home/room_night_light.png');
     expect(tester.takeException(), isNull);
   });
 
@@ -378,13 +383,7 @@ void main() {
       harness.restart();
       await mount(tester, harness);
       expect(harness.ready.completedGoals, hasLength(3));
-      for (final visual in HomeRoomVisual.rewards) {
-        expect(reward(visual.rewardAssetId), findsOneWidget);
-        expect(
-          tester.widget<Image>(reward(visual.rewardAssetId)).image,
-          AssetImage(visual.asset),
-        );
-      }
+      expect(roomAsset(tester), 'assets/images/home/room_all_rewards.png');
       expect(tester.takeException(), isNull);
     },
   );
@@ -487,12 +486,13 @@ void main() {
         await harness.home.load();
       });
       await tester.pumpAndSettle();
-      expect(accessory('accessory_bow'), findsNothing);
+      expect(accessory('accessory_bow'), findsOneWidget);
       expect(accessory('accessory_hat'), findsOneWidget);
       expect(accessory('accessory_collar'), findsOneWidget);
       expect(harness.ready.equippedAccessories, {
-        ShopEquipSlot.head: 'accessory_hat',
+        ShopEquipSlot.head: 'accessory_bow',
         ShopEquipSlot.neck: 'accessory_collar',
+        ShopEquipSlot.back: 'accessory_hat',
       });
 
       await tester.runAsync(() async {
@@ -501,6 +501,7 @@ void main() {
       });
       await tester.pumpAndSettle();
       expect(accessory('accessory_hat'), findsNothing);
+      expect(accessory('accessory_bow'), findsOneWidget);
       expect(accessory('accessory_collar'), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox());
@@ -509,6 +510,7 @@ void main() {
         harness.restart();
         await harness.home.load();
         expect(harness.ready.equippedAccessories, {
+          ShopEquipSlot.head: 'accessory_bow',
           ShopEquipSlot.neck: 'accessory_collar',
         });
         final db = await harness.database.database;
@@ -532,6 +534,7 @@ void main() {
         await harness.home.load();
         expect(harness.ready.freePlay, isTrue);
         expect(harness.ready.equippedAccessories, {
+          ShopEquipSlot.head: 'accessory_bow',
           ShopEquipSlot.neck: 'accessory_collar',
         });
         await harness.addProfile(2, freePlay: false);
@@ -545,6 +548,7 @@ void main() {
             .setActiveProfileId(1);
         await harness.home.load();
         expect(harness.ready.equippedAccessories, {
+          ShopEquipSlot.head: 'accessory_bow',
           ShopEquipSlot.neck: 'accessory_collar',
         });
         await harness.claim('goal_night_light');
@@ -571,16 +575,6 @@ void main() {
               ShopEquipSlot.head: 'legacy_hat',
               ShopEquipSlot.neck: 'accessory_bow',
             },
-            completedGoals: [
-              CompletedGoal(
-                profileId: 1,
-                goalId: 'goal_scooter',
-                rewardAssetId: 'legacy_reward',
-                pricePaid: 600,
-                completedAt: DateTime.utc(2026),
-                claimOperationId: 'old',
-              ),
-            ],
           ),
         ),
       ),
@@ -594,7 +588,19 @@ void main() {
       ),
       findsNothing,
     );
-    expect(reward('reward_scooter'), findsNothing);
+    expect(
+      HomeRoomVisual.roomAssetFor([
+        CompletedGoal(
+          profileId: 1,
+          goalId: 'goal_scooter',
+          rewardAssetId: 'legacy_reward',
+          pricePaid: 600,
+          completedAt: DateTime.utc(2026),
+          claimOperationId: 'old',
+        ),
+      ], profileId: 1),
+      'assets/images/home/room_base.png',
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -649,10 +655,10 @@ void main() {
         );
         await tester.pump();
       }
-      expect(find.textContaining('На Финни: Наушники'), findsOneWidget);
+      expect(find.textContaining('На Финни: Кепка'), findsOneWidget);
       expect(find.textContaining('В доме: Самокат для Финни'), findsOneWidget);
       expect(accessory('accessory_bow'), findsOneWidget);
-      expect(reward('reward_scooter'), findsOneWidget);
+      expect(roomAsset(tester), 'assets/images/home/room_scooter.png');
       expect(accessory('accessory_collar'), findsNothing);
       expect(tester.takeException(), isNull);
     },
@@ -660,99 +666,71 @@ void main() {
 
   for (final size in [const Size(360, 800), const Size(393, 852)]) {
     for (final stage in [1, 2, 3]) {
-      for (final head in ['accessory_bow', 'accessory_hat']) {
-        testWidgets(
-          '$head stage $stage at $size keeps accessories and decor inside scene away from HUD',
-          (tester) async {
-            final harness = (await tester.runAsync(RoomHarness.create))!;
-            addTearDown(harness.dispose);
-            await tester.runAsync(() async {
-              await harness.ownAccessories();
+      testWidgets(
+        'all accessories stage $stage at $size fit with composite room',
+        (tester) async {
+          final harness = (await tester.runAsync(RoomHarness.create))!;
+          addTearDown(harness.dispose);
+          await tester.runAsync(() async {
+            await harness.ownAccessories();
+            for (final itemId in [
+              'accessory_bow',
+              'accessory_collar',
+              'accessory_hat',
+            ]) {
               await harness.container
                   .read(freePlayServiceProvider)
-                  .equip(profileId: 1, itemId: head);
-              await harness.container
-                  .read(freePlayServiceProvider)
-                  .equip(profileId: 1, itemId: 'accessory_collar');
-              for (final visual in HomeRoomVisual.rewards) {
-                await harness.claim(visual.goalId);
-              }
-              await harness.games.savePet(
-                harness.ready.pet.copyWith(developmentStage: stage),
-              );
-            });
-            await mount(tester, harness, size: size);
-            final scene = tester.getRect(
-              find.byKey(const Key('home-room-scene')),
-            );
-            final canvas = tester.getRect(
-              find.byKey(const Key('home-finny-canvas')),
-            );
-            expect(
-              scene.top,
-              greaterThanOrEqualTo(
-                tester.getRect(find.byKey(const Key('home-stats'))).bottom,
-              ),
-            );
-            expect(
-              scene.bottom,
-              lessThanOrEqualTo(
-                tester.getRect(find.byKey(const Key('home-free-pet'))).top,
-              ),
-            );
-            for (final id in [head, 'accessory_collar']) {
-              final rect = tester.getRect(accessory(id));
-              expect(scene.contains(rect.topLeft), isTrue);
-              expect(
-                scene.contains(rect.bottomRight - const Offset(0.01, 0.01)),
-                isTrue,
-              );
+                  .equip(profileId: 1, itemId: itemId);
             }
-            final rects = [
-              for (final visual in HomeRoomVisual.rewards)
-                tester.getRect(reward(visual.rewardAssetId)),
-            ];
-            for (var index = 0; index < rects.length; index++) {
-              final rect = rects[index];
-              if (index == 0) {
-                // The nightlight stands on the bedside table above the pet lane.
-                expect(rect.top, lessThan(scene.top));
-                expect(
-                  rect.top,
-                  greaterThan(
-                    tester.getRect(find.byKey(const Key('home-stats'))).bottom,
-                  ),
-                );
-              } else {
-                expect(scene.contains(rect.topLeft), isTrue);
-              }
-              expect(
-                scene.contains(rect.bottomRight - const Offset(0.01, 0.01)),
-                isTrue,
-              );
-              expect(rect.contains(canvas.center), isFalse);
-              for (final other in rects.where((r) => r != rect)) {
-                expect(rect.overlaps(other), isFalse);
-              }
+            for (final visual in HomeRoomVisual.rewards) {
+              await harness.claim(visual.goalId);
             }
-            final stack = find
-                .ancestor(
-                  of: find.byKey(Key('home-finny-stage-$stage')),
-                  matching: find.byType(Stack),
-                )
-                .first;
-            final children = tester.widget<Stack>(stack).children;
-            expect(children.first, isA<Positioned>());
-            expect(children[1], isA<Image>());
-            expect(children.last, isA<Positioned>());
-            expect(
-              find.byKey(const Key('home-room-background')),
-              findsOneWidget,
+            await harness.games.savePet(
+              harness.ready.pet.copyWith(developmentStage: stage),
             );
-            expect(tester.takeException(), isNull);
-          },
-        );
-      }
+          });
+          await mount(tester, harness, size: size);
+          final scene = tester.getRect(
+            find.byKey(const Key('home-room-scene')),
+          );
+          expect(
+            scene.top,
+            greaterThanOrEqualTo(
+              tester.getRect(find.byKey(const Key('home-stats'))).bottom,
+            ),
+          );
+          expect(
+            scene.bottom,
+            lessThanOrEqualTo(
+              tester.getRect(find.byKey(const Key('home-free-pet'))).top,
+            ),
+          );
+          for (final id in [
+            'accessory_bow',
+            'accessory_collar',
+            'accessory_hat',
+          ]) {
+            final rect = tester.getRect(accessory(id));
+            expect(scene.contains(rect.topLeft), isTrue);
+            expect(
+              scene.contains(rect.bottomRight - const Offset(0.01, 0.01)),
+              isTrue,
+            );
+          }
+          expect(roomAsset(tester), 'assets/images/home/room_all_rewards.png');
+          final stack = find
+              .ancestor(
+                of: find.byKey(Key('home-finny-stage-$stage')),
+                matching: find.byType(Stack),
+              )
+              .first;
+          final children = tester.widget<Stack>(stack).children;
+          expect(children.first, isA<Positioned>());
+          expect(children[1], isA<Image>());
+          expect(children.last, isA<Positioned>());
+          expect(tester.takeException(), isNull);
+        },
+      );
     }
   }
 }

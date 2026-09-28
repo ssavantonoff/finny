@@ -691,7 +691,10 @@ void main() {
         expect(find.byKey(const Key('home-room-background')), findsOneWidget);
         expect(find.byType(HomeSceneBackdrop), findsOneWidget);
         final room = tester.widget<Image>(
-          find.byKey(const Key('home-room-background')),
+          find.descendant(
+            of: find.byKey(const Key('home-room-background')),
+            matching: find.byType(Image),
+          ),
         );
         expect(room.fit, BoxFit.cover);
         final name = tester.widget<Text>(

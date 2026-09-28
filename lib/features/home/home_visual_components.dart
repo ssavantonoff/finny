@@ -7,7 +7,6 @@ import 'package:finny/features/home/home_room_visual.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_art.dart';
 import 'package:finny/features/minigames/finny_catch/finny_catch_models.dart';
 import 'package:finny/models/pet.dart';
-import 'package:finny/models/completed_goal.dart';
 import 'package:finny/models/shop_item.dart';
 import 'package:finny/models/virtual_day_rules.dart';
 import 'package:flutter/material.dart';
@@ -147,10 +146,16 @@ class HomeWallet extends StatelessWidget {
 }
 
 class HomeSceneBackdrop extends StatelessWidget {
-  const HomeSceneBackdrop({super.key, required this.child, this.phase});
+  const HomeSceneBackdrop({
+    super.key,
+    required this.child,
+    this.phase,
+    this.roomAsset = 'assets/images/home/room_base.png',
+  });
 
   final Widget child;
   final VirtualDayPhase? phase;
+  final String roomAsset;
 
   List<Color> get _tintColors => switch (phase) {
     VirtualDayPhase.morning => const [Color(0x14FFE1EE), Color(0x0CFFE8DE)],
@@ -163,11 +168,18 @@ class HomeSceneBackdrop extends StatelessWidget {
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
     children: [
-      Image.asset(
-        'assets/images/home/room_base.png',
+      AnimatedSwitcher(
         key: const Key('home-room-background'),
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        child: Image.asset(
+          roomAsset,
+          key: ValueKey(roomAsset),
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          excludeFromSemantics: true,
+        ),
       ),
       DecoratedBox(
         key: const Key('home-room-phase-tint'),
@@ -220,14 +232,12 @@ class FinnyRoomScene extends StatefulWidget {
     required this.pet,
     this.showBackground = true,
     this.equippedAccessories = const {},
-    this.completedGoals = const [],
     this.petReactionToken = 0,
   });
 
   final Pet pet;
   final bool showBackground;
   final Map<ShopEquipSlot, String> equippedAccessories;
-  final List<CompletedGoal> completedGoals;
   final int petReactionToken;
 
   @override
@@ -312,10 +322,6 @@ class _FinnyRoomSceneState extends State<FinnyRoomScene>
     final accessories = HomeRoomVisual.accessoriesFor(
       widget.equippedAccessories,
     );
-    final rewards = HomeRoomVisual.rewardsFor(
-      widget.completedGoals,
-      profileId: pet.profileId,
-    );
     final roomHeight = (MediaQuery.sizeOf(context).height * 0.43).clamp(
       300.0,
       420.0,
@@ -334,10 +340,9 @@ class _FinnyRoomSceneState extends State<FinnyRoomScene>
       child: LayoutBuilder(
         builder: (context, constraints) {
           final aspect = HomeRoomVisual.petAspectRatio(stage);
-          // Keep space on both sides for claimed room objects.
           final canvasWidth = math.min(
             finnyHeight * aspect,
-            constraints.maxWidth * (rewards.isEmpty ? 1.0 : 0.60),
+            constraints.maxWidth,
           );
           return Stack(
             clipBehavior: Clip.none,
@@ -349,41 +354,6 @@ class _FinnyRoomSceneState extends State<FinnyRoomScene>
                   key: const Key('home-room-background'),
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
-                ),
-              for (final reward in HomeRoomVisual.rewards)
-                Positioned.fromRect(
-                  rect: _scaledRect(reward.placement, constraints.biggest),
-                  child: AnimatedSwitcher(
-                    layoutBuilder: (current, previous) => Stack(
-                      fit: StackFit.expand,
-                      children: [...previous, ?current],
-                    ),
-                    duration: _animationsDisabled
-                        ? Duration.zero
-                        : const Duration(milliseconds: 300),
-                    transitionBuilder: (child, animation) => FadeTransition(
-                      opacity: animation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(
-                          begin: 0.94,
-                          end: 1,
-                        ).animate(animation),
-                        child: child,
-                      ),
-                    ),
-                    child: rewards.contains(reward)
-                        ? Image.asset(
-                            reward.asset,
-                            key: Key('home-reward-${reward.rewardAssetId}'),
-                            fit: BoxFit.contain,
-                            excludeFromSemantics: true,
-                          )
-                        : SizedBox(
-                            key: Key(
-                              'home-reward-empty-${reward.rewardAssetId}',
-                            ),
-                          ),
-                  ),
                 ),
               Align(
                 alignment: widget.showBackground
@@ -411,20 +381,8 @@ class _FinnyRoomSceneState extends State<FinnyRoomScene>
                         clipBehavior: Clip.none,
                         fit: StackFit.expand,
                         children: [
-                          _accessorySlot(
-                            HomeRoomVisual.accessories.last,
-                            accessories,
-                            stage,
-                            canvas.biggest,
-                          ),
-                          Image.asset(
-                            FinnyVisual.assetForPet(pet),
-                            key: Key('home-finny-stage-$stage'),
-                            fit: BoxFit.contain,
-                            semanticLabel: FinnyVisual.descriptionForPet(pet),
-                          ),
                           for (final visual in HomeRoomVisual.accessories.where(
-                            (v) => !v.behindPet,
+                            (visual) => visual.behindPet,
                           ))
                             _accessorySlot(
                               visual,
@@ -432,6 +390,27 @@ class _FinnyRoomSceneState extends State<FinnyRoomScene>
                               stage,
                               canvas.biggest,
                             ),
+                          Image.asset(
+                            FinnyVisual.assetForPet(pet),
+                            key: Key('home-finny-stage-$stage'),
+                            fit: BoxFit.contain,
+                            semanticLabel: FinnyVisual.descriptionForPet(pet),
+                          ),
+                          for (final slot in [
+                            ShopEquipSlot.neck,
+                            ShopEquipSlot.head,
+                          ])
+                            for (final visual
+                                in HomeRoomVisual.accessories.where(
+                                  (visual) =>
+                                      visual.slot == slot && !visual.behindPet,
+                                ))
+                              _accessorySlot(
+                                visual,
+                                accessories,
+                                stage,
+                                canvas.biggest,
+                              ),
                         ],
                       ),
                     ),
@@ -479,47 +458,15 @@ class _FinnyRoomSceneState extends State<FinnyRoomScene>
         ),
       ),
       child: equipped.contains(visual)
-          ? visual.itemId == 'accessory_bow'
-                ? ClipPath(
-                    clipper: const _HeadphoneFaceClipper(),
-                    child: Image.asset(
-                      visual.asset,
-                      key: Key('home-accessory-${visual.itemId}'),
-                      fit: BoxFit.fill,
-                      excludeFromSemantics: true,
-                    ),
-                  )
-                : Image.asset(
-                    visual.asset,
-                    key: Key('home-accessory-${visual.itemId}'),
-                    fit: visual.behindPet ? BoxFit.fill : BoxFit.contain,
-                    excludeFromSemantics: true,
-                  )
+          ? Image.asset(
+              visual.asset,
+              key: Key('home-accessory-${visual.itemId}'),
+              fit: visual.behindPet ? BoxFit.fill : BoxFit.contain,
+              excludeFromSemantics: true,
+            )
           : SizedBox(key: Key('home-accessory-empty-${visual.itemId}')),
     ),
   );
-}
-
-/// Lets the face appear in front of the inner edges of the ear cups.
-class _HeadphoneFaceClipper extends CustomClipper<Path> {
-  const _HeadphoneFaceClipper();
-
-  @override
-  Path getClip(Size size) => Path.combine(
-    PathOperation.difference,
-    Path()..addRect(Offset.zero & size),
-    Path()..addOval(
-      Rect.fromLTWH(
-        size.width * 0.30,
-        size.height * 0.57,
-        size.width * 0.40,
-        size.height * 0.72,
-      ),
-    ),
-  );
-
-  @override
-  bool shouldReclip(covariant _HeadphoneFaceClipper oldClipper) => false;
 }
 
 class HomeGoalCard extends StatelessWidget {

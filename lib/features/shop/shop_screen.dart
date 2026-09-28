@@ -372,8 +372,7 @@ class _CategoryChip extends StatelessWidget {
                       ShopDisplaySection.food => Icons.restaurant_rounded,
                       ShopDisplaySection.care => Icons.shower_rounded,
                       ShopDisplaySection.toys => Icons.sports_esports_rounded,
-                      ShopDisplaySection.accessories =>
-                        Icons.headphones_rounded,
+                      ShopDisplaySection.accessories => Icons.checkroom_rounded,
                     },
               size: 20,
               color: selected ? Colors.white : AppColors.primary,

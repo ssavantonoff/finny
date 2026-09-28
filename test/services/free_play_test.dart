@@ -51,7 +51,7 @@ const toy = ShopItem(
 );
 const bow = ShopItem(
   id: 'bow',
-  name: 'Наушники',
+  name: 'Кепка',
   category: ShopItemCategory.want,
   price: 25,
   persistent: true,

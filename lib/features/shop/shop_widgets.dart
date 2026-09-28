@@ -89,8 +89,8 @@ String shopItemDescription(ShopItem item) => switch (item.id) {
   'toy_ball' => 'Весёлая игра с мячом для Финни',
   'toy_frisbee' => 'Для активной игры с Финни',
   'toy_plush' => 'Машинка для весёлой игры',
-  'accessory_bow' => 'Стильные наушники для Финни',
-  'accessory_collar' => 'Очки для нового образа Финни',
+  'accessory_bow' => 'Кепка для Финни',
+  'accessory_collar' => 'Бандана для нового образа Финни',
   'accessory_hat' => 'Крылья для особенного образа Финни',
   _ => 'Предмет для Финни',
 };

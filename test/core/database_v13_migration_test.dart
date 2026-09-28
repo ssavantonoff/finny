@@ -17,7 +17,7 @@ void main() {
       );
       addTearDown(db.close);
       final sqlite = await db.database;
-      expect(await sqlite.getVersion(), 13);
+      expect(await sqlite.getVersion(), AppDatabase.schemaVersion);
       final profileId = await sqlite.insert('profiles', {
         'game_name': 'Игрок',
         'profile_type': 'NORMAL',
@@ -112,7 +112,7 @@ void main() {
       );
       addTearDown(upgraded.close);
       final next = await upgraded.database;
-      expect(await next.getVersion(), 13);
+      expect(await next.getVersion(), AppDatabase.schemaVersion);
       expect(await next.query('campaign_completion'), isEmpty);
       expect(await next.query('free_play_pet_operations'), isEmpty);
       expect(await next.query('free_play_equipped_accessories'), isEmpty);
