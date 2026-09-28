@@ -12,9 +12,9 @@ abstract final class HomeRoomVisual {
       asset: 'assets/images/things/headphones_wearable.png',
       behindPet: false,
       anchors: [
-        Rect.fromLTWH(-0.19, 0.06, 1.38, 0.57),
-        Rect.fromLTWH(-0.17, 0.07, 1.34, 0.51),
-        Rect.fromLTWH(-0.16, 0.08, 1.32, 0.48),
+        Rect.fromLTWH(0.00, 0.02, 1.00, 0.44),
+        Rect.fromLTWH(0.01, 0.03, 0.98, 0.42),
+        Rect.fromLTWH(0.02, 0.03, 0.96, 0.40),
       ],
     ),
     HomeAccessoryVisual(
