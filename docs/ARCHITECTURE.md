@@ -191,7 +191,7 @@ Home рисует `cap_overlay.png` и `bandana_overlay.png` перед Финн
 
 ## Миграции
 
-Текущая schema version — 12. Миграция v1 → v2 добавляет period definition identity,
+Текущая schema version — 14. Миграция v1 → v2 добавляет period definition identity,
 required/resolved checkpoint snapshots и индекс period transactions, не удаляя
 существующие профили, balances, планы или историю. Для прежних периодов 1–5
 identity/checkpoint snapshot восстанавливается из зафиксированных v2 definitions;
@@ -218,3 +218,10 @@ active elapsed-time в `0/76/100/0..69`, не пересчитывает сущ�
 `task_progress` и финансовую историю: завершённое старое основное задание
 признаётся через legacy compatibility path только вместе с валидной наградой и
 закрытым `financial_task`.
+
+Миграция v12 → v13 создаёт таблицы `campaign_completion`,
+`free_play_pet_operations` и `free_play_equipped_accessories` для сохранения
+завершения Campaign, выбора после Finale и состояния Free Play. Миграция
+v13 → v14 обновляет допустимые слоты экипировки до `head / neck / back`:
+сохранённый `accessory_hat` переносится в `back`, а остальные записи экипировки
+сохраняются.
